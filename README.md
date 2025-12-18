@@ -1,6 +1,6 @@
-# 8BitDo Fixer
+# 8BitDo Ultimate 2c BluetoothFixer
 
-A Windows application that remaps 8BitDo controllers (DirectInput mode) to a virtual Xbox 360 controller, with battery monitoring support.
+An application that remaps 8BitDo Ultimate 2c controllers (Bluetooth mode) to a virtual Xinput controller, with battery monitoring support.
 
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)
 ![Windows](https://img.shields.io/badge/Windows-10+-0078D6?logo=windows)
@@ -8,10 +8,8 @@ A Windows application that remaps 8BitDo controllers (DirectInput mode) to a vir
 
 ## ✨ Features
 
-- **Controller Remapping**: Converts 8BitDo DirectInput to Xbox 360 controller
+- **Controller Remapping**: Converts 8BitDo Ultimate 2c Bluetooth DirectInput to Xinput controller
 - **Battery Monitoring**: Displays battery level via Bluetooth GATT
-- **Modern UI**: Dark-themed Material Design interface
-- **Single EXE**: No installation required
 
 ## 📋 Requirements
 
@@ -21,23 +19,22 @@ A Windows application that remaps 8BitDo controllers (DirectInput mode) to a vir
 
 ### For Developers (Source)
 - .NET 10 SDK
-- Visual Studio 2022 or VS Code
 
 ## 🚀 Installation
 
 1. Download `8bitdofixer.exe` from [Releases](../../releases)
 2. Install [ViGEmBus Driver](https://github.com/nefarius/ViGEmBus/releases)
-3. Run the EXE - no installation needed!
+3. Run the .exe
 
 ## 🎮 Usage
 
-1. Connect your 8BitDo controller via Bluetooth (DirectInput mode)
+1. Connect your 8BitDo Ultimate 2c controller via Bluetooth
 2. Launch **8BitDo Fixer**
 3. The app will automatically:
    - Detect your controller
    - Create a virtual Xbox 360 controller
    - Start remapping inputs
-4. Battery level updates every 5 minutes
+4. Battery level updates at launch and every 5 minutes
 
 ## 🔧 Building from Source
 
@@ -79,8 +76,7 @@ dotnet publish -c Release -o ./publish
 
 ## ⚠️ Known Limitations
 
-- Triggers work as digital buttons (hardware limitation in DirectInput mode)
-- Battery monitoring only works with 8BitDo controllers that support Bluetooth GATT
+- Triggers work as digital buttons (hardware limitation in DirectInput mode because it was designed for Android in the first place)
 
 ## 📝 License
 
