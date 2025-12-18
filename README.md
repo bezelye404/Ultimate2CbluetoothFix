@@ -29,7 +29,7 @@ An application that remaps 8BitDo Ultimate 2c controllers (Bluetooth mode) to a 
 ## 🎮 Usage
 
 1. Connect your 8BitDo Ultimate 2c controller via Bluetooth
-2. Launch **8BitDo Fixer**
+2. Launch.
 3. The app will automatically:
    - Detect your controller
    - Create a virtual Xbox 360 controller
