@@ -1,6 +1,6 @@
 # 8BitDo Ultimate 2C Bluetooth Fixer
 
-An application that remaps 8BitDo Ultimate 2c controllers (Bluetooth mode) to a virtual Xinput controller, with battery monitoring support.
+An application that remaps 8BitDo Ultimate 2C controllers (Bluetooth mode) to a virtual Xinput controller, with battery monitoring support.
 
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)
 ![Windows](https://img.shields.io/badge/Windows-10+-0078D6?logo=windows)
