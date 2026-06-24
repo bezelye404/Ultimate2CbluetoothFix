@@ -14,7 +14,7 @@ namespace BitDoFixer
 {
     private const int Deadzone = 4000;
 
-    public static async Task RunAsync(CancellationToken token, Action<string>? logCallback = null, Action<string>? statusCallback = null)
+    public static async Task RunAsync(IntPtr hwnd, CancellationToken token, Action<string>? logCallback = null, Action<string>? statusCallback = null)
     {
         void Log(string m) => logCallback?.Invoke(m);
         
@@ -38,13 +38,67 @@ namespace BitDoFixer
         statusCallback?.Invoke(loc.MapperConnectedStatus);
 
         using var joystick = new Joystick(directInput, chosen.InstanceGuid);
+        joystick.SetCooperativeLevel(hwnd, CooperativeLevel.Exclusive | CooperativeLevel.Background);
         joystick.Properties.BufferSize = 128; // Buffer
         joystick.Acquire();
+
+        Effect? forceFeedbackEffect = null;
+        EffectParameters? effectParams = null;
+
+        try
+        {
+            var actuators = joystick.GetObjects(DeviceObjectTypeFlags.ForceFeedbackActuator)
+                                    .Select(x => (int)x.ObjectId)
+                                    .ToArray();
+                                    
+            if (actuators.Length > 0)
+            {
+                effectParams = new EffectParameters
+                {
+                    Flags = EffectFlags.Cartesian | EffectFlags.ObjectIds,
+                    StartDelay = 0,
+                    SamplePeriod = 0,
+                    Duration = -1, // Infinite
+                    TriggerButton = -1,
+                    TriggerRepeatInterval = 0,
+                    Axes = new int[] { actuators[0], actuators.Length > 1 ? actuators[1] : actuators[0] },
+                    Directions = new int[] { 0, 0 },
+                    Envelope = null,
+                    Parameters = new ConstantForce { Magnitude = 0 }
+                };
+                
+                forceFeedbackEffect = new Effect(joystick, EffectGuid.ConstantForce, effectParams);
+                forceFeedbackEffect.Download();
+                Log("Vibration support (Force Feedback) enabled.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"Vibration setup failed: {ex.Message} (continuing without rumble)");
+        }
 
         using var client = new ViGEmClient();
         var controller = client.CreateXbox360Controller(0x045E, 0x028E);
         
-        controller.FeedbackReceived += (sender, args) => { };
+        controller.FeedbackReceived += (sender, args) => 
+        { 
+            if (forceFeedbackEffect != null && effectParams != null)
+            {
+                try
+                {
+                    // Convert ViGEm motor values (0-255) to DInput Magnitude (-10000 to 10000)
+                    int maxMotor = Math.Max(args.LargeMotor, args.SmallMotor);
+                    int magnitude = (maxMotor * 10000) / 255;
+
+                    effectParams.Parameters = new ConstantForce { Magnitude = magnitude };
+                    forceFeedbackEffect.SetParameters(effectParams, EffectParameterFlags.TypeSpecificParameters);
+                    
+                    if (magnitude > 0) forceFeedbackEffect.Start(1, EffectPlayFlags.NoDownload);
+                    else forceFeedbackEffect.Stop();
+                }
+                catch { } // Ignore runtime FFB errors to avoid crashing the mapper
+            }
+        };
 
         controller.Connect();
         Log(loc.LogMapperReady);

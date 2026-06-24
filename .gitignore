@@ -1,8 +1,4 @@
-# ============================================
-# MAXIMUM SECURITY .gitignore
-# ============================================
 
-# Build outputs (may contain paths)
 bin/
 obj/
 publish/
@@ -13,12 +9,11 @@ debug/
 x64/
 x86/
 
-# Debug symbols (contain full file paths)
 *.pdb
 *.dbg
 *.dmp
 
-# IDE and Editor files
+
 .vs/
 .vscode/
 .idea/
@@ -30,13 +25,13 @@ x86/
 .project
 .settings/
 
-# Logs (may contain system/user info)
+
 *.log
 *.txt.log
 crash.log
 error.log
 
-# Cache and temp
+
 *.cache
 *.tmp
 *.temp
@@ -44,7 +39,7 @@ error.log
 .cache/
 __pycache__/
 
-# OS generated files
+
 Thumbs.db
 ehthumbs.db
 .DS_Store
@@ -52,18 +47,15 @@ Desktop.ini
 $RECYCLE.BIN/
 *.lnk
 
-# Backup files
 *.bak
 *.backup
 *.old
 *.orig
 
-# NuGet
 packages/
 *.nupkg
 .nuget/
 
-# Local settings (may contain secrets)
 *.local
 *.env
 .env
@@ -71,22 +63,22 @@ appsettings.*.json
 secrets.json
 launchSettings.json
 
-# Test results
+
 TestResults/
 *.trx
 
-# Coverage
+
 coverage/
 *.coverage
 *.coveragexml
 
-# Archives
+
 *.zip
 *.7z
 *.rar
 *.tar.gz
 
-# Executables
+
 *.exe
 *.dll
 *.so

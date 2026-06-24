@@ -38,9 +38,10 @@ namespace BitDoFixer
             var loc = Localization.Instance;
             Log(loc.LogServicesStarting);
 
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
             var token = _cts.Token;
 
-            _ = Task.Run(() => BluetoothRemapper.RunAsync(token, 
+            _ = Task.Run(() => BluetoothRemapper.RunAsync(hwnd, token, 
                 logCallback: (msg) => Log($"[MAPPER] {msg}"),
                 statusCallback: (status) => Dispatcher.Invoke(() => {
                     TxtRemapperStatus.Text = status;
