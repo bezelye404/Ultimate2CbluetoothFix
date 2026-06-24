@@ -2,12 +2,18 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace BitDoFixer
 {
     public partial class MainWindow : Window
     {
+        private static readonly Brush IdleBrush = new SolidColorBrush(Color.FromRgb(0x9E, 0x9E, 0x9E));
+        private static readonly Brush ConnectedBrush = new SolidColorBrush(Color.FromRgb(0x4C, 0xAF, 0x50));
+        private static readonly Brush ScanningBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xC1, 0x07));
+        private static readonly Brush ErrorBrush = new SolidColorBrush(Color.FromRgb(0xEF, 0x53, 0x50));
+
         private CancellationTokenSource? _cts;
         private bool _isRunning = false;
         private RemapperStatus? _lastRemapperStatus;
@@ -16,6 +22,8 @@ namespace BitDoFixer
         {
             InitializeComponent();
             Log(Localization.Instance.LogAppInit);
+            SetStatusColor(IdleBrush);
+            SetBatteryColor(IdleBrush);
         }
 
         private async void BtnStart_Click(object sender, RoutedEventArgs e)
@@ -73,9 +81,11 @@ namespace BitDoFixer
 
             TxtRemapperStatus.Text = loc.Stopped;
             TxtDeviceInfo.Text = loc.Idle;
+            SetStatusColor(IdleBrush);
             BatteryProgress.Value = 0;
             TxtBatteryLevel.Text = "--%";
             TxtBatteryDevice.Text = loc.NoDevice;
+            SetBatteryColor(IdleBrush);
         }
 
         private void UpdateUiState(bool running)
@@ -89,6 +99,19 @@ namespace BitDoFixer
             TxtBatteryLevel.Text = $"{level}%";
             BatteryProgress.Value = level;
             TxtBatteryDevice.Text = deviceName;
+            SetBatteryColor(level <= 20 ? ErrorBrush : level <= 50 ? ScanningBrush : ConnectedBrush);
+        }
+
+        private void SetBatteryColor(Brush brush)
+        {
+            BatteryProgress.Foreground = brush;
+            IconBatteryBolt.Foreground = brush;
+        }
+
+        private void SetStatusColor(Brush brush)
+        {
+            IconConnectionStatus.Foreground = brush;
+            TxtRemapperStatus.Foreground = brush;
         }
 
         private void BtnLang_Click(object sender, RoutedEventArgs e)
@@ -102,6 +125,8 @@ namespace BitDoFixer
                 TxtRemapperStatus.Text = loc.Stopped;
                 TxtDeviceInfo.Text = loc.Idle;
                 TxtBatteryDevice.Text = loc.NoDevice;
+                SetStatusColor(IdleBrush);
+                SetBatteryColor(IdleBrush);
             }
             else
             {
@@ -117,18 +142,22 @@ namespace BitDoFixer
                 case RemapperStatus.Connected:
                     TxtRemapperStatus.Text = loc.MapperConnectedStatus;
                     TxtDeviceInfo.Text = loc.Connected;
+                    SetStatusColor(ConnectedBrush);
                     break;
                 case RemapperStatus.NotFound:
                     TxtRemapperStatus.Text = loc.MapperNotFoundStatus;
                     TxtDeviceInfo.Text = loc.SearchingDInput;
+                    SetStatusColor(ErrorBrush);
                     break;
                 case RemapperStatus.Disconnected:
                     TxtRemapperStatus.Text = loc.MapperDisconnectedStatus;
                     TxtDeviceInfo.Text = loc.SearchingDInput;
+                    SetStatusColor(ErrorBrush);
                     break;
                 default:
                     TxtRemapperStatus.Text = loc.Scanning;
                     TxtDeviceInfo.Text = loc.SearchingDInput;
+                    SetStatusColor(ScanningBrush);
                     break;
             }
         }
