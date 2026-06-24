@@ -58,6 +58,11 @@ namespace BitDoFixer
 
                 if (actuators.Length > 0)
                 {
+                    // Tek aktüatör kullanıyoruz: çoğu DInput cihazında tek motor vardır,
+                    // ve sıfır olmayan tek eksenli yön (Cartesian'da "1") en güvenilir/yaygın çalışan ayardır.
+                    var axes = new[] { actuators[0] };
+                    var directions = new[] { 1 };
+
                     effectParams = new EffectParameters
                     {
                         Flags = EffectFlags.Cartesian | EffectFlags.ObjectIds,
@@ -66,8 +71,8 @@ namespace BitDoFixer
                         Duration = -1, // Infinite
                         TriggerButton = -1,
                         TriggerRepeatInterval = 0,
-                        Axes = actuators.Take(2).ToArray(),
-                        Directions = actuators.Take(2).Select(_ => 0).ToArray(),
+                        Axes = axes,
+                        Directions = directions,
                         Envelope = null,
                         Parameters = new ConstantForce { Magnitude = 0 }
                     };
@@ -75,6 +80,10 @@ namespace BitDoFixer
                     forceFeedbackEffect = new Effect(joystick, EffectGuid.ConstantForce, effectParams);
                     forceFeedbackEffect.Download();
                     Log("Vibration support (Force Feedback) enabled.");
+                }
+                else
+                {
+                    Log("This device does not report a Force Feedback actuator; rumble is unavailable.");
                 }
             }
             catch (Exception ex)
