@@ -27,7 +27,7 @@ namespace BitDoFixer
         public string BatteryLevelTitle => IsEnglish ? "BATTERY LEVEL" : "PİL SEVİYESİ";
         public string StartServiceBtn => IsEnglish ? "START SERVICE" : "BAŞLAT";
         public string StopServiceBtn => IsEnglish ? "STOP SERVICE" : "DURDUR";
-        public string FooterText => "v0.0.1 • github.com/bezelye404";
+        public string FooterText => "v0.1.0 • github.com/bezelye404";
         
         // Dynamic Texts (Used in Code-Behind)
         public string SearchingDInput => IsEnglish ? "Waiting for D-Input Device..." : "D-Input Cihazı Bekleniyor...";
