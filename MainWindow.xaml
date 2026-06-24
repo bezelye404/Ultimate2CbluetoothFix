@@ -4,59 +4,70 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        xmlns:local="clr-namespace:BitDoFixer"
         mc:Ignorable="d"
-        Title="8BitDo Fixer" Height="600" Width="900"
+        Title="8BitDo Fixer" Height="620" Width="900"
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
         TextElement.FontWeight="Regular"
-        TextElement.FontSize="13"
+        TextElement.FontSize="14"
         TextOptions.TextFormattingMode="Ideal"
         TextOptions.TextRenderingMode="Auto"
         Background="{DynamicResource MaterialDesignPaper}"
         FontFamily="{DynamicResource MaterialDesignFont}"
-        WindowStartupLocation="CenterScreen" ResizeMode="CanMinimize">
-    
+        WindowStartupLocation="CenterScreen" ResizeMode="CanMinimize"
+        BorderBrush="{DynamicResource PrimaryHueMidBrush}" BorderThickness="1">
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- Header -->
             <RowDefinition Height="Auto"/> <!-- Status Cards -->
             <RowDefinition Height="*"/>    <!-- Logs -->
-            <RowDefinition Height="Auto"/> <!-- Actions -->
+            <RowDefinition Height="Auto"/> <!-- Actions Footer -->
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <materialDesign:ColorZone Mode="PrimaryMid" Padding="16" materialDesign:ElevationAssist.Elevation="Dp4">
-            <DockPanel>
-                <materialDesign:PackIcon Kind="GamepadVariant" Width="32" Height="32" VerticalAlignment="Center" Margin="0,0,15,0"/>
-                <TextBlock VerticalAlignment="Center" FontSize="22" FontWeight="SemiBold" Text="8BitDo Kontrolcü Düzeltici"/>
-            </DockPanel>
-        </materialDesign:ColorZone>
+        <Border Background="{DynamicResource PrimaryHueMidBrush}" Padding="20,15" materialDesign:ElevationAssist.Elevation="Dp3">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <materialDesign:PackIcon Kind="ControllerClassic" Width="36" Height="36" VerticalAlignment="Center" Margin="0,0,15,0" Foreground="White"/>
+                
+                <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="24" FontWeight="Bold" Foreground="White" 
+                           Text="{Binding AppTitle, Source={x:Static local:Localization.Instance}}" />
+                
+                <Button Grid.Column="2" x:Name="BtnLang" Click="BtnLang_Click" 
+                        Style="{DynamicResource MaterialDesignOutlinedButton}" 
+                        Foreground="White" BorderBrush="White"
+                        Content="TR" Width="50" Padding="0" VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
 
         <!-- Status Dashboard -->
-        <Grid Grid.Row="1" Margin="20">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-
+        <UniformGrid Grid.Row="1" Columns="2" Margin="20,20,20,10">
             <!-- Card 1: Connection Status -->
-            <materialDesign:Card Margin="0,0,10,0" Padding="20" UniformCornerRadius="12" materialDesign:ElevationAssist.Elevation="Dp2">
+            <materialDesign:Card Margin="0,0,10,0" Padding="25" UniformCornerRadius="8" materialDesign:ElevationAssist.Elevation="Dp2">
                 <StackPanel>
-                    <TextBlock Text="BAĞLANTI DURUMU" FontSize="12" FontWeight="Bold" Opacity="0.8" Foreground="{DynamicResource PrimaryHueMidBrush}"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,15,0,0">
-                        <materialDesign:PackIcon Kind="BluetoothConnect" Width="48" Height="48" VerticalAlignment="Center" Margin="0,0,15,0" Foreground="{DynamicResource PrimaryHueMidBrush}"/>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock x:Name="TxtRemapperStatus" Text="Taranıyor..." FontSize="26" FontWeight="SemiBold"/>
-                            <TextBlock x:Name="TxtDeviceInfo" Text="D-Input Cihazı Bekleniyor..." FontSize="14" Opacity="0.6" Margin="0,2,0,0"/>
-                        </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                        <materialDesign:PackIcon Kind="BluetoothConnect" Width="24" Height="24" Foreground="{DynamicResource PrimaryHueMidBrush}" Margin="0,0,8,0"/>
+                        <TextBlock Text="{Binding ConnectionStatusTitle, Source={x:Static local:Localization.Instance}}" FontSize="14" FontWeight="Bold" Opacity="0.8" Foreground="{DynamicResource PrimaryHueMidBrush}" VerticalAlignment="Center"/>
                     </StackPanel>
+                    <TextBlock x:Name="TxtRemapperStatus" Text="{Binding Stopped, Source={x:Static local:Localization.Instance}}" FontSize="28" FontWeight="Light"/>
+                    <TextBlock x:Name="TxtDeviceInfo" Text="{Binding Idle, Source={x:Static local:Localization.Instance}}" FontSize="14" Opacity="0.6" Margin="0,5,0,0"/>
                 </StackPanel>
             </materialDesign:Card>
 
             <!-- Card 2: Battery -->
-            <materialDesign:Card Grid.Column="1" Margin="10,0,0,0" Padding="20" UniformCornerRadius="12" materialDesign:ElevationAssist.Elevation="Dp2">
+            <materialDesign:Card Margin="10,0,0,0" Padding="25" UniformCornerRadius="8" materialDesign:ElevationAssist.Elevation="Dp2">
                 <StackPanel>
-                    <TextBlock Text="PİL SEVİYESİ" FontSize="12" FontWeight="Bold" Opacity="0.8" Foreground="{DynamicResource SecondaryHueMidBrush}"/>
-                    <Grid Margin="0,15,0,0">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                        <materialDesign:PackIcon Kind="BatteryMedium" Width="24" Height="24" Foreground="{DynamicResource SecondaryHueMidBrush}" Margin="0,0,8,0"/>
+                        <TextBlock Text="{Binding BatteryLevelTitle, Source={x:Static local:Localization.Instance}}" FontSize="14" FontWeight="Bold" Opacity="0.8" Foreground="{DynamicResource SecondaryHueMidBrush}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
@@ -65,46 +76,71 @@
                         <!-- Battery Icon/Gauge -->
                         <Grid Width="60" Height="60">
                              <ProgressBar x:Name="BatteryProgress" Style="{DynamicResource MaterialDesignCircularProgressBar}"
-                                          Value="0"
-                                          Maximum="100" Width="60" Height="60"/>
-                             <materialDesign:PackIcon Kind="BatteryCharging"
-                                                      Width="28" Height="28"
-                                                      HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryHueMidBrush}"/>
+                                          Value="0" Maximum="100" Width="60" Height="60"/>
+                             <materialDesign:PackIcon Kind="LightningBolt" Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryHueMidBrush}"/>
                         </Grid>
 
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="20,0,0,0">
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="25,0,0,0">
                             <TextBlock x:Name="TxtBatteryLevel" Text="--%" FontSize="32" FontWeight="Bold"/>
-                            <TextBlock x:Name="TxtBatteryDevice" Text="Cihaz Bağlı Değil" FontSize="14" Opacity="0.6" Margin="0,2,0,0"/>
+                            <TextBlock x:Name="TxtBatteryDevice" Text="{Binding NoDevice, Source={x:Static local:Localization.Instance}}" FontSize="14" Opacity="0.6" Margin="0,5,0,0"/>
                         </StackPanel>
                     </Grid>
                 </StackPanel>
             </materialDesign:Card>
-        </Grid>
+        </UniformGrid>
 
         <!-- Logs Console -->
-        <Border Grid.Row="2" Margin="20,0,20,10" Background="#1E1E1E" CornerRadius="8" BorderBrush="{DynamicResource MaterialDesignDivider}" BorderThickness="1">
+        <materialDesign:Card Grid.Row="2" Margin="20,10,20,15" UniformCornerRadius="8" Background="{DynamicResource MaterialDesignCardBackground}" materialDesign:ElevationAssist.Elevation="Dp2">
             <Grid>
-                <ScrollViewer x:Name="LogScroller" VerticalScrollBarVisibility="Auto" Margin="5">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                
+                <Border Background="{DynamicResource PrimaryHueDarkBrush}" CornerRadius="8,8,0,0" Padding="15,8">
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="ConsoleLine" Width="18" Height="18" Foreground="{DynamicResource PrimaryHueLightForegroundBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Terminal" Foreground="{DynamicResource PrimaryHueLightForegroundBrush}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+                
+                <ScrollViewer Grid.Row="1" x:Name="LogScroller" VerticalScrollBarVisibility="Auto" Margin="5">
                     <TextBox x:Name="TxtLogs" Margin="10" IsReadOnly="True" 
                              TextWrapping="Wrap" BorderThickness="0" FontFamily="Consolas" FontSize="13"
-                             Foreground="#A9B7C6" Background="Transparent"/>
+                             Foreground="{DynamicResource MaterialDesignBody}" Background="Transparent"/>
                 </ScrollViewer>
             </Grid>
-        </Border>
+        </materialDesign:Card>
 
         <!-- Actions Footer -->
-        <Grid Grid.Row="3" Margin="20,0,20,20">
+        <Grid Grid.Row="3" Margin="20,10,20,25">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             
-            <TextBlock Text="v0.0.1 • github.com/bezelye404" VerticalAlignment="Center" Opacity="0.5" FontStyle="Italic"/>
+            <TextBlock Text="{Binding FooterText, Source={x:Static local:Localization.Instance}}" VerticalAlignment="Center" Opacity="0.5" FontStyle="Italic"/>
             
-            <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <Button x:Name="BtnStop" Click="BtnStop_Click" Style="{DynamicResource MaterialDesignOutlinedButton}" Content="DURDUR" Margin="0,0,10,0" IsEnabled="False" Width="120"/>
-                <Button x:Name="BtnStart" Click="BtnStart_Click" Style="{DynamicResource MaterialDesignRaisedButton}" Content="BAŞLAT" Width="120"/>
-            </StackPanel>
+            <Button Grid.Column="1" x:Name="BtnStop" Click="BtnStop_Click" 
+                    Style="{DynamicResource MaterialDesignOutlinedButton}" 
+                    Margin="0,0,15,0" IsEnabled="False" Width="160" Height="40"
+                    materialDesign:ButtonAssist.CornerRadius="8">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="StopCircleOutline" Width="20" Height="20" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding StopServiceBtn, Source={x:Static local:Localization.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                </StackPanel>
+            </Button>
+            
+            <Button Grid.Column="2" x:Name="BtnStart" Click="BtnStart_Click" 
+                    Style="{DynamicResource MaterialDesignRaisedButton}" 
+                    Width="160" Height="40"
+                    materialDesign:ButtonAssist.CornerRadius="8">
+                <StackPanel Orientation="Horizontal">
+                    <materialDesign:PackIcon Kind="PlayCircleOutline" Width="20" Height="20" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding StartServiceBtn, Source={x:Static local:Localization.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                </StackPanel>
+            </Button>
         </Grid>
     </Grid>
 </Window>

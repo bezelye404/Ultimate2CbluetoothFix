@@ -14,8 +14,7 @@ namespace BitDoFixer
         public MainWindow()
         {
             InitializeComponent();
-            Log("Uygulama başlatıldı.");
-            StartService();
+            Log(Localization.Instance.LogAppInit);
         }
 
         private async void BtnStart_Click(object sender, RoutedEventArgs e)
@@ -36,20 +35,21 @@ namespace BitDoFixer
             _isRunning = true;
             UpdateUiState(true);
 
-            Log("Servisler başlatılıyor...");
+            var loc = Localization.Instance;
+            Log(loc.LogServicesStarting);
 
             var token = _cts.Token;
 
             _ = Task.Run(() => BluetoothRemapper.RunAsync(token, 
-                logCallback: (msg) => Log($"[EŞLEŞTİRİCİ] {msg}"),
+                logCallback: (msg) => Log($"[MAPPER] {msg}"),
                 statusCallback: (status) => Dispatcher.Invoke(() => {
                     TxtRemapperStatus.Text = status;
-                    if(status.Contains("Bulundu") || status.Contains("Bağlandı")) TxtDeviceInfo.Text = "Bağlantı Sağlandı";
+                    if(status == loc.MapperConnectedStatus || status == loc.Connected) TxtDeviceInfo.Text = loc.Connected;
                 })
             ));
 
             _ = Task.Run(() => BluetoothBatteryMonitor.RunAsync(3, 300, token,
-                logCallback: (msg) => Log($"[BATARYA] {msg}"),
+                logCallback: (msg) => Log($"[BATTERY] {msg}"),
                 batteryCallback: (devName, level) => Dispatcher.Invoke(() => UpdateBattery(devName, level))
             ));
         }
@@ -58,17 +58,18 @@ namespace BitDoFixer
         {
             if (!_isRunning) return;
 
-            Log("Servisler durduruluyor...");
+            var loc = Localization.Instance;
+            Log(loc.LogServicesStopping);
             _cts?.Cancel();
             _cts = null;
             _isRunning = false;
             UpdateUiState(false);
             
-            TxtRemapperStatus.Text = "Durduruldu";
-            TxtDeviceInfo.Text = "Boşta";
+            TxtRemapperStatus.Text = loc.Stopped;
+            TxtDeviceInfo.Text = loc.Idle;
             BatteryProgress.Value = 0;
             TxtBatteryLevel.Text = "--%";
-            TxtBatteryDevice.Text = "Cihaz Bağlı Değil";
+            TxtBatteryDevice.Text = loc.NoDevice;
         }
 
         private void UpdateUiState(bool running)
@@ -82,6 +83,25 @@ namespace BitDoFixer
             TxtBatteryLevel.Text = $"{level}%";
             BatteryProgress.Value = level;
             TxtBatteryDevice.Text = deviceName;
+        }
+
+        private void BtnLang_Click(object sender, RoutedEventArgs e)
+        {
+            var loc = Localization.Instance;
+            loc.IsEnglish = !loc.IsEnglish;
+            BtnLang.Content = loc.IsEnglish ? "TR" : "EN";
+
+            if (!_isRunning)
+            {
+                TxtRemapperStatus.Text = loc.Stopped;
+                TxtDeviceInfo.Text = loc.Idle;
+                TxtBatteryDevice.Text = loc.NoDevice;
+            }
+            else
+            {
+                TxtRemapperStatus.Text = loc.Scanning;
+                TxtDeviceInfo.Text = loc.SearchingDInput;
+            }
         }
 
         private void Log(string message)

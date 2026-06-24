@@ -18,7 +18,8 @@ namespace BitDoFixer
     {
         void Log(string m) => logCallback?.Invoke(m);
         
-        Log("Bluetooth (DInput) -> Sanal Xbox 360 Kontrolcüsü Başlatıldı");
+        var loc = Localization.Instance;
+        Log(loc.LogMapperStart);
 
         var directInput = new DirectInput();
 
@@ -27,14 +28,14 @@ namespace BitDoFixer
 
         if (devices.Count == 0)
         {
-            Log("HATA: DInput gamepad/joystick bulunamadı!");
-            statusCallback?.Invoke("Bulunamadı");
+            Log(loc.LogMapperNotFound);
+            statusCallback?.Invoke(loc.MapperNotFoundStatus);
             return;
         }
 
         var chosen = devices[0];
-        Log($"Kaynak Cihaz: {chosen.InstanceName}");
-        statusCallback?.Invoke("Bağlandı");
+        Log(loc.LogMapperSource(chosen.InstanceName));
+        statusCallback?.Invoke(loc.MapperConnectedStatus);
 
         using var joystick = new Joystick(directInput, chosen.InstanceGuid);
         joystick.Properties.BufferSize = 128; // Buffer
@@ -46,7 +47,7 @@ namespace BitDoFixer
         controller.FeedbackReceived += (sender, args) => { };
 
         controller.Connect();
-        Log("Sanal Xbox Kontrolcüsü Bağlandı. Hazır!");
+        Log(loc.LogMapperReady);
 
         try
         {
@@ -106,8 +107,8 @@ namespace BitDoFixer
         }
         catch (Exception ex)
         {
-            Log($"Hata veya bağlantı koptu: {ex.Message}");
-            statusCallback?.Invoke("Bağlantı Koptu");
+            Log(loc.LogMapperError(ex.Message));
+            statusCallback?.Invoke(loc.MapperDisconnectedStatus);
         }
     }
 

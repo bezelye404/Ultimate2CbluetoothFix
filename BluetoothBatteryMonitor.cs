@@ -19,7 +19,8 @@ namespace BitDoFixer
     {
         void Log(string m) => logCallback?.Invoke(m);
 
-        Log($"BLE Batarya Monitörü Başlatıldı (İlk Gecikme: {initialDelaySeconds}s, Aralık: {intervalSeconds}s)");
+        var loc = Localization.Instance;
+        Log(loc.LogBatteryStart(initialDelaySeconds, intervalSeconds));
 
         try
         {
@@ -40,7 +41,7 @@ namespace BitDoFixer
         }
         catch (Exception ex)
         {
-            Log($"[BLE Monitör Kritik Hata]: {ex.Message}");
+            Log(Localization.Instance.LogBatteryFatal(ex.Message));
         }
     }
 
@@ -80,7 +81,7 @@ namespace BitDoFixer
                                 var reader = DataReader.FromBuffer(result.Value);
                                 byte level = reader.ReadByte();
 
-                                Log($"{service.Device.Name} Pil: %{level}");
+                                Log(Localization.Instance.LogBatteryLevel(service.Device.Name, level));
                                 batteryCallback?.Invoke(service.Device.Name, level);
                             }
                         }
@@ -93,7 +94,7 @@ namespace BitDoFixer
         }
         catch (Exception ex)
         {
-            Log($"[BLE Tarama Hatası]: {ex.Message}");
+            Log(Localization.Instance.LogBatteryScanError(ex.Message));
         }
     }
     }
