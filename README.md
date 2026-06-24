@@ -1,6 +1,6 @@
 # 8BitDo Ultimate 2C Bluetooth Fixer
 
-An elegant, modern Windows application that remaps 8BitDo Ultimate 2C controllers (connected via Bluetooth) to a virtual XInput (Xbox 360) controller. It also supports battery monitoring and force feedback (vibration).
+A modern Windows application that remaps 8BitDo Ultimate 2C controllers (connected via Bluetooth) to a virtual XInput (Xbox 360) controller. It also supports battery monitoring and force feedback. (Unfortunately due to hardware restrictions rumble/vibration is not available in 8bitdo Ultimate 2C Wireless.)
 
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)
 ![Windows](https://img.shields.io/badge/Windows-10+-0078D6?logo=windows)
@@ -11,7 +11,7 @@ An elegant, modern Windows application that remaps 8BitDo Ultimate 2C controller
 ## ✨ Features
 
 - 🎮 **Controller Remapping**: Flawlessly maps the 8BitDo Ultimate 2C Bluetooth DirectInput layout to a virtual Xbox 360 controller.
-- 📳 **Rumble / Force Feedback Support**: Direct mapping of XInput motor vibration commands back to the controller via DirectInput force feedback actuators.
+- 📳 **Rumble / Force Feedback Support**: Direct mapping of XInput motor vibration commands back to the controller via DirectInput force feedback actuators. (Read Known Limitations)
 - 🔋 **Battery Monitoring**: Reads and displays the real-time battery level of the controller using Bluetooth GATT services.
 - 🎨 **Modern UI**: A fully overhauled, responsive, and clean user interface powered by Material Design, featuring dynamic status indicators.
 - 🌐 **Bilingual (EN / TR)**: Full localization support with automatic language detection and switching.
@@ -43,26 +43,6 @@ An elegant, modern Windows application that remaps 8BitDo Ultimate 2C controller
 
 ---
 
-## 🔧 Building from Source
-
-To build or run the application from source:
-
-```bash
-# Clone the repository
-git clone https://github.com/bezelye404/Ultimate2CbluetoothFix.git
-cd Ultimate2CbluetoothFix
-
-# Run the app
-dotnet run
-
-# Publish a single-file, self-contained Release build
-dotnet publish -c Release
-```
-
-The published build will be located under `bin/Release/net10.0-windows10.0.19041.0/win-x64/publish/`.
-
----
-
 ## 🔌 Dependencies
 
 The project leverages the following main libraries:
@@ -75,15 +55,14 @@ The project leverages the following main libraries:
 
 ---
 
-## ⚠️ Limitations
+## ⚠️ Known Issues
 
-* **Trigger Axes:** The triggers function as digital buttons. This is a hardware/firmware constraint of the 8BitDo Ultimate 2C controller when running in Android/Bluetooth (DirectInput) mode, as it only reports them as button presses rather than analog axes.
-
+* **Trigger Axes:** The triggers function as digital buttons. Another issue due to hardware limitations since Bluetooh mode is built considering Android at the first place.
 ---
 
 ## 📝 License
 
-Distributed under the **MIT License**. See `LICENSE` for more information.
+Distributed under the **MIT License**. Feel free to use and contribute to the project.
 
 ---
 
