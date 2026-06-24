@@ -61,8 +61,8 @@ namespace BitDoFixer
                     Duration = -1, // Infinite
                     TriggerButton = -1,
                     TriggerRepeatInterval = 0,
-                    Axes = new int[] { actuators[0], actuators.Length > 1 ? actuators[1] : actuators[0] },
-                    Directions = new int[] { 0, 0 },
+                    Axes = actuators.Take(2).ToArray(),
+                    Directions = actuators.Take(2).Select(_ => 0).ToArray(),
                     Envelope = null,
                     Parameters = new ConstantForce { Magnitude = 0 }
                 };
@@ -163,6 +163,10 @@ namespace BitDoFixer
         {
             Log(loc.LogMapperError(ex.Message));
             statusCallback?.Invoke(loc.MapperDisconnectedStatus);
+        }
+        finally
+        {
+            forceFeedbackEffect?.Dispose();
         }
     }
 
