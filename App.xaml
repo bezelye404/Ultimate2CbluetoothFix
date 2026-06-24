@@ -8,6 +8,14 @@
             <ResourceDictionary.MergedDictionaries>
                 <materialDesign:BundledTheme BaseTheme="Dark" PrimaryColor="Teal" SecondaryColor="Amber" />
             </ResourceDictionary.MergedDictionaries>
+
+            <!-- Explicit accent colors: guaranteed to render regardless of theme resource resolution -->
+            <SolidColorBrush x:Key="AccentTealBrush" Color="#2DD9C2"/>
+            <SolidColorBrush x:Key="AccentTealDarkBrush" Color="#0D4A43"/>
+            <SolidColorBrush x:Key="AccentAmberBrush" Color="#FFC94A"/>
+            <SolidColorBrush x:Key="HeaderTextBrush" Color="#F2FFFC"/>
+            <SolidColorBrush x:Key="CardBgBrush" Color="#23282A"/>
+            <SolidColorBrush x:Key="PageBgBrush" Color="#161A1B"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

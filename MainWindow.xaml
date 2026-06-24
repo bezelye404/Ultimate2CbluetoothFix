@@ -12,10 +12,10 @@
         TextElement.FontSize="14"
         TextOptions.TextFormattingMode="Ideal"
         TextOptions.TextRenderingMode="Auto"
-        Background="{DynamicResource MaterialDesignPaper}"
+        Background="{StaticResource PageBgBrush}"
         FontFamily="{DynamicResource MaterialDesignFont}"
         WindowStartupLocation="CenterScreen" ResizeMode="CanMinimize"
-        BorderBrush="{DynamicResource PrimaryHueMidBrush}" BorderThickness="1"
+        BorderBrush="{StaticResource AccentTealBrush}" BorderThickness="1"
         Icon="Assets/logo.ico">
 
     <Grid>
@@ -27,34 +27,36 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Border Background="{DynamicResource PrimaryHueDarkBrush}" Padding="20,15" materialDesign:ElevationAssist.Elevation="Dp3">
+        <Border Background="{StaticResource AccentTealDarkBrush}" Padding="20,15" materialDesign:ElevationAssist.Elevation="Dp3">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                
+
                 <Image Source="Assets/logo.ico" Width="36" Height="36" VerticalAlignment="Center" Margin="0,0,15,0" />
-                
-                <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="24" FontWeight="Bold" Foreground="White" 
+
+                <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="24" FontWeight="Bold" Foreground="{StaticResource HeaderTextBrush}"
                            Text="{Binding AppTitle, Source={x:Static local:Localization.Instance}}" />
-                
-                <Button Grid.Column="2" x:Name="BtnLang" Click="BtnLang_Click" 
-                        Style="{DynamicResource MaterialDesignOutlinedButton}" 
-                        Foreground="White" BorderBrush="White"
-                        Content="TR" Width="50" Padding="0" VerticalAlignment="Center"/>
+
+                <Button Grid.Column="2" x:Name="BtnLang" Click="BtnLang_Click"
+                        Style="{DynamicResource MaterialDesignOutlinedButton}"
+                        Background="Transparent" Foreground="{StaticResource HeaderTextBrush}" BorderBrush="{StaticResource HeaderTextBrush}"
+                        BorderThickness="1.5" FontWeight="Bold" FontSize="14"
+                        Content="TR" Width="50" Height="32" Padding="0" VerticalAlignment="Center"
+                        Cursor="Hand"/>
             </Grid>
         </Border>
 
         <!-- Status Dashboard -->
         <UniformGrid Grid.Row="1" Columns="2" Margin="20,20,20,10">
             <!-- Card 1: Connection Status -->
-            <materialDesign:Card Margin="0,0,10,0" Padding="25" UniformCornerRadius="8" materialDesign:ElevationAssist.Elevation="Dp2">
+            <materialDesign:Card Margin="0,0,10,0" Padding="25" UniformCornerRadius="8" Background="{StaticResource CardBgBrush}" materialDesign:ElevationAssist.Elevation="Dp2">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
-                        <materialDesign:PackIcon x:Name="IconConnectionStatus" Kind="BluetoothConnect" Width="24" Height="24" Foreground="{DynamicResource PrimaryHueMidBrush}" Margin="0,0,8,0"/>
-                        <TextBlock Text="{Binding ConnectionStatusTitle, Source={x:Static local:Localization.Instance}}" FontSize="14" FontWeight="Bold" Opacity="0.85" Foreground="{DynamicResource PrimaryHueMidBrush}" VerticalAlignment="Center"/>
+                        <materialDesign:PackIcon x:Name="IconConnectionStatus" Kind="BluetoothConnect" Width="24" Height="24" Foreground="{StaticResource AccentTealBrush}" Margin="0,0,8,0"/>
+                        <TextBlock Text="{Binding ConnectionStatusTitle, Source={x:Static local:Localization.Instance}}" FontSize="14" FontWeight="Bold" Foreground="{StaticResource AccentTealBrush}" VerticalAlignment="Center"/>
                     </StackPanel>
                     <TextBlock x:Name="TxtRemapperStatus" Text="{Binding Stopped, Source={x:Static local:Localization.Instance}}" FontSize="28" FontWeight="SemiBold"/>
                     <TextBlock x:Name="TxtDeviceInfo" Text="{Binding Idle, Source={x:Static local:Localization.Instance}}" FontSize="14" Opacity="0.72" Margin="0,5,0,0"/>
@@ -62,11 +64,11 @@
             </materialDesign:Card>
 
             <!-- Card 2: Battery -->
-            <materialDesign:Card Margin="10,0,0,0" Padding="25" UniformCornerRadius="8" materialDesign:ElevationAssist.Elevation="Dp2">
+            <materialDesign:Card Margin="10,0,0,0" Padding="25" UniformCornerRadius="8" Background="{StaticResource CardBgBrush}" materialDesign:ElevationAssist.Elevation="Dp2">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
-                        <materialDesign:PackIcon Kind="BatteryMedium" Width="24" Height="24" Foreground="{DynamicResource SecondaryHueMidBrush}" Margin="0,0,8,0"/>
-                        <TextBlock Text="{Binding BatteryLevelTitle, Source={x:Static local:Localization.Instance}}" FontSize="14" FontWeight="Bold" Opacity="0.85" Foreground="{DynamicResource SecondaryHueMidBrush}" VerticalAlignment="Center"/>
+                        <materialDesign:PackIcon Kind="BatteryMedium" Width="24" Height="24" Foreground="{StaticResource AccentAmberBrush}" Margin="0,0,8,0"/>
+                        <TextBlock Text="{Binding BatteryLevelTitle, Source={x:Static local:Localization.Instance}}" FontSize="14" FontWeight="Bold" Foreground="{StaticResource AccentAmberBrush}" VerticalAlignment="Center"/>
                     </StackPanel>
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -77,8 +79,8 @@
                         <!-- Battery Icon/Gauge -->
                         <Grid Width="60" Height="60">
                              <ProgressBar x:Name="BatteryProgress" Style="{DynamicResource MaterialDesignCircularProgressBar}"
-                                          Value="0" Maximum="100" Width="60" Height="60" Foreground="{DynamicResource SecondaryHueMidBrush}"/>
-                             <materialDesign:PackIcon x:Name="IconBatteryBolt" Kind="LightningBolt" Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryHueMidBrush}"/>
+                                          Value="0" Maximum="100" Width="60" Height="60" Foreground="{StaticResource AccentAmberBrush}"/>
+                             <materialDesign:PackIcon x:Name="IconBatteryBolt" Kind="LightningBolt" Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource AccentAmberBrush}"/>
                         </Grid>
 
                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="25,0,0,0">
@@ -91,24 +93,24 @@
         </UniformGrid>
 
         <!-- Logs Console -->
-        <materialDesign:Card Grid.Row="2" Margin="20,10,20,15" UniformCornerRadius="8" Background="{DynamicResource MaterialDesignCardBackground}" materialDesign:ElevationAssist.Elevation="Dp2">
+        <materialDesign:Card Grid.Row="2" Margin="20,10,20,15" UniformCornerRadius="8" Background="{StaticResource CardBgBrush}" materialDesign:ElevationAssist.Elevation="Dp2">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                
-                <Border Background="{DynamicResource PrimaryHueDarkBrush}" CornerRadius="8,8,0,0" Padding="15,8">
+
+                <Border Background="{StaticResource AccentTealDarkBrush}" CornerRadius="8,8,0,0" Padding="15,8">
                     <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="ConsoleLine" Width="18" Height="18" Foreground="{DynamicResource PrimaryHueDarkForegroundBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="Terminal" Foreground="{DynamicResource PrimaryHueDarkForegroundBrush}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        <materialDesign:PackIcon Kind="ConsoleLine" Width="18" Height="18" Foreground="{StaticResource HeaderTextBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Terminal" Foreground="{StaticResource HeaderTextBrush}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Border>
-                
+
                 <ScrollViewer Grid.Row="1" x:Name="LogScroller" VerticalScrollBarVisibility="Auto" Margin="5">
-                    <TextBox x:Name="TxtLogs" Margin="10" IsReadOnly="True" 
+                    <TextBox x:Name="TxtLogs" Margin="10" IsReadOnly="True"
                              TextWrapping="Wrap" BorderThickness="0" FontFamily="Consolas" FontSize="13"
-                             Foreground="{DynamicResource MaterialDesignBody}" Background="Transparent"/>
+                             Foreground="{StaticResource HeaderTextBrush}" Background="Transparent"/>
                 </ScrollViewer>
             </Grid>
         </materialDesign:Card>
