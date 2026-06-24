@@ -18,7 +18,7 @@ namespace BitDoFixer
     {
         void Log(string m) => logCallback?.Invoke(m);
         
-        Log("Bluetooth (DInput) -> Virtual Xbox 360 Remapper Started");
+        Log("Bluetooth (DInput) -> Sanal Xbox 360 Kontrolcüsü Başlatıldı");
 
         var directInput = new DirectInput();
 
@@ -27,14 +27,14 @@ namespace BitDoFixer
 
         if (devices.Count == 0)
         {
-            Log("ERROR: DInput gamepad/joystick not found!");
-            statusCallback?.Invoke("Not Found");
+            Log("HATA: DInput gamepad/joystick bulunamadı!");
+            statusCallback?.Invoke("Bulunamadı");
             return;
         }
 
         var chosen = devices[0];
-        Log($"Source Device: {chosen.InstanceName}");
-        statusCallback?.Invoke("Connected");
+        Log($"Kaynak Cihaz: {chosen.InstanceName}");
+        statusCallback?.Invoke("Bağlandı");
 
         using var joystick = new Joystick(directInput, chosen.InstanceGuid);
         joystick.Properties.BufferSize = 128; // Buffer
@@ -46,64 +46,76 @@ namespace BitDoFixer
         controller.FeedbackReceived += (sender, args) => { };
 
         controller.Connect();
-        controller.Connect();
-        Log("Virtual Xbox Controller Connected. Ready!");
+        Log("Sanal Xbox Kontrolcüsü Bağlandı. Hazır!");
 
-        var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(5));
-
-        while (await timer.WaitForNextTickAsync(token))
+        try
         {
-            joystick.Poll();
-            var state = joystick.GetCurrentState();
-            if (state is null) continue;
+            var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(5));
 
-            short lx = NormalizeAxis(state.X);
-            short ly = NormalizeAxis(state.Y);
+            while (await timer.WaitForNextTickAsync(token))
+            {
+                joystick.Poll();
+                var state = joystick.GetCurrentState();
+                if (state is null) continue;
 
-            short rx = NormalizeAxis(state.Z);
-            short ry = NormalizeAxis(state.RotationZ);
-            
-            lx = ApplyDeadzone(lx);
-            ly = ApplyDeadzone(ly);
-            rx = ApplyDeadzone(rx);
-            ry = ApplyDeadzone(ry);
+                var buttons = state.Buttons;
 
-            controller.SetAxisValue(Xbox360Axis.LeftThumbX, lx);
-            controller.SetAxisValue(Xbox360Axis.LeftThumbY, (short)-ly); 
-            controller.SetAxisValue(Xbox360Axis.RightThumbX, rx);
-            controller.SetAxisValue(Xbox360Axis.RightThumbY, (short)-ry); 
+                short lx = NormalizeAxis(state.X);
+                short ly = NormalizeAxis(state.Y);
 
-            byte lt = 0; if (GetBtn(state, 8)) lt = 255;
-            byte rt = 0; if (GetBtn(state, 9)) rt = 255;
-            controller.SetSliderValue(Xbox360Slider.LeftTrigger, lt);
-            controller.SetSliderValue(Xbox360Slider.RightTrigger, rt);
+                short rx = NormalizeAxis(state.Z);
+                short ry = NormalizeAxis(state.RotationZ);
+                
+                lx = ApplyDeadzone(lx);
+                ly = ApplyDeadzone(ly);
+                rx = ApplyDeadzone(rx);
+                ry = ApplyDeadzone(ry);
 
-            SetButton(controller, Xbox360Button.A, GetBtn(state, 0)); 
-            SetButton(controller, Xbox360Button.B, GetBtn(state, 1));
-            SetButton(controller, Xbox360Button.X, GetBtn(state, 3)); 
-            SetButton(controller, Xbox360Button.Y, GetBtn(state, 4));
+                controller.SetAxisValue(Xbox360Axis.LeftThumbX, lx);
+                controller.SetAxisValue(Xbox360Axis.LeftThumbY, (short)-ly); 
+                controller.SetAxisValue(Xbox360Axis.RightThumbX, rx);
+                controller.SetAxisValue(Xbox360Axis.RightThumbY, (short)-ry); 
 
-            SetButton(controller, Xbox360Button.LeftShoulder, GetBtn(state, 6));
-            SetButton(controller, Xbox360Button.RightShoulder, GetBtn(state, 7));
+                byte lt = 0; if (GetBtn(buttons, 8)) lt = 255;
+                byte rt = 0; if (GetBtn(buttons, 9)) rt = 255;
+                controller.SetSliderValue(Xbox360Slider.LeftTrigger, lt);
+                controller.SetSliderValue(Xbox360Slider.RightTrigger, rt);
 
-            SetButton(controller, Xbox360Button.Back, GetBtn(state, 10));
-            SetButton(controller, Xbox360Button.Start, GetBtn(state, 11));
-            
-            SetButton(controller, Xbox360Button.LeftThumb, GetBtn(state, 13));
-            SetButton(controller, Xbox360Button.RightThumb, GetBtn(state, 14));
+                SetButton(controller, Xbox360Button.A, GetBtn(buttons, 0)); 
+                SetButton(controller, Xbox360Button.B, GetBtn(buttons, 1));
+                SetButton(controller, Xbox360Button.X, GetBtn(buttons, 3)); 
+                SetButton(controller, Xbox360Button.Y, GetBtn(buttons, 4));
 
-            ApplyDpad(controller, state.PointOfViewControllers);
+                SetButton(controller, Xbox360Button.LeftShoulder, GetBtn(buttons, 6));
+                SetButton(controller, Xbox360Button.RightShoulder, GetBtn(buttons, 7));
 
-            controller.SubmitReport();
+                SetButton(controller, Xbox360Button.Back, GetBtn(buttons, 10));
+                SetButton(controller, Xbox360Button.Start, GetBtn(buttons, 11));
+                
+                SetButton(controller, Xbox360Button.LeftThumb, GetBtn(buttons, 13));
+                SetButton(controller, Xbox360Button.RightThumb, GetBtn(buttons, 14));
+
+                ApplyDpad(controller, state.PointOfViewControllers);
+
+                controller.SubmitReport();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected on stop
+        }
+        catch (Exception ex)
+        {
+            Log($"Hata veya bağlantı koptu: {ex.Message}");
+            statusCallback?.Invoke("Bağlantı Koptu");
         }
     }
 
-    private static bool GetBtn(JoystickState s, int index)
+    private static bool GetBtn(bool[] buttons, int index)
     {
-        var b = s.Buttons;
-        if (b is null) return false;
-        if (index < 0 || index >= b.Length) return false;
-        return b[index];
+        if (buttons is null) return false;
+        if (index < 0 || index >= buttons.Length) return false;
+        return buttons[index];
     }
 
     private static void SetButton(IXbox360Controller c, Xbox360Button btn, bool pressed)

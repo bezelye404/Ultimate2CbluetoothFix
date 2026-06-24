@@ -14,7 +14,7 @@ namespace BitDoFixer
         public MainWindow()
         {
             InitializeComponent();
-            Log("Application Initialized.");
+            Log("Uygulama başlatıldı.");
             StartService();
         }
 
@@ -36,20 +36,20 @@ namespace BitDoFixer
             _isRunning = true;
             UpdateUiState(true);
 
-            Log("Starting Services...");
+            Log("Servisler başlatılıyor...");
 
             var token = _cts.Token;
 
             _ = Task.Run(() => BluetoothRemapper.RunAsync(token, 
-                logCallback: (msg) => Log($"[MAPPER] {msg}"),
+                logCallback: (msg) => Log($"[EŞLEŞTİRİCİ] {msg}"),
                 statusCallback: (status) => Dispatcher.Invoke(() => {
                     TxtRemapperStatus.Text = status;
-                    if(status.Contains("Found")) TxtDeviceInfo.Text = "Connected";
+                    if(status.Contains("Bulundu") || status.Contains("Bağlandı")) TxtDeviceInfo.Text = "Bağlantı Sağlandı";
                 })
             ));
 
             _ = Task.Run(() => BluetoothBatteryMonitor.RunAsync(3, 300, token,
-                logCallback: (msg) => Log($"[BATTERY] {msg}"),
+                logCallback: (msg) => Log($"[BATARYA] {msg}"),
                 batteryCallback: (devName, level) => Dispatcher.Invoke(() => UpdateBattery(devName, level))
             ));
         }
@@ -58,14 +58,17 @@ namespace BitDoFixer
         {
             if (!_isRunning) return;
 
-            Log("Stopping Services...");
+            Log("Servisler durduruluyor...");
             _cts?.Cancel();
             _cts = null;
             _isRunning = false;
             UpdateUiState(false);
             
-            TxtRemapperStatus.Text = "Stopped";
-            TxtDeviceInfo.Text = "Idle";
+            TxtRemapperStatus.Text = "Durduruldu";
+            TxtDeviceInfo.Text = "Boşta";
+            BatteryProgress.Value = 0;
+            TxtBatteryLevel.Text = "--%";
+            TxtBatteryDevice.Text = "Cihaz Bağlı Değil";
         }
 
         private void UpdateUiState(bool running)
@@ -77,6 +80,7 @@ namespace BitDoFixer
         private void UpdateBattery(string deviceName, int level)
         {
             TxtBatteryLevel.Text = $"{level}%";
+            BatteryProgress.Value = level;
             TxtBatteryDevice.Text = deviceName;
         }
 

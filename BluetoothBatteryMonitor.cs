@@ -19,17 +19,28 @@ namespace BitDoFixer
     {
         void Log(string m) => logCallback?.Invoke(m);
 
-        Log($"BLE Battery Monitor Started (Initial: {initialDelaySeconds}s, Interval: {intervalSeconds}s)");
+        Log($"BLE Batarya Monitörü Başlatıldı (İlk Gecikme: {initialDelaySeconds}s, Aralık: {intervalSeconds}s)");
 
-        await Task.Delay(TimeSpan.FromSeconds(initialDelaySeconds), token);
-        
-        await PollBatteryAsync(Log, batteryCallback, token);
-
-        var timer = new PeriodicTimer(TimeSpan.FromSeconds(intervalSeconds));
-
-        while (await timer.WaitForNextTickAsync(token))
+        try
         {
+            await Task.Delay(TimeSpan.FromSeconds(initialDelaySeconds), token);
+            
             await PollBatteryAsync(Log, batteryCallback, token);
+
+            var timer = new PeriodicTimer(TimeSpan.FromSeconds(intervalSeconds));
+
+            while (await timer.WaitForNextTickAsync(token))
+            {
+                await PollBatteryAsync(Log, batteryCallback, token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected on cancellation
+        }
+        catch (Exception ex)
+        {
+            Log($"[BLE Monitör Kritik Hata]: {ex.Message}");
         }
     }
 
@@ -69,7 +80,7 @@ namespace BitDoFixer
                                 var reader = DataReader.FromBuffer(result.Value);
                                 byte level = reader.ReadByte();
 
-                                Log($"{service.Device.Name} Battery: {level}%");
+                                Log($"{service.Device.Name} Pil: %{level}");
                                 batteryCallback?.Invoke(service.Device.Name, level);
                             }
                         }
@@ -82,7 +93,7 @@ namespace BitDoFixer
         }
         catch (Exception ex)
         {
-            Log($"[BLE Scan Error]: {ex.Message}");
+            Log($"[BLE Tarama Hatası]: {ex.Message}");
         }
     }
     }
