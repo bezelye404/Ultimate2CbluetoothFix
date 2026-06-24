@@ -10,6 +10,7 @@ namespace BitDoFixer
     {
         private CancellationTokenSource? _cts;
         private bool _isRunning = false;
+        private RemapperStatus? _lastRemapperStatus;
 
         public MainWindow()
         {
@@ -38,14 +39,17 @@ namespace BitDoFixer
             var loc = Localization.Instance;
             Log(loc.LogServicesStarting);
 
+            _lastRemapperStatus = null;
+            ApplyRemapperStatus(null);
+
             var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
             var token = _cts.Token;
 
-            _ = Task.Run(() => BluetoothRemapper.RunAsync(hwnd, token, 
+            _ = Task.Run(() => BluetoothRemapper.RunAsync(hwnd, token,
                 logCallback: (msg) => Log($"[MAPPER] {msg}"),
                 statusCallback: (status) => Dispatcher.Invoke(() => {
-                    TxtRemapperStatus.Text = status;
-                    if(status == loc.MapperConnectedStatus || status == loc.Connected) TxtDeviceInfo.Text = loc.Connected;
+                    _lastRemapperStatus = status;
+                    ApplyRemapperStatus(status);
                 })
             ));
 
@@ -64,8 +68,9 @@ namespace BitDoFixer
             _cts?.Cancel();
             _cts = null;
             _isRunning = false;
+            _lastRemapperStatus = null;
             UpdateUiState(false);
-            
+
             TxtRemapperStatus.Text = loc.Stopped;
             TxtDeviceInfo.Text = loc.Idle;
             BatteryProgress.Value = 0;
@@ -100,8 +105,31 @@ namespace BitDoFixer
             }
             else
             {
-                TxtRemapperStatus.Text = loc.Scanning;
-                TxtDeviceInfo.Text = loc.SearchingDInput;
+                ApplyRemapperStatus(_lastRemapperStatus);
+            }
+        }
+
+        private void ApplyRemapperStatus(RemapperStatus? status)
+        {
+            var loc = Localization.Instance;
+            switch (status)
+            {
+                case RemapperStatus.Connected:
+                    TxtRemapperStatus.Text = loc.MapperConnectedStatus;
+                    TxtDeviceInfo.Text = loc.Connected;
+                    break;
+                case RemapperStatus.NotFound:
+                    TxtRemapperStatus.Text = loc.MapperNotFoundStatus;
+                    TxtDeviceInfo.Text = loc.SearchingDInput;
+                    break;
+                case RemapperStatus.Disconnected:
+                    TxtRemapperStatus.Text = loc.MapperDisconnectedStatus;
+                    TxtDeviceInfo.Text = loc.SearchingDInput;
+                    break;
+                default:
+                    TxtRemapperStatus.Text = loc.Scanning;
+                    TxtDeviceInfo.Text = loc.SearchingDInput;
+                    break;
             }
         }
 

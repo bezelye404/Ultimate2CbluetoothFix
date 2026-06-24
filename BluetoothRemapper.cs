@@ -10,101 +10,105 @@ using Nefarius.ViGEm.Client.Targets.Xbox360;
 
 namespace BitDoFixer
 {
+    public enum RemapperStatus { NotFound, Connected, Disconnected }
+
     internal static class BluetoothRemapper
 {
     private const int Deadzone = 4000;
 
-    public static async Task RunAsync(IntPtr hwnd, CancellationToken token, Action<string>? logCallback = null, Action<string>? statusCallback = null)
+    public static async Task RunAsync(IntPtr hwnd, CancellationToken token, Action<string>? logCallback = null, Action<RemapperStatus>? statusCallback = null)
     {
         void Log(string m) => logCallback?.Invoke(m);
-        
+
         var loc = Localization.Instance;
         Log(loc.LogMapperStart);
 
-        var directInput = new DirectInput();
-
-        var devices = directInput.GetDevices(DeviceType.Gamepad, DeviceEnumerationFlags.AttachedOnly);
-        if (devices.Count == 0) devices = directInput.GetDevices(DeviceType.Joystick, DeviceEnumerationFlags.AttachedOnly);
-
-        if (devices.Count == 0)
-        {
-            Log(loc.LogMapperNotFound);
-            statusCallback?.Invoke(loc.MapperNotFoundStatus);
-            return;
-        }
-
-        var chosen = devices[0];
-        Log(loc.LogMapperSource(chosen.InstanceName));
-        statusCallback?.Invoke(loc.MapperConnectedStatus);
-
-        using var joystick = new Joystick(directInput, chosen.InstanceGuid);
-        joystick.SetCooperativeLevel(hwnd, CooperativeLevel.Exclusive | CooperativeLevel.Background);
-        joystick.Properties.BufferSize = 128; // Buffer
-        joystick.Acquire();
-
+        Joystick? joystick = null;
+        ViGEmClient? client = null;
         Effect? forceFeedbackEffect = null;
         EffectParameters? effectParams = null;
 
         try
         {
-            var actuators = joystick.GetObjects(DeviceObjectTypeFlags.ForceFeedbackActuator)
-                                    .Select(x => (int)x.ObjectId)
-                                    .ToArray();
-                                    
-            if (actuators.Length > 0)
+            using var directInput = new DirectInput();
+
+            var devices = directInput.GetDevices(DeviceType.Gamepad, DeviceEnumerationFlags.AttachedOnly);
+            if (devices.Count == 0) devices = directInput.GetDevices(DeviceType.Joystick, DeviceEnumerationFlags.AttachedOnly);
+
+            if (devices.Count == 0)
             {
-                effectParams = new EffectParameters
-                {
-                    Flags = EffectFlags.Cartesian | EffectFlags.ObjectIds,
-                    StartDelay = 0,
-                    SamplePeriod = 0,
-                    Duration = -1, // Infinite
-                    TriggerButton = -1,
-                    TriggerRepeatInterval = 0,
-                    Axes = actuators.Take(2).ToArray(),
-                    Directions = actuators.Take(2).Select(_ => 0).ToArray(),
-                    Envelope = null,
-                    Parameters = new ConstantForce { Magnitude = 0 }
-                };
-                
-                forceFeedbackEffect = new Effect(joystick, EffectGuid.ConstantForce, effectParams);
-                forceFeedbackEffect.Download();
-                Log("Vibration support (Force Feedback) enabled.");
+                Log(loc.LogMapperNotFound);
+                statusCallback?.Invoke(RemapperStatus.NotFound);
+                return;
             }
-        }
-        catch (Exception ex)
-        {
-            Log($"Vibration setup failed: {ex.Message} (continuing without rumble)");
-        }
 
-        using var client = new ViGEmClient();
-        var controller = client.CreateXbox360Controller(0x045E, 0x028E);
-        
-        controller.FeedbackReceived += (sender, args) => 
-        { 
-            if (forceFeedbackEffect != null && effectParams != null)
+            var chosen = devices[0];
+            Log(loc.LogMapperSource(chosen.InstanceName));
+
+            joystick = new Joystick(directInput, chosen.InstanceGuid);
+            joystick.SetCooperativeLevel(hwnd, CooperativeLevel.Exclusive | CooperativeLevel.Background);
+            joystick.Properties.BufferSize = 128; // Buffer
+            joystick.Acquire();
+
+            try
             {
-                try
-                {
-                    // Convert ViGEm motor values (0-255) to DInput Magnitude (-10000 to 10000)
-                    int maxMotor = Math.Max(args.LargeMotor, args.SmallMotor);
-                    int magnitude = (maxMotor * 10000) / 255;
+                var actuators = joystick.GetObjects(DeviceObjectTypeFlags.ForceFeedbackActuator)
+                                        .Select(x => (int)x.ObjectId)
+                                        .ToArray();
 
-                    effectParams.Parameters = new ConstantForce { Magnitude = magnitude };
-                    forceFeedbackEffect.SetParameters(effectParams, EffectParameterFlags.TypeSpecificParameters);
-                    
-                    if (magnitude > 0) forceFeedbackEffect.Start(1, EffectPlayFlags.NoDownload);
-                    else forceFeedbackEffect.Stop();
+                if (actuators.Length > 0)
+                {
+                    effectParams = new EffectParameters
+                    {
+                        Flags = EffectFlags.Cartesian | EffectFlags.ObjectIds,
+                        StartDelay = 0,
+                        SamplePeriod = 0,
+                        Duration = -1, // Infinite
+                        TriggerButton = -1,
+                        TriggerRepeatInterval = 0,
+                        Axes = actuators.Take(2).ToArray(),
+                        Directions = actuators.Take(2).Select(_ => 0).ToArray(),
+                        Envelope = null,
+                        Parameters = new ConstantForce { Magnitude = 0 }
+                    };
+
+                    forceFeedbackEffect = new Effect(joystick, EffectGuid.ConstantForce, effectParams);
+                    forceFeedbackEffect.Download();
+                    Log("Vibration support (Force Feedback) enabled.");
                 }
-                catch { } // Ignore runtime FFB errors to avoid crashing the mapper
             }
-        };
+            catch (Exception ex)
+            {
+                Log($"Vibration setup failed: {ex.Message} (continuing without rumble)");
+            }
 
-        controller.Connect();
-        Log(loc.LogMapperReady);
+            client = new ViGEmClient();
+            var controller = client.CreateXbox360Controller(0x045E, 0x028E);
 
-        try
-        {
+            controller.FeedbackReceived += (sender, args) =>
+            {
+                if (forceFeedbackEffect != null && effectParams != null)
+                {
+                    try
+                    {
+                        // Convert ViGEm motor values (0-255) to DInput Magnitude (-10000 to 10000)
+                        int maxMotor = Math.Max(args.LargeMotor, args.SmallMotor);
+                        int magnitude = (maxMotor * 10000) / 255;
+
+                        effectParams.Parameters = new ConstantForce { Magnitude = magnitude };
+                        forceFeedbackEffect.SetParameters(effectParams, EffectParameterFlags.TypeSpecificParameters);
+
+                        if (magnitude > 0) forceFeedbackEffect.Start(1, EffectPlayFlags.NoDownload);
+                        else forceFeedbackEffect.Stop();
+                    }
+                    catch { } // Ignore runtime FFB errors to avoid crashing the mapper
+                }
+            };
+
+            controller.Connect();
+            Log(loc.LogMapperReady);
+            statusCallback?.Invoke(RemapperStatus.Connected);
+
             var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(5));
 
             while (await timer.WaitForNextTickAsync(token))
@@ -120,25 +124,25 @@ namespace BitDoFixer
 
                 short rx = NormalizeAxis(state.Z);
                 short ry = NormalizeAxis(state.RotationZ);
-                
+
                 lx = ApplyDeadzone(lx);
                 ly = ApplyDeadzone(ly);
                 rx = ApplyDeadzone(rx);
                 ry = ApplyDeadzone(ry);
 
                 controller.SetAxisValue(Xbox360Axis.LeftThumbX, lx);
-                controller.SetAxisValue(Xbox360Axis.LeftThumbY, (short)-ly); 
+                controller.SetAxisValue(Xbox360Axis.LeftThumbY, NegateAxis(ly));
                 controller.SetAxisValue(Xbox360Axis.RightThumbX, rx);
-                controller.SetAxisValue(Xbox360Axis.RightThumbY, (short)-ry); 
+                controller.SetAxisValue(Xbox360Axis.RightThumbY, NegateAxis(ry));
 
                 byte lt = 0; if (GetBtn(buttons, 8)) lt = 255;
                 byte rt = 0; if (GetBtn(buttons, 9)) rt = 255;
                 controller.SetSliderValue(Xbox360Slider.LeftTrigger, lt);
                 controller.SetSliderValue(Xbox360Slider.RightTrigger, rt);
 
-                SetButton(controller, Xbox360Button.A, GetBtn(buttons, 0)); 
+                SetButton(controller, Xbox360Button.A, GetBtn(buttons, 0));
                 SetButton(controller, Xbox360Button.B, GetBtn(buttons, 1));
-                SetButton(controller, Xbox360Button.X, GetBtn(buttons, 3)); 
+                SetButton(controller, Xbox360Button.X, GetBtn(buttons, 3));
                 SetButton(controller, Xbox360Button.Y, GetBtn(buttons, 4));
 
                 SetButton(controller, Xbox360Button.LeftShoulder, GetBtn(buttons, 6));
@@ -146,7 +150,7 @@ namespace BitDoFixer
 
                 SetButton(controller, Xbox360Button.Back, GetBtn(buttons, 10));
                 SetButton(controller, Xbox360Button.Start, GetBtn(buttons, 11));
-                
+
                 SetButton(controller, Xbox360Button.LeftThumb, GetBtn(buttons, 13));
                 SetButton(controller, Xbox360Button.RightThumb, GetBtn(buttons, 14));
 
@@ -162,11 +166,13 @@ namespace BitDoFixer
         catch (Exception ex)
         {
             Log(loc.LogMapperError(ex.Message));
-            statusCallback?.Invoke(loc.MapperDisconnectedStatus);
+            statusCallback?.Invoke(RemapperStatus.Disconnected);
         }
         finally
         {
             forceFeedbackEffect?.Dispose();
+            joystick?.Dispose();
+            client?.Dispose();
         }
     }
 
@@ -220,6 +226,13 @@ namespace BitDoFixer
     {
         if (v > -Deadzone && v < Deadzone) return 0;
         return v;
+    }
+
+    private static short NegateAxis(short v)
+    {
+        // short.MinValue'nun negatifi short.MaxValue'yu aştığı için taşmayı önlüyoruz
+        if (v == short.MinValue) return short.MaxValue;
+        return (short)-v;
     }
 
     private static byte ToTrigger(int v)
