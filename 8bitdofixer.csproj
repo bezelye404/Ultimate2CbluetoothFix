@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
@@ -7,6 +7,7 @@
     <RootNamespace>BitDoFixer</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <ApplicationIcon>Assets\logo.ico</ApplicationIcon>
     
     <!-- Publish Configuration -->
     <PublishSingleFile>true</PublishSingleFile>
@@ -14,6 +15,10 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\logo.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- Bluetooth DInput okuyup sanal Xbox koluna basmak için -->

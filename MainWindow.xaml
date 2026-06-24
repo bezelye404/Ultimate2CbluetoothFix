@@ -15,7 +15,8 @@
         Background="{DynamicResource MaterialDesignPaper}"
         FontFamily="{DynamicResource MaterialDesignFont}"
         WindowStartupLocation="CenterScreen" ResizeMode="CanMinimize"
-        BorderBrush="{DynamicResource PrimaryHueMidBrush}" BorderThickness="1">
+        BorderBrush="{DynamicResource PrimaryHueMidBrush}" BorderThickness="1"
+        Icon="Assets/logo.ico">
 
     <Grid>
         <Grid.RowDefinitions>
@@ -34,7 +35,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 
-                <materialDesign:PackIcon Kind="ControllerClassic" Width="36" Height="36" VerticalAlignment="Center" Margin="0,0,15,0" Foreground="White"/>
+                <Image Source="Assets/logo.ico" Width="36" Height="36" VerticalAlignment="Center" Margin="0,0,15,0" />
                 
                 <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="24" FontWeight="Bold" Foreground="White" 
                            Text="{Binding AppTitle, Source={x:Static local:Localization.Instance}}" />
