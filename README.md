@@ -14,7 +14,7 @@ A modern Windows application that remaps 8BitDo Ultimate 2C controllers (connect
 - 📳 **Rumble / Force Feedback Support**: Direct mapping of XInput motor vibration commands back to the controller via DirectInput force feedback actuators. (Read Known Limitations)
 - 🔋 **Battery Monitoring**: Reads and displays the real-time battery level of the controller using Bluetooth GATT services.
 - 🎨 **Modern UI**: A fully overhauled, responsive, and clean user interface powered by Material Design, featuring dynamic status indicators.
-- 🌐 **Bilingual (EN / TR)**: Full localization support with automatic language detection and switching.
+- 🌐 **English / Turkish**: Full localization support with automatic language detection and switching.
 
 ---
 
