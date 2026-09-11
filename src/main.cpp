@@ -1,3 +1,13 @@
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0A00
+#endif
+#ifndef WINVER
+#define WINVER 0x0A00
+#endif
+#ifndef NTDDI_VERSION
+#define NTDDI_VERSION 0x0A000003
+#endif
+
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -22,6 +32,37 @@
 using namespace BitDoFixer;
 
 namespace {
+
+inline void InitDpiAwareness() {
+    HMODULE hUser32 = GetModuleHandleW(L"user32.dll");
+    if (hUser32) {
+        typedef BOOL (WINAPI *pfn_SetDpi)(void*);
+        auto fn = (pfn_SetDpi)GetProcAddress(hUser32, "SetProcessDpiAwarenessContext");
+        if (fn) {
+            fn((void*)-4); // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+        }
+    }
+}
+
+inline UINT SafeGetDpiForWindow(HWND hwnd) {
+    HMODULE hUser32 = GetModuleHandleW(L"user32.dll");
+    if (hUser32) {
+        typedef UINT (WINAPI *pfn_GetDpi)(HWND);
+        auto fn = (pfn_GetDpi)GetProcAddress(hUser32, "GetDpiForWindow");
+        if (fn) return fn(hwnd);
+    }
+    return 96;
+}
+
+inline UINT SafeGetDpiForSystem() {
+    HMODULE hUser32 = GetModuleHandleW(L"user32.dll");
+    if (hUser32) {
+        typedef UINT (WINAPI *pfn_GetDpiSys)();
+        auto fn = (pfn_GetDpiSys)GetProcAddress(hUser32, "GetDpiForSystem");
+        if (fn) return fn();
+    }
+    return 96;
+}
 
 constexpr int WM_TRAYICON           = WM_USER + 1;
 constexpr int WM_UPDATE_LOG         = WM_USER + 2;
@@ -390,7 +431,7 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
         case WM_CREATE: {
-            g_dpi = GetDpiForWindow(hwnd);
+            g_dpi = SafeGetDpiForWindow(hwnd);
             if (g_dpi == 0) g_dpi = 96;
 
             g_hFontTitle = CreateFontW(-MulDiv(15, g_dpi, 72), 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
@@ -557,7 +598,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     // 1. Enable Per-Monitor DPI Awareness V2 (Stops Windows from bitmap-stretching and blurring the UI)
-    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    InitDpiAwareness();
 
     INITCOMMONCONTROLSEX icex = {};
     icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
@@ -577,7 +618,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
 
     RegisterClassExW(&wc);
 
-    UINT dpi = GetDpiForSystem();
+    UINT dpi = SafeGetDpiForSystem();
     int winWidth = MulDiv(640, dpi, 96);
     int winHeight = MulDiv(510, dpi, 96);
 
