@@ -36,3 +36,15 @@ target_link_libraries(8bitdofixer PRIVATE
 if(MSVC)
     target_link_libraries(8bitdofixer PRIVATE windowsapp)
 endif()
+
+# Automatically locate and copy ViGEmClient.dll next to the executable
+file(GLOB_RECURSE VIGEM_DLLS "$ENV{USERPROFILE}/.nuget/packages/nefarius.vigem.client/*/native/ViGEmClient.dll")
+if(VIGEM_DLLS)
+    list(GET VIGEM_DLLS 0 VIGEM_DLL_PATH)
+    add_custom_command(TARGET 8bitdofixer POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${VIGEM_DLL_PATH}"
+        "$<TARGET_FILE_DIR:8bitdofixer>/ViGEmClient.dll"
+        COMMENT "Copying ViGEmClient.dll to target directory"
+    )
+endif()
