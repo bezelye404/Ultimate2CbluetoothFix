@@ -15,6 +15,7 @@ enum class StringId {
     LogsTitle,
     ClearBtn,
     Footer,
+    MinimizeOnClose,
     TrayOpen,
     TrayExit,
     StatusSearching,

@@ -14,7 +14,8 @@ std::wstring Localization::Get(StringId id) const {
             case StringId::TrayBtn: return L"Minimize to Tray";
             case StringId::LogsTitle: return L"Terminal & Diagnostics";
             case StringId::ClearBtn: return L"Clear";
-            case StringId::Footer: return L"v0.1.0 (C++) - github.com/bezelye404";
+            case StringId::Footer: return L"";
+            case StringId::MinimizeOnClose: return L"Minimize to tray on close";
             case StringId::TrayOpen: return L"Open";
             case StringId::TrayExit: return L"Exit";
             case StringId::StatusSearching: return L"Searching for controller...";
@@ -45,7 +46,8 @@ std::wstring Localization::Get(StringId id) const {
             case StringId::TrayBtn: return L"Tepsiye K\x00FC\x00E7\x00FClt";
             case StringId::LogsTitle: return L"Terminal ve Tan\x0131lama";
             case StringId::ClearBtn: return L"Temizle";
-            case StringId::Footer: return L"v0.1.0 (C++) - github.com/bezelye404";
+            case StringId::Footer: return L"";
+            case StringId::MinimizeOnClose: return L"Kapat\x0131ld\x0131\x011F\x0131nda tepsiye k\x00FC\x00E7\x00FClt";
             case StringId::TrayOpen: return L"A\x00E7";
             case StringId::TrayExit: return L"\x00C7\x0131k\x0131\x015F";
             case StringId::StatusSearching: return L"Kontrolc\x00FC aran\x0131yor...";

@@ -80,6 +80,7 @@ constexpr int IDC_BTN_LANG          = 103;
 constexpr int IDC_BTN_TRAY          = 104;
 constexpr int IDC_BTN_CLEAR_LOGS    = 105;
 constexpr int IDC_EDIT_LOGS         = 106;
+constexpr int IDC_CHK_MINIMIZE_CLOSE= 107;
 
 constexpr int IDM_TRAY_OPEN         = 201;
 constexpr int IDM_TRAY_EXIT         = 202;
@@ -93,6 +94,8 @@ HWND g_hBtnLang                     = nullptr;
 HWND g_hBtnTray                     = nullptr;
 HWND g_hBtnClearLogs                = nullptr;
 HWND g_hEditLogs                    = nullptr;
+HWND g_hChkMinimizeClose            = nullptr;
+bool g_minimizeOnClose              = true;
 
 HFONT g_hFontTitle                  = nullptr;
 HFONT g_hFontBody                   = nullptr;
@@ -143,6 +146,24 @@ void AppendLogMessage(const std::wstring& msg) {
     SendMessageW(g_hEditLogs, EM_SCROLLCARET, 0, 0);
 }
 
+void UpdateTrayTooltip() {
+    if (!g_trayCreated) return;
+    auto& loc = Localization::Instance();
+    std::wstring tip = L"8BitDo Ultimate 2C";
+    if (g_currentStatus == RemapperStatus::Connected) {
+        tip += L": " + loc.Get(StringId::StatusConnected);
+        if (g_batteryLevel >= 0) {
+            tip += L" (" + std::to_wstring(g_batteryLevel) + L"%)";
+        }
+    } else if (g_currentStatus == RemapperStatus::Searching) {
+        tip += L": " + loc.Get(StringId::StatusSearching);
+    } else {
+        tip += L": " + loc.Get(StringId::StatusStopped);
+    }
+    wcsncpy_s(g_nid.szTip, tip.c_str(), _TRUNCATE);
+    Shell_NotifyIconW(NIM_MODIFY, &g_nid);
+}
+
 void UpdateUIStrings() {
     auto& loc = Localization::Instance();
     SetWindowTextW(g_hWnd, loc.Get(StringId::AppTitle).c_str());
@@ -150,6 +171,8 @@ void UpdateUIStrings() {
     SetWindowTextW(g_hBtnStop, loc.Get(StringId::StopBtn).c_str());
     SetWindowTextW(g_hBtnClearLogs, loc.Get(StringId::ClearBtn).c_str());
     SetWindowTextW(g_hBtnLang, loc.IsEnglish() ? L"TR" : L"EN");
+    SetWindowTextW(g_hChkMinimizeClose, loc.Get(StringId::MinimizeOnClose).c_str());
+    UpdateTrayTooltip();
     InvalidateRect(g_hWnd, NULL, TRUE);
 }
 
@@ -328,27 +351,23 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
 
     auto& loc = Localization::Instance();
 
-    // 1. Header Title & Subtitle
+    // MARK: Header
     SelectObject(memDC, g_hFontTitle);
     SetTextColor(memDC, UI::ColorTextPrimary);
-    TextOutW(memDC, S(20), S(16), loc.Get(StringId::AppTitle).c_str(), (int)loc.Get(StringId::AppTitle).length());
+    TextOutW(memDC, S(20), S(18), loc.Get(StringId::AppTitle).c_str(), (int)loc.Get(StringId::AppTitle).length());
 
-    SelectObject(memDC, g_hFontSmall);
-    SetTextColor(memDC, UI::ColorTextMuted);
-    TextOutW(memDC, S(20), S(42), loc.Get(StringId::ModeDesc).c_str(), (int)loc.Get(StringId::ModeDesc).length());
-
-    // 2. Card 1: Controller Status
-    RECT cardStatus = { S(20), S(68), clientRc.right - S(230), S(156) };
+    // MARK: Controller Status Card
+    RECT cardStatus = { S(20), S(56), clientRc.right - S(230), S(146) };
     DrawCard(memDC, cardStatus);
 
     SelectObject(memDC, g_hFontSmall);
     SetTextColor(memDC, UI::ColorTextMuted);
-    TextOutW(memDC, S(36), S(82), loc.Get(StringId::StatusTitle).c_str(), (int)loc.Get(StringId::StatusTitle).length());
+    TextOutW(memDC, S(36), S(70), loc.Get(StringId::StatusTitle).c_str(), (int)loc.Get(StringId::StatusTitle).length());
 
     SelectObject(memDC, g_hFontTitle);
     SetTextColor(memDC, UI::ColorTextPrimary);
     std::wstring devName = g_deviceName.empty() ? loc.Get(StringId::NoDevice) : g_deviceName;
-    TextOutW(memDC, S(36), S(102), devName.c_str(), (int)devName.length());
+    TextOutW(memDC, S(36), S(90), devName.c_str(), (int)devName.length());
 
     // MARK: Smooth Status Dot
     COLORREF dotColor = UI::ColorStatusGray;
@@ -366,28 +385,27 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
 
     SelectObject(memDC, g_hFontBody);
     SetTextColor(memDC, dotColor);
-    TextOutW(memDC, S(36), S(126), L"●", 1);
+    TextOutW(memDC, S(36), S(118), L"●", 1);
 
     SetTextColor(memDC, UI::ColorTextSecondary);
-    TextOutW(memDC, S(50), S(126), statusText.c_str(), (int)statusText.length());
+    TextOutW(memDC, S(50), S(118), statusText.c_str(), (int)statusText.length());
 
-    // 3. Card 2: Battery Status
-    RECT cardBattery = { clientRc.right - S(216), S(68), clientRc.right - S(20), S(156) };
+    // MARK: Battery Card
+    RECT cardBattery = { clientRc.right - S(216), S(56), clientRc.right - S(20), S(146) };
     DrawCard(memDC, cardBattery);
 
     SelectObject(memDC, g_hFontSmall);
     SetTextColor(memDC, UI::ColorTextMuted);
-    TextOutW(memDC, cardBattery.left + S(16), S(82), loc.Get(StringId::BatteryTitle).c_str(), (int)loc.Get(StringId::BatteryTitle).length());
+    TextOutW(memDC, cardBattery.left + S(16), S(70), loc.Get(StringId::BatteryTitle).c_str(), (int)loc.Get(StringId::BatteryTitle).length());
 
-    // Battery percentage
     std::wstring pctStr = (g_batteryLevel >= 0) ? (std::to_wstring(g_batteryLevel) + L"%") : L"--%";
     SelectObject(memDC, g_hFontTitle);
     SetTextColor(memDC, UI::ColorTextPrimary);
-    RECT pctRc = { cardBattery.left + S(16), S(80), cardBattery.right - S(16), S(102) };
+    RECT pctRc = { cardBattery.left + S(16), S(68), cardBattery.right - S(16), S(90) };
     DrawTextW(memDC, pctStr.c_str(), (int)pctStr.length(), &pctRc, DT_RIGHT | DT_SINGLELINE);
 
     // MARK: Battery Bar
-    RECT trackRc = { cardBattery.left + S(16), S(110), cardBattery.right - S(16), S(116) };
+    RECT trackRc = { cardBattery.left + S(16), S(100), cardBattery.right - S(16), S(106) };
     HBRUSH hTrackBr = CreateSolidBrush(UI::ColorCardBorder);
     FillRect(memDC, &trackRc, hTrackBr);
     DeleteObject(hTrackBr);
@@ -405,20 +423,15 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     SelectObject(memDC, g_hFontSmall);
     SetTextColor(memDC, UI::ColorTextMuted);
     std::wstring bDevName = g_batteryDevice.empty() ? loc.Get(StringId::NoDevice) : g_batteryDevice;
-    TextOutW(memDC, cardBattery.left + S(16), S(128), bDevName.c_str(), (int)bDevName.length());
+    TextOutW(memDC, cardBattery.left + S(16), S(118), bDevName.c_str(), (int)bDevName.length());
 
-    // Card for logs/terminal background
-    RECT cardTerminal = { S(20), S(236), clientRc.right - S(20), clientRc.bottom - S(32) };
+    // MARK: Terminal Card
+    RECT cardTerminal = { S(20), S(206), clientRc.right - S(20), clientRc.bottom - S(20) };
     DrawCard(memDC, cardTerminal);
 
     SelectObject(memDC, g_hFontSmall);
     SetTextColor(memDC, UI::ColorTextMuted);
-    TextOutW(memDC, S(36), S(244), loc.Get(StringId::LogsTitle).c_str(), (int)loc.Get(StringId::LogsTitle).length());
-
-    // 4. Footer
-    SelectObject(memDC, g_hFontSmall);
-    SetTextColor(memDC, UI::ColorTextMuted);
-    TextOutW(memDC, S(22), clientRc.bottom - S(22), loc.Get(StringId::Footer).c_str(), (int)loc.Get(StringId::Footer).length());
+    TextOutW(memDC, S(36), S(216), loc.Get(StringId::LogsTitle).c_str(), (int)loc.Get(StringId::LogsTitle).length());
 
     BitBlt(hdc, 0, 0, clientRc.right, clientRc.bottom, memDC, 0, 0, SRCCOPY);
 
@@ -444,13 +457,21 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
             RECT rc;
             GetClientRect(hwnd, &rc);
+            auto& loc = Localization::Instance();
 
             // MARK: Controls
             g_hBtnStart = CreateWindowW(L"BUTTON", L"Start Service", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
-                S(20), S(170), S(140), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_START, GetModuleHandleW(NULL), NULL);
+                S(20), S(158), S(134), S(34), hwnd, (HMENU)(INT_PTR)IDC_BTN_START, GetModuleHandleW(NULL), NULL);
 
             g_hBtnStop = CreateWindowW(L"BUTTON", L"Stop Service", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW | WS_DISABLED,
-                S(170), S(170), S(140), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_STOP, GetModuleHandleW(NULL), NULL);
+                S(164), S(158), S(134), S(34), hwnd, (HMENU)(INT_PTR)IDC_BTN_STOP, GetModuleHandleW(NULL), NULL);
+
+            g_hChkMinimizeClose = CreateWindowW(L"BUTTON", loc.Get(StringId::MinimizeOnClose).c_str(),
+                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
+                rc.right - S(236), S(164), S(216), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_MINIMIZE_CLOSE, GetModuleHandleW(NULL), NULL);
+            SendMessageW(g_hChkMinimizeClose, WM_SETFONT, (WPARAM)g_hFontSmall, TRUE);
+            SendMessageW(g_hChkMinimizeClose, BM_SETCHECK, g_minimizeOnClose ? BST_CHECKED : BST_UNCHECKED, 0);
+            SetWindowTheme(g_hChkMinimizeClose, L"DarkMode_Explorer", NULL);
 
             g_hBtnLang = CreateWindowW(L"BUTTON", L"TR", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
                 rc.right - S(108), S(16), S(38), S(26), hwnd, (HMENU)(INT_PTR)IDC_BTN_LANG, GetModuleHandleW(NULL), NULL);
@@ -459,14 +480,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 rc.right - S(62), S(16), S(38), S(26), hwnd, (HMENU)(INT_PTR)IDC_BTN_TRAY, GetModuleHandleW(NULL), NULL);
 
             g_hBtnClearLogs = CreateWindowW(L"BUTTON", L"Clear", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
-                rc.right - S(82), S(240), S(54), S(22), hwnd, (HMENU)(INT_PTR)IDC_BTN_CLEAR_LOGS, GetModuleHandleW(NULL), NULL);
+                rc.right - S(82), S(212), S(54), S(22), hwnd, (HMENU)(INT_PTR)IDC_BTN_CLEAR_LOGS, GetModuleHandleW(NULL), NULL);
 
             // MARK: Terminal Logs
-            int editHeight = rc.bottom - S(320);
-            if (editHeight < S(150)) editHeight = S(150);
+            int editHeight = (rc.bottom - S(20)) - S(240) - S(12);
+            if (editHeight < S(140)) editHeight = S(140);
             g_hEditLogs = CreateWindowExW(0, L"EDIT", L"",
                 WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
-                S(32), S(268), rc.right - S(64), editHeight, hwnd, (HMENU)(INT_PTR)IDC_EDIT_LOGS, GetModuleHandleW(NULL), NULL);
+                S(32), S(240), rc.right - S(64), editHeight, hwnd, (HMENU)(INT_PTR)IDC_EDIT_LOGS, GetModuleHandleW(NULL), NULL);
 
             SendMessageW(g_hEditLogs, WM_SETFONT, (WPARAM)g_hFontMono, TRUE);
             SetWindowTheme(g_hEditLogs, L"DarkMode_Explorer", NULL);
@@ -490,6 +511,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         case WM_COMMAND: {
             int id = LOWORD(wParam);
             switch (id) {
+                case IDC_CHK_MINIMIZE_CLOSE:
+                    g_minimizeOnClose = (SendMessageW(g_hChkMinimizeClose, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                    break;
                 case IDC_BTN_START: StartServices(); break;
                 case IDC_BTN_STOP:  StopServices(); break;
                 case IDC_BTN_CLEAR_LOGS:
@@ -529,6 +553,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 g_deviceName = *pName;
                 delete pName;
             }
+            UpdateTrayTooltip();
             InvalidateRect(hwnd, NULL, FALSE);
             return 0;
         }
@@ -540,20 +565,35 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 g_batteryDevice = *pName;
                 delete pName;
             }
+            UpdateTrayTooltip();
             InvalidateRect(hwnd, NULL, FALSE);
             return 0;
         }
 
         case WM_CTLCOLORSTATIC:
         case WM_CTLCOLOREDIT: {
-            HDC hdcEdit = (HDC)wParam;
+            HDC hdcCtrl = (HDC)wParam;
             HWND hwndCtrl = (HWND)lParam;
+            if (hwndCtrl == g_hChkMinimizeClose) {
+                SetTextColor(hdcCtrl, UI::ColorTextSecondary);
+                SetBkColor(hdcCtrl, UI::ColorWindowBg);
+                return (LRESULT)g_hBrWindowBg;
+            }
             if (hwndCtrl == g_hEditLogs) {
-                SetTextColor(hdcEdit, UI::ColorTextSecondary);
-                SetBkColor(hdcEdit, UI::ColorCardBg);
+                SetTextColor(hdcCtrl, UI::ColorTextSecondary);
+                SetBkColor(hdcCtrl, UI::ColorCardBg);
                 return (LRESULT)g_hBrEditBg;
             }
             break;
+        }
+
+        case WM_CLOSE: {
+            if (g_minimizeOnClose) {
+                MinimizeToTray();
+                return 0;
+            }
+            DestroyWindow(hwnd);
+            return 0;
         }
 
         case WM_TRAYICON: {
