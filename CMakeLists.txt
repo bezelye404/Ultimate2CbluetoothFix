@@ -33,6 +33,7 @@ target_link_libraries(8bitdofixer PRIVATE
     dwmapi
     comctl32
     shell32
+    uxtheme
 )
 
 if(MSVC)

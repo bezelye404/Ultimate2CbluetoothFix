@@ -25,10 +25,13 @@ constexpr COLORREF ColorStatusAmber     = RGB(245, 158, 11);   // #F59E0B
 constexpr COLORREF ColorStatusRed       = RGB(239, 68, 68);    // #EF4444
 constexpr COLORREF ColorStatusGray      = RGB(113, 113, 122);  // #71717A
 
-constexpr COLORREF ColorButtonBg        = RGB(39, 39, 47);     // #27272F
-constexpr COLORREF ColorButtonHover     = RGB(50, 50, 61);     // #32323D
-constexpr COLORREF ColorButtonAccent    = RGB(228, 228, 231);  // #E4E4E7
-constexpr COLORREF ColorButtonAccentText= RGB(9, 9, 11);       // #09090B
+constexpr COLORREF ColorButtonBg          = RGB(32, 32, 38);     // #202026
+constexpr COLORREF ColorButtonHover       = RGB(42, 42, 50);     // #2A2A32
+constexpr COLORREF ColorButtonBorder      = RGB(52, 52, 62);     // #34343E
+constexpr COLORREF ColorButtonAccent      = RGB(39, 39, 47);     // #27272F
+constexpr COLORREF ColorButtonAccentHover = RGB(49, 49, 59);     // #31313B
+constexpr COLORREF ColorButtonAccentBorder= RGB(66, 66, 78);     // #42424E
+constexpr COLORREF ColorButtonAccentText  = RGB(244, 244, 245);  // #F4F4F5
 
 inline void EnableImmersiveDarkMode(HWND hwnd) {
     BOOL useDarkMode = TRUE;

@@ -17,6 +17,7 @@
 #include <windows.h>
 #include <commctrl.h>
 #include <shellapi.h>
+#include <uxtheme.h>
 #include <string>
 #include <vector>
 #include <deque>
@@ -30,6 +31,7 @@
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "dwmapi.lib")
+#pragma comment(lib, "uxtheme.lib")
 #pragma comment(linker, "\"/manifestdependency:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 using namespace BitDoFixer;
@@ -271,16 +273,20 @@ void DrawModernButton(LPDRAWITEMSTRUCT dis, bool isAccent = false) {
     bool isPressed = (dis->itemState & ODS_SELECTED);
     bool isDisabled = (dis->itemState & ODS_DISABLED);
 
+    // MARK: Fill button background with parent color to eliminate white corner notches
+    HBRUSH hParentBg = (dis->hwndItem == g_hBtnClearLogs) ? g_hBrCardBg : g_hBrWindowBg;
+    FillRect(hdc, &rc, hParentBg);
+
     COLORREF bg = isAccent ? UI::ColorButtonAccent : UI::ColorButtonBg;
-    COLORREF border = isAccent ? UI::ColorButtonAccent : UI::ColorCardBorder;
+    COLORREF border = isAccent ? UI::ColorButtonAccentBorder : UI::ColorButtonBorder;
     COLORREF text = isAccent ? UI::ColorButtonAccentText : UI::ColorTextPrimary;
 
     if (isDisabled) {
-        bg = RGB(24, 24, 28);
-        border = RGB(35, 35, 42);
+        bg = RGB(22, 22, 26);
+        border = RGB(32, 32, 38);
         text = UI::ColorTextMuted;
     } else if (isPressed) {
-        bg = isAccent ? RGB(210, 210, 214) : RGB(30, 30, 36);
+        bg = isAccent ? UI::ColorButtonAccentHover : UI::ColorButtonHover;
     }
 
     HBRUSH hBr = CreateSolidBrush(bg);
@@ -295,7 +301,6 @@ void DrawModernButton(LPDRAWITEMSTRUCT dis, bool isAccent = false) {
     DeleteObject(hBr);
     DeleteObject(hPen);
 
-    // Button text
     wchar_t textBuf[128];
     GetWindowTextW(dis->hwndItem, textBuf, 128);
 
@@ -345,7 +350,7 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     std::wstring devName = g_deviceName.empty() ? loc.Get(StringId::NoDevice) : g_deviceName;
     TextOutW(memDC, S(36), S(102), devName.c_str(), (int)devName.length());
 
-    // Status Dot
+    // MARK: Smooth Status Dot
     COLORREF dotColor = UI::ColorStatusGray;
     std::wstring statusText = loc.Get(StringId::StatusStopped);
     if (g_currentStatus == RemapperStatus::Connected) {
@@ -359,21 +364,12 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
         statusText = loc.Get(StringId::WaitingReconnect);
     }
 
-    HBRUSH hDotBrush = CreateSolidBrush(dotColor);
-    HPEN hNoPen = CreatePen(PS_NULL, 0, 0);
-    HBRUSH hOldBrush = (HBRUSH)SelectObject(memDC, hDotBrush);
-    HPEN hOldPen = (HPEN)SelectObject(memDC, hNoPen);
-
-    Ellipse(memDC, S(36), S(132), S(44), S(140));
-
-    SelectObject(memDC, hOldBrush);
-    SelectObject(memDC, hOldPen);
-    DeleteObject(hDotBrush);
-    DeleteObject(hNoPen);
-
     SelectObject(memDC, g_hFontBody);
+    SetTextColor(memDC, dotColor);
+    TextOutW(memDC, S(36), S(126), L"●", 1);
+
     SetTextColor(memDC, UI::ColorTextSecondary);
-    TextOutW(memDC, S(50), S(128), statusText.c_str(), (int)statusText.length());
+    TextOutW(memDC, S(50), S(126), statusText.c_str(), (int)statusText.length());
 
     // 3. Card 2: Battery Status
     RECT cardBattery = { clientRc.right - S(216), S(68), clientRc.right - S(20), S(156) };
@@ -473,6 +469,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 S(32), S(268), rc.right - S(64), editHeight, hwnd, (HMENU)(INT_PTR)IDC_EDIT_LOGS, GetModuleHandleW(NULL), NULL);
 
             SendMessageW(g_hEditLogs, WM_SETFONT, (WPARAM)g_hFontMono, TRUE);
+            SetWindowTheme(g_hEditLogs, L"DarkMode_Explorer", NULL);
 
             SetupTray(hwnd);
             UpdateUIStrings();
@@ -568,6 +565,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             return 0;
         }
 
+        case WM_ERASEBKGND:
+            return 1;
+
         case WM_PAINT: {
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hwnd, &ps);
@@ -615,7 +615,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     wc.lpszClassName = CLASS_NAME;
     wc.hCursor = LoadCursorW(NULL, (LPCWSTR)IDC_ARROW);
     wc.hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(1));
-    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wc.hbrBackground = CreateSolidBrush(UI::ColorWindowBg);
 
     RegisterClassExW(&wc);
 
