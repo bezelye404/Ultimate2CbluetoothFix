@@ -23,7 +23,6 @@
 
   <ItemGroup>
     <!-- Bluetooth DInput okuyup sanal Xbox koluna basmak için -->
-    <PackageReference Include="MaterialDesignThemes" Version="5.3.0" />
     <PackageReference Include="Nefarius.ViGEm.Client" Version="1.*" />
     <PackageReference Include="SharpDX" Version="4.2.0" />
     <PackageReference Include="SharpDX.DirectInput" Version="4.2.0" />

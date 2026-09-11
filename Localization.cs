@@ -22,39 +22,47 @@ namespace BitDoFixer
         }
 
         // XAML Bound Properties
-        public string AppTitle => IsEnglish ? "8BitDo Controller Fixer" : "8BitDo Kontrolcü Düzeltici";
-        public string ConnectionStatusTitle => IsEnglish ? "CONNECTION STATUS" : "BAĞLANTI DURUMU";
-        public string BatteryLevelTitle => IsEnglish ? "BATTERY LEVEL" : "PİL SEVİYESİ";
-        public string StartServiceBtn => IsEnglish ? "START SERVICE" : "BAŞLAT";
-        public string StopServiceBtn => IsEnglish ? "STOP SERVICE" : "DURDUR";
+        public string AppTitle => IsEnglish ? "8BitDo Ultimate 2C Fixer" : "8BitDo Ultimate 2C Düzeltici";
+        public string ConnectionStatusTitle => IsEnglish ? "CONTROLLER STATUS" : "KONTROLCÜ DURUMU";
+        public string BatteryLevelTitle => IsEnglish ? "BATTERY" : "PİL";
+        public string InputModeTitle => IsEnglish ? "TRANSLATION" : "DÖNÜŞÜM";
+        public string InputModeDesc => "DirectInput ➔ XInput (Xbox 360)";
+        public string StartServiceBtn => IsEnglish ? "Start Service" : "Servisi Başlat";
+        public string StopServiceBtn => IsEnglish ? "Stop Service" : "Servisi Durdur";
+        public string MinimizeToTrayBtn => IsEnglish ? "Minimize to Tray" : "Tepsiye Küçült";
+        public string ToggleLogsText => IsEnglish ? "Logs & Diagnostics" : "Günlükler ve Tanılama";
+        public string ClearLogsBtn => IsEnglish ? "Clear" : "Temizle";
         public string FooterText => "v0.1.0 • github.com/bezelye404";
+        public string TrayOpen => IsEnglish ? "Open" : "Aç";
+        public string TrayExit => IsEnglish ? "Exit" : "Çıkış";
         
         // Dynamic Texts (Used in Code-Behind)
-        public string SearchingDInput => IsEnglish ? "Waiting for D-Input Device..." : "D-Input Cihazı Bekleniyor...";
-        public string NoDevice => IsEnglish ? "No Device Connected" : "Cihaz Bağlı Değil";
+        public string SearchingDInput => IsEnglish ? "Searching for controller..." : "Kontrolcü aranıyor...";
+        public string NoDevice => IsEnglish ? "No Device Detected" : "Cihaz Algılanmadı";
         public string Scanning => IsEnglish ? "Scanning..." : "Taranıyor...";
-        public string Connected => IsEnglish ? "Connection Established" : "Bağlantı Sağlandı";
-        public string Stopped => IsEnglish ? "Stopped" : "Durduruldu";
+        public string Connected => IsEnglish ? "Connected & Active" : "Bağlı ve Aktif";
+        public string Stopped => IsEnglish ? "Service Stopped" : "Servis Durduruldu";
         public string Idle => IsEnglish ? "Idle" : "Boşta";
+        public string WaitingReconnect => IsEnglish ? "Waiting for controller..." : "Kolun açılması bekleniyor...";
 
         // Log messages
-        public string LogAppInit => IsEnglish ? "Application Initialized." : "Uygulama başlatıldı.";
-        public string LogServicesStarting => IsEnglish ? "Starting Services..." : "Servisler başlatılıyor...";
-        public string LogServicesStopping => IsEnglish ? "Stopping Services..." : "Servisler durduruluyor...";
+        public string LogAppInit => IsEnglish ? "Application ready." : "Uygulama hazır.";
+        public string LogServicesStarting => IsEnglish ? "Starting services..." : "Servisler başlatılıyor...";
+        public string LogServicesStopping => IsEnglish ? "Stopping services..." : "Servisler durduruluyor...";
         
-        public string LogMapperStart => IsEnglish ? "Bluetooth (DInput) -> Virtual Xbox 360 Remapper Started" : "Bluetooth (DInput) -> Sanal Xbox 360 Kontrolcüsü Başlatıldı";
-        public string LogMapperNotFound => IsEnglish ? "ERROR: DInput gamepad/joystick not found!" : "HATA: DInput gamepad/joystick bulunamadı!";
+        public string LogMapperStart => IsEnglish ? "Bluetooth (DInput) -> Virtual Xbox 360 Remapper started." : "Bluetooth (DInput) -> Sanal Xbox 360 Remapper başlatıldı.";
+        public string LogMapperNotFound => IsEnglish ? "Controller not found. Entering auto-reconnect scan..." : "Kontrolcü bulunamadı. Otomatik arama moduna geçiliyor...";
         public string MapperNotFoundStatus => IsEnglish ? "Not Found" : "Bulunamadı";
-        public string LogMapperSource(string name) => IsEnglish ? $"Source Device: {name}" : $"Kaynak Cihaz: {name}";
+        public string LogMapperSource(string name) => IsEnglish ? $"Connected to device: {name}" : $"Cihaza bağlanıldı: {name}";
         public string MapperConnectedStatus => IsEnglish ? "Connected" : "Bağlandı";
-        public string LogMapperReady => IsEnglish ? "Virtual Xbox Controller Connected. Ready!" : "Sanal Xbox Kontrolcüsü Bağlandı. Hazır!";
-        public string LogMapperError(string ex) => IsEnglish ? $"Error or disconnected: {ex}" : $"Hata veya bağlantı koptu: {ex}";
+        public string LogMapperReady => IsEnglish ? "Virtual Xbox 360 controller active and ready." : "Sanal Xbox 360 kontrolcüsü aktif ve hazır.";
+        public string LogMapperError(string ex) => IsEnglish ? $"Connection dropped: {ex}. Reconnecting..." : $"Bağlantı koptu: {ex}. Yeniden bağlanılıyor...";
         public string MapperDisconnectedStatus => IsEnglish ? "Disconnected" : "Bağlantı Koptu";
 
-        public string LogBatteryStart(int init, int interval) => IsEnglish ? $"BLE Battery Monitor Started (Initial: {init}s, Interval: {interval}s)" : $"BLE Batarya Monitörü Başlatıldı (İlk Gecikme: {init}s, Aralık: {interval}s)";
-        public string LogBatteryFatal(string ex) => IsEnglish ? $"[BLE Monitor Fatal Error]: {ex}" : $"[BLE Monitör Kritik Hata]: {ex}";
-        public string LogBatteryLevel(string name, int level) => IsEnglish ? $"{name} Battery: {level}%" : $"{name} Pil: %{level}";
-        public string LogBatteryScanError(string ex) => IsEnglish ? $"[BLE Scan Error]: {ex}" : $"[BLE Tarama Hatası]: {ex}";
+        public string LogBatteryStart(int init, int interval) => IsEnglish ? $"Battery monitor active (refresh: {interval}s)." : $"Pil monitörü aktif (yenileme: {interval}sn).";
+        public string LogBatteryFatal(string ex) => IsEnglish ? $"Battery monitor error: {ex}" : $"Pil monitörü hatası: {ex}";
+        public string LogBatteryLevel(string name, int level) => IsEnglish ? $"{name}: {level}%" : $"{name}: %{level}";
+        public string LogBatteryScanError(string ex) => IsEnglish ? $"Battery scan warning: {ex}" : $"Pil tarama uyarısı: {ex}";
 
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string? name = null)

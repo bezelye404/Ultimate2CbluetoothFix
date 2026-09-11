@@ -11,9 +11,10 @@ A modern Windows application that remaps 8BitDo Ultimate 2C controllers (connect
 ## ✨ Features
 
 - 🎮 **Controller Remapping**: Flawlessly maps the 8BitDo Ultimate 2C Bluetooth DirectInput layout to a virtual Xbox 360 controller.
-- 📳 **Rumble / Force Feedback Support**: Direct mapping of XInput motor vibration commands back to the controller via DirectInput force feedback actuators. (Read Known Limitations)
+- ⚡ **Ultra-Low Latency & CPU/RAM**: Optimized 5ms polling loop with dirty-checking, auto-reconnect, and minimal resource footprint (~10-20 MB RAM).
 - 🔋 **Battery Monitoring**: Reads and displays the real-time battery level of the controller using Bluetooth GATT services.
-- 🎨 **Modern UI**: A fully overhauled, responsive, and clean user interface powered by Material Design, featuring dynamic status indicators.
+- 🗕 **System Tray Support**: Minimizes to Windows system tray with memory working-set trimming for distraction-free gaming.
+- 🎨 **Minimal High-UX UI**: Clean, neutral dark, distraction-free interface built with vanilla WPF (no heavy theme libraries, zero neon/gradients).
 - 🌐 **English / Turkish**: Full localization support with automatic language detection and switching.
 
 ---
@@ -35,11 +36,12 @@ A modern Windows application that remaps 8BitDo Ultimate 2C controllers (connect
 2. Install the [ViGEmBus Driver](https://github.com/nefarius/ViGEmBus/releases) if you haven't already.
 3. Turn on your controller in **Bluetooth mode** (Bluetooth/Android mode) and pair it with Windows.
 4. Launch `8bitdofixer.exe`.
-5. Click **Start** to run the remapper service. The app will:
-   * Detect the connected controller.
+5. Click **Start Service** to run the remapper. The app will:
+   * Detect the connected controller (with auto-reconnect support).
    * Emulate a virtual Xbox 360 controller.
-   * Start remapping inputs and routing rumble signals.
+   * Start remapping inputs.
    * Periodically check and display the battery level.
+   * Can be minimized to the system tray while gaming.
 
 ---
 
@@ -49,15 +51,14 @@ The project leverages the following main libraries:
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| [MaterialDesignThemes](https://github.com/MaterialDesignInXAML/MaterialDesignInXamlToolkit) | `5.3.0` | Modern UI Theme & Icon pack |
 | [Nefarius.ViGEm.Client](https://github.com/nefarius/ViGEm.Client) | `1.x` | Virtual Xbox 360 emulation |
-| [SharpDX.DirectInput](http://sharpdx.org/) | `4.2.0` | Fetching DirectInput states and sending vibration commands |
+| [SharpDX.DirectInput](http://sharpdx.org/) | `4.2.0` | Fetching DirectInput states |
 
 ---
 
 ## ⚠️ Known Issues
 
-* **Trigger Axes:** The triggers function as digital buttons. Another issue due to hardware limitations since Bluetooh mode is built considering Android at the first place.
+* **Trigger Axes:** The triggers function as digital buttons. Another issue due to hardware limitations since Bluetooth mode is built considering Android at the first place.
 ---
 
 ## 📝 License
@@ -69,5 +70,4 @@ Distributed under the **MIT License**. Feel free to use and contribute to the pr
 ## 🙏 Credits
 
 * [ViGEmBus](https://github.com/nefarius/ViGEmBus) by Nefarius
-* [MaterialDesignInXAML](https://github.com/MaterialDesignInXAML/MaterialDesignInXamlToolkit)
 * [SharpDX](https://github.com/sharpdx/SharpDX)

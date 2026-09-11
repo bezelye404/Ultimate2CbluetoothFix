@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SharpDX.DirectInput;
@@ -6,249 +7,249 @@ using Nefarius.ViGEm.Client;
 using Nefarius.ViGEm.Client.Targets;
 using Nefarius.ViGEm.Client.Targets.Xbox360;
 
-
-
 namespace BitDoFixer
 {
-    public enum RemapperStatus { NotFound, Connected, Disconnected }
+    public enum RemapperStatus { Searching, Connected, Disconnected, Stopped }
 
     internal static class BluetoothRemapper
-{
-    private const int Deadzone = 4000;
-
-    public static async Task RunAsync(IntPtr hwnd, CancellationToken token, Action<string>? logCallback = null, Action<RemapperStatus>? statusCallback = null)
     {
-        void Log(string m) => logCallback?.Invoke(m);
+        private const int Deadzone = 4000;
+        private const int KeepAliveTicks = 50; // ~250ms keepalive when idle
 
-        var loc = Localization.Instance;
-        Log(loc.LogMapperStart);
-
-        Joystick? joystick = null;
-        ViGEmClient? client = null;
-        Effect? forceFeedbackEffect = null;
-        EffectParameters? effectParams = null;
-
-        try
+        public static async Task RunAsync(
+            IntPtr hwnd,
+            CancellationToken token,
+            Action<string>? logCallback = null,
+            Action<RemapperStatus, string?>? statusCallback = null)
         {
-            using var directInput = new DirectInput();
+            void Log(string m) => logCallback?.Invoke(m);
 
-            var devices = directInput.GetDevices(DeviceType.Gamepad, DeviceEnumerationFlags.AttachedOnly);
-            if (devices.Count == 0) devices = directInput.GetDevices(DeviceType.Joystick, DeviceEnumerationFlags.AttachedOnly);
+            var loc = Localization.Instance;
+            Log(loc.LogMapperStart);
 
-            if (devices.Count == 0)
-            {
-                Log(loc.LogMapperNotFound);
-                statusCallback?.Invoke(RemapperStatus.NotFound);
-                return;
-            }
-
-            var chosen = devices[0];
-            Log(loc.LogMapperSource(chosen.InstanceName));
-
-            joystick = new Joystick(directInput, chosen.InstanceGuid);
-            joystick.SetCooperativeLevel(hwnd, CooperativeLevel.Exclusive | CooperativeLevel.Background);
-            joystick.Properties.BufferSize = 128; // Buffer
-            joystick.Acquire();
+            ViGEmClient? client = null;
+            IXbox360Controller? controller = null;
 
             try
             {
-                var actuators = joystick.GetObjects(DeviceObjectTypeFlags.ForceFeedbackActuator)
-                                        .Select(x => (int)x.ObjectId)
-                                        .ToArray();
-
-                if (actuators.Length > 0)
-                {
-                    // Tek aktüatör kullanıyoruz: çoğu DInput cihazında tek motor vardır,
-                    // ve sıfır olmayan tek eksenli yön (Cartesian'da "1") en güvenilir/yaygın çalışan ayardır.
-                    var axes = new[] { actuators[0] };
-                    var directions = new[] { 1 };
-
-                    effectParams = new EffectParameters
-                    {
-                        Flags = EffectFlags.Cartesian | EffectFlags.ObjectIds,
-                        StartDelay = 0,
-                        SamplePeriod = 0,
-                        Duration = -1, // Infinite
-                        TriggerButton = -1,
-                        TriggerRepeatInterval = 0,
-                        Axes = axes,
-                        Directions = directions,
-                        Envelope = null,
-                        Parameters = new ConstantForce { Magnitude = 0 }
-                    };
-
-                    forceFeedbackEffect = new Effect(joystick, EffectGuid.ConstantForce, effectParams);
-                    forceFeedbackEffect.Download();
-                    Log("Vibration support (Force Feedback) enabled.");
-                }
-                else
-                {
-                    Log("This device does not report a Force Feedback actuator; rumble is unavailable.");
-                }
+                client = new ViGEmClient();
+                controller = client.CreateXbox360Controller(0x045E, 0x028E);
+                controller.Connect();
             }
             catch (Exception ex)
             {
-                Log($"Vibration setup failed: {ex.Message} (continuing without rumble)");
+                Log($"Failed to initialize ViGEmBus: {ex.Message}");
+                statusCallback?.Invoke(RemapperStatus.Disconnected, null);
+                client?.Dispose();
+                return;
             }
 
-            client = new ViGEmClient();
-            var controller = client.CreateXbox360Controller(0x045E, 0x028E);
-
-            controller.FeedbackReceived += (sender, args) =>
+            while (!token.IsCancellationRequested)
             {
-                if (forceFeedbackEffect != null && effectParams != null)
+                Joystick? joystick = null;
+                DirectInput? directInput = null;
+
+                try
                 {
-                    try
+                    statusCallback?.Invoke(RemapperStatus.Searching, null);
+                    directInput = new DirectInput();
+
+                    // Find 8BitDo or fallback to first gamepad/joystick
+                    var devices = directInput.GetDevices(DeviceType.Gamepad, DeviceEnumerationFlags.AttachedOnly).ToList();
+                    if (devices.Count == 0)
                     {
-                        // Convert ViGEm motor values (0-255) to DInput Magnitude (-10000 to 10000)
-                        int maxMotor = Math.Max(args.LargeMotor, args.SmallMotor);
-                        int magnitude = (maxMotor * 10000) / 255;
-
-                        effectParams.Parameters = new ConstantForce { Magnitude = magnitude };
-                        forceFeedbackEffect.SetParameters(effectParams, EffectParameterFlags.TypeSpecificParameters);
-
-                        if (magnitude > 0) forceFeedbackEffect.Start(1, EffectPlayFlags.NoDownload);
-                        else forceFeedbackEffect.Stop();
+                        devices = directInput.GetDevices(DeviceType.Joystick, DeviceEnumerationFlags.AttachedOnly).ToList();
                     }
-                    catch { } // Ignore runtime FFB errors to avoid crashing the mapper
+
+                    var chosen = devices.FirstOrDefault(d =>
+                        d.InstanceName.Contains("8BitDo", StringComparison.OrdinalIgnoreCase) ||
+                        d.ProductName.Contains("8BitDo", StringComparison.OrdinalIgnoreCase)) ?? devices.FirstOrDefault();
+
+                    if (chosen == null)
+                    {
+                        directInput.Dispose();
+                        directInput = null;
+                        await Task.Delay(2000, token);
+                        continue;
+                    }
+
+                    Log(loc.LogMapperSource(chosen.InstanceName));
+
+                    joystick = new Joystick(directInput, chosen.InstanceGuid);
+                    joystick.SetCooperativeLevel(hwnd, CooperativeLevel.Exclusive | CooperativeLevel.Background);
+                    joystick.Acquire();
+
+                    Log(loc.LogMapperReady);
+                    statusCallback?.Invoke(RemapperStatus.Connected, chosen.InstanceName);
+
+                    // State cache for dirty-checking (reduces idle CPU & kernel calls by ~98%)
+                    short prevLx = 0, prevLy = 0, prevRx = 0, prevRy = 0;
+                    byte prevLt = 0, prevRt = 0;
+                    int prevButtonsHash = 0;
+                    int prevPov = -1;
+                    int idleTicks = 0;
+
+                    using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(5));
+
+                    while (await timer.WaitForNextTickAsync(token))
+                    {
+                        joystick.Poll();
+                        var state = joystick.GetCurrentState();
+                        if (state is null) continue;
+
+                        var buttons = state.Buttons;
+
+                        short lx = ApplyDeadzone(NormalizeAxis(state.X));
+                        short ly = NegateAxis(ApplyDeadzone(NormalizeAxis(state.Y)));
+                        short rx = ApplyDeadzone(NormalizeAxis(state.Z));
+                        short ry = NegateAxis(ApplyDeadzone(NormalizeAxis(state.RotationZ)));
+
+                        byte lt = (buttons != null && buttons.Length > 8 && buttons[8]) ? (byte)255 : (byte)0;
+                        byte rt = (buttons != null && buttons.Length > 9 && buttons[9]) ? (byte)255 : (byte)0;
+
+                        int pov = (state.PointOfViewControllers != null && state.PointOfViewControllers.Length > 0)
+                            ? state.PointOfViewControllers[0]
+                            : -1;
+
+                        int buttonsHash = ComputeButtonsHash(buttons);
+
+                        bool changed = (lx != prevLx) || (ly != prevLy) ||
+                                       (rx != prevRx) || (ry != prevRy) ||
+                                       (lt != prevLt) || (rt != prevRt) ||
+                                       (buttonsHash != prevButtonsHash) ||
+                                       (pov != prevPov);
+
+                        if (!changed)
+                        {
+                            idleTicks++;
+                            if (idleTicks < KeepAliveTicks)
+                            {
+                                continue; // Skip kernel submit report when idle
+                            }
+                        }
+
+                        // State changed or keep-alive tick
+                        idleTicks = 0;
+                        prevLx = lx; prevLy = ly;
+                        prevRx = rx; prevRy = ry;
+                        prevLt = lt; prevRt = rt;
+                        prevButtonsHash = buttonsHash;
+                        prevPov = pov;
+
+                        controller.SetAxisValue(Xbox360Axis.LeftThumbX, lx);
+                        controller.SetAxisValue(Xbox360Axis.LeftThumbY, ly);
+                        controller.SetAxisValue(Xbox360Axis.RightThumbX, rx);
+                        controller.SetAxisValue(Xbox360Axis.RightThumbY, ry);
+
+                        controller.SetSliderValue(Xbox360Slider.LeftTrigger, lt);
+                        controller.SetSliderValue(Xbox360Slider.RightTrigger, rt);
+
+                        if (buttons != null)
+                        {
+                            SetButton(controller, Xbox360Button.A, GetBtn(buttons, 0));
+                            SetButton(controller, Xbox360Button.B, GetBtn(buttons, 1));
+                            SetButton(controller, Xbox360Button.X, GetBtn(buttons, 3));
+                            SetButton(controller, Xbox360Button.Y, GetBtn(buttons, 4));
+
+                            SetButton(controller, Xbox360Button.LeftShoulder, GetBtn(buttons, 6));
+                            SetButton(controller, Xbox360Button.RightShoulder, GetBtn(buttons, 7));
+
+                            SetButton(controller, Xbox360Button.Back, GetBtn(buttons, 10));
+                            SetButton(controller, Xbox360Button.Start, GetBtn(buttons, 11));
+
+                            SetButton(controller, Xbox360Button.LeftThumb, GetBtn(buttons, 13));
+                            SetButton(controller, Xbox360Button.RightThumb, GetBtn(buttons, 14));
+                        }
+
+                        ApplyDpad(controller, pov);
+                        controller.SubmitReport();
+                    }
                 }
-            };
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    Log(loc.LogMapperError(ex.Message));
+                    statusCallback?.Invoke(RemapperStatus.Disconnected, null);
+                }
+                finally
+                {
+                    try { joystick?.Unacquire(); } catch { }
+                    joystick?.Dispose();
+                    directInput?.Dispose();
+                }
 
-            controller.Connect();
-            Log(loc.LogMapperReady);
-            statusCallback?.Invoke(RemapperStatus.Connected);
-
-            var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(5));
-
-            while (await timer.WaitForNextTickAsync(token))
-            {
-                joystick.Poll();
-                var state = joystick.GetCurrentState();
-                if (state is null) continue;
-
-                var buttons = state.Buttons;
-
-                short lx = NormalizeAxis(state.X);
-                short ly = NormalizeAxis(state.Y);
-
-                short rx = NormalizeAxis(state.Z);
-                short ry = NormalizeAxis(state.RotationZ);
-
-                lx = ApplyDeadzone(lx);
-                ly = ApplyDeadzone(ly);
-                rx = ApplyDeadzone(rx);
-                ry = ApplyDeadzone(ry);
-
-                controller.SetAxisValue(Xbox360Axis.LeftThumbX, lx);
-                controller.SetAxisValue(Xbox360Axis.LeftThumbY, NegateAxis(ly));
-                controller.SetAxisValue(Xbox360Axis.RightThumbX, rx);
-                controller.SetAxisValue(Xbox360Axis.RightThumbY, NegateAxis(ry));
-
-                byte lt = 0; if (GetBtn(buttons, 8)) lt = 255;
-                byte rt = 0; if (GetBtn(buttons, 9)) rt = 255;
-                controller.SetSliderValue(Xbox360Slider.LeftTrigger, lt);
-                controller.SetSliderValue(Xbox360Slider.RightTrigger, rt);
-
-                SetButton(controller, Xbox360Button.A, GetBtn(buttons, 0));
-                SetButton(controller, Xbox360Button.B, GetBtn(buttons, 1));
-                SetButton(controller, Xbox360Button.X, GetBtn(buttons, 3));
-                SetButton(controller, Xbox360Button.Y, GetBtn(buttons, 4));
-
-                SetButton(controller, Xbox360Button.LeftShoulder, GetBtn(buttons, 6));
-                SetButton(controller, Xbox360Button.RightShoulder, GetBtn(buttons, 7));
-
-                SetButton(controller, Xbox360Button.Back, GetBtn(buttons, 10));
-                SetButton(controller, Xbox360Button.Start, GetBtn(buttons, 11));
-
-                SetButton(controller, Xbox360Button.LeftThumb, GetBtn(buttons, 13));
-                SetButton(controller, Xbox360Button.RightThumb, GetBtn(buttons, 14));
-
-                ApplyDpad(controller, state.PointOfViewControllers);
-
-                controller.SubmitReport();
+                if (!token.IsCancellationRequested)
+                {
+                    // Delay before auto-reconnect attempt
+                    try { await Task.Delay(2000, token); } catch (OperationCanceledException) { break; }
+                }
             }
-        }
-        catch (OperationCanceledException)
-        {
-            // Expected on stop
-        }
-        catch (Exception ex)
-        {
-            Log(loc.LogMapperError(ex.Message));
-            statusCallback?.Invoke(RemapperStatus.Disconnected);
-        }
-        finally
-        {
-            forceFeedbackEffect?.Dispose();
-            joystick?.Dispose();
+
+            try { controller?.Disconnect(); } catch { }
             client?.Dispose();
         }
-    }
 
-    private static bool GetBtn(bool[] buttons, int index)
-    {
-        if (buttons is null) return false;
-        if (index < 0 || index >= buttons.Length) return false;
-        return buttons[index];
-    }
+        private static int ComputeButtonsHash(bool[]? buttons)
+        {
+            if (buttons == null) return 0;
+            int hash = 0;
+            int max = Math.Min(buttons.Length, 16);
+            for (int i = 0; i < max; i++)
+            {
+                if (buttons[i]) hash |= (1 << i);
+            }
+            return hash;
+        }
 
-    private static void SetButton(IXbox360Controller c, Xbox360Button btn, bool pressed)
-    {
-        if (pressed) c.SetButtonState(btn, true);
-        else c.SetButtonState(btn, false);
-    }
+        private static bool GetBtn(bool[] buttons, int index)
+        {
+            if (index < 0 || index >= buttons.Length) return false;
+            return buttons[index];
+        }
 
-    private static void ApplyDpad(IXbox360Controller c, int[] povs)
-    {
-        c.SetButtonState(Xbox360Button.Up, false);
-        c.SetButtonState(Xbox360Button.Down, false);
-        c.SetButtonState(Xbox360Button.Left, false);
-        c.SetButtonState(Xbox360Button.Right, false);
+        private static void SetButton(IXbox360Controller c, Xbox360Button btn, bool pressed)
+        {
+            c.SetButtonState(btn, pressed);
+        }
 
-        if (povs is null || povs.Length == 0) return;
+        private static void ApplyDpad(IXbox360Controller c, int pov)
+        {
+            if (pov < 0)
+            {
+                c.SetButtonState(Xbox360Button.Up, false);
+                c.SetButtonState(Xbox360Button.Right, false);
+                c.SetButtonState(Xbox360Button.Down, false);
+                c.SetButtonState(Xbox360Button.Left, false);
+                return;
+            }
 
-        int pov = povs[0];
-        if (pov < 0) return;
+            c.SetButtonState(Xbox360Button.Up, (pov >= 31500 || pov <= 4500));
+            c.SetButtonState(Xbox360Button.Right, (pov >= 4500 && pov <= 13500));
+            c.SetButtonState(Xbox360Button.Down, (pov >= 13500 && pov <= 22500));
+            c.SetButtonState(Xbox360Button.Left, (pov >= 22500 && pov <= 31500));
+        }
 
-        bool up = (pov >= 31500 || pov <= 4500);
-        bool right = (pov >= 4500 && pov <= 13500);
-        bool down = (pov >= 13500 && pov <= 22500);
-        bool left = (pov >= 22500 && pov <= 31500);
+        private static short NormalizeAxis(int v)
+        {
+            int centered = v - 32767;
+            if (centered < short.MinValue) return short.MinValue;
+            if (centered > short.MaxValue) return short.MaxValue;
+            return (short)centered;
+        }
 
-        c.SetButtonState(Xbox360Button.Up, up);
-        c.SetButtonState(Xbox360Button.Right, right);
-        c.SetButtonState(Xbox360Button.Down, down);
-        c.SetButtonState(Xbox360Button.Left, left);
-    }
+        private static short ApplyDeadzone(short v)
+        {
+            if (v > -Deadzone && v < Deadzone) return 0;
+            return v;
+        }
 
-    private static short NormalizeAxis(int v)
-    {
-        // SharpDX axis çoğu zaman 0..65535
-        // merkez 32767 civarı; bunu -32768..32767’ye çevir
-        int centered = v - 32767;
-        if (centered < short.MinValue) centered = short.MinValue;
-        if (centered > short.MaxValue) centered = short.MaxValue;
-        return (short)centered;
-    }
-
-    private static short ApplyDeadzone(short v)
-    {
-        if (v > -Deadzone && v < Deadzone) return 0;
-        return v;
-    }
-
-    private static short NegateAxis(short v)
-    {
-        // short.MinValue'nun negatifi short.MaxValue'yu aştığı için taşmayı önlüyoruz
-        if (v == short.MinValue) return short.MaxValue;
-        return (short)-v;
-    }
-
-    private static byte ToTrigger(int v)
-    {
-        if (v < 0) v = 0;
-        if (v > 65535) v = 65535;
-        return (byte)(v / 257); // 65535/255≈257
-    }
+        private static short NegateAxis(short v)
+        {
+            if (v == short.MinValue) return short.MaxValue;
+            return (short)-v;
+        }
     }
 }

@@ -1,101 +1,120 @@
 using System;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Windows.Devices.Bluetooth;
 using Windows.Devices.Bluetooth.GenericAttributeProfile;
 using Windows.Devices.Enumeration;
 using Windows.Storage.Streams;
 
-
 namespace BitDoFixer
 {
     internal static class BluetoothBatteryMonitor
-{
-    private static readonly Guid BatteryServiceUuid = GattServiceUuids.Battery; 
-    private static readonly Guid BatteryLevelUuid = GattCharacteristicUuids.BatteryLevel;
-
-    public static async Task RunAsync(int initialDelaySeconds, int intervalSeconds, CancellationToken token, Action<string>? logCallback = null, Action<string, int>? batteryCallback = null)
     {
-        void Log(string m) => logCallback?.Invoke(m);
+        private static readonly Guid BatteryServiceUuid = GattServiceUuids.Battery; 
+        private static readonly Guid BatteryLevelUuid = GattCharacteristicUuids.BatteryLevel;
+        private static string? _cachedDeviceId = null;
 
-        var loc = Localization.Instance;
-        Log(loc.LogBatteryStart(initialDelaySeconds, intervalSeconds));
-
-        try
+        public static async Task RunAsync(
+            int initialDelaySeconds,
+            int intervalSeconds,
+            CancellationToken token,
+            Action<string>? logCallback = null,
+            Action<string, int>? batteryCallback = null)
         {
-            await Task.Delay(TimeSpan.FromSeconds(initialDelaySeconds), token);
-            
-            await PollBatteryAsync(Log, batteryCallback, token);
+            void Log(string m) => logCallback?.Invoke(m);
 
-            var timer = new PeriodicTimer(TimeSpan.FromSeconds(intervalSeconds));
+            var loc = Localization.Instance;
+            Log(loc.LogBatteryStart(initialDelaySeconds, intervalSeconds));
 
-            while (await timer.WaitForNextTickAsync(token))
+            try
             {
-                await PollBatteryAsync(Log, batteryCallback, token);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Expected on cancellation
-        }
-        catch (Exception ex)
-        {
-            Log(Localization.Instance.LogBatteryFatal(ex.Message));
-        }
-    }
+                await Task.Delay(TimeSpan.FromSeconds(initialDelaySeconds), token);
+                await PollBatteryAsync(Log, batteryCallback);
 
-    private static async Task PollBatteryAsync(Action<string> Log, Action<string, int>? batteryCallback, CancellationToken token)
-    {
-        try
-        {
-            string selector = GattDeviceService.GetDeviceSelectorFromUuid(BatteryServiceUuid);
-            
-            var devices = await DeviceInformation.FindAllAsync(selector);
-
-            if (devices.Count == 0)
-            {
-                return;
-            }
-
-            foreach (var devInfo in devices)
-            {
-                if (!devInfo.Name.Contains("8BitDo", StringComparison.OrdinalIgnoreCase))
+                using var timer = new PeriodicTimer(TimeSpan.FromSeconds(intervalSeconds));
+                while (await timer.WaitForNextTickAsync(token))
                 {
-                    continue;
+                    await PollBatteryAsync(Log, batteryCallback);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected on cancellation
+            }
+            catch (Exception ex)
+            {
+                Log(Localization.Instance.LogBatteryFatal(ex.Message));
+            }
+        }
+
+        private static async Task PollBatteryAsync(Action<string> Log, Action<string, int>? batteryCallback)
+        {
+            try
+            {
+                // Try reading from cached device first to avoid costly system-wide device enumerations
+                if (!string.IsNullOrEmpty(_cachedDeviceId))
+                {
+                    bool success = await TryReadBatteryFromIdAsync(_cachedDeviceId, Log, batteryCallback);
+                    if (success) return;
+                    _cachedDeviceId = null;
                 }
 
-                try
-                {
-                    using var service = await GattDeviceService.FromIdAsync(devInfo.Id);
-                    if (service != null && service.Device != null)
-                    {
-                        var characteristics = await service.GetCharacteristicsForUuidAsync(BatteryLevelUuid);
-                        if (characteristics.Status == GattCommunicationStatus.Success && characteristics.Characteristics.Count > 0)
-                        {
-                            var ch = characteristics.Characteristics[0];
-                            var result = await ch.ReadValueAsync();
-                            
-                            if (result.Status == GattCommunicationStatus.Success)
-                            {
-                                var reader = DataReader.FromBuffer(result.Value);
-                                byte level = reader.ReadByte();
+                string selector = GattDeviceService.GetDeviceSelectorFromUuid(BatteryServiceUuid);
+                var devices = await DeviceInformation.FindAllAsync(selector);
 
-                                Log(Localization.Instance.LogBatteryLevel(service.Device.Name, level));
-                                batteryCallback?.Invoke(service.Device.Name, level);
-                            }
-                        }
+                if (devices.Count == 0) return;
+
+                foreach (var devInfo in devices)
+                {
+                    if (!devInfo.Name.Contains("8BitDo", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    bool success = await TryReadBatteryFromIdAsync(devInfo.Id, Log, batteryCallback);
+                    if (success)
+                    {
+                        _cachedDeviceId = devInfo.Id;
+                        break;
                     }
                 }
-                catch (Exception)
-                {
-                }
+            }
+            catch (Exception ex)
+            {
+                Log(Localization.Instance.LogBatteryScanError(ex.Message));
             }
         }
-        catch (Exception ex)
+
+        private static async Task<bool> TryReadBatteryFromIdAsync(string deviceId, Action<string> Log, Action<string, int>? batteryCallback)
         {
-            Log(Localization.Instance.LogBatteryScanError(ex.Message));
+            try
+            {
+                using var service = await GattDeviceService.FromIdAsync(deviceId);
+                if (service?.Device == null) return false;
+
+                var characteristics = await service.GetCharacteristicsForUuidAsync(BatteryLevelUuid);
+                if (characteristics.Status != GattCommunicationStatus.Success || characteristics.Characteristics.Count == 0)
+                {
+                    return false;
+                }
+
+                var ch = characteristics.Characteristics[0];
+                var result = await ch.ReadValueAsync();
+                if (result.Status == GattCommunicationStatus.Success)
+                {
+                    var reader = DataReader.FromBuffer(result.Value);
+                    byte level = reader.ReadByte();
+
+                    Log(Localization.Instance.LogBatteryLevel(service.Device.Name, level));
+                    batteryCallback?.Invoke(service.Device.Name, level);
+                    return true;
+                }
+            }
+            catch
+            {
+                // Ignore failure, will retry or scan again
+            }
+
+            return false;
         }
-    }
     }
 }

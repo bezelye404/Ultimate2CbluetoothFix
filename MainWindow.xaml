@@ -3,147 +3,164 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:local="clr-namespace:BitDoFixer"
         mc:Ignorable="d"
-        Title="8BitDo Fixer" Height="620" Width="900"
-        TextElement.Foreground="{DynamicResource MaterialDesignBody}"
-        TextElement.FontWeight="Regular"
-        TextElement.FontSize="14"
-        TextOptions.TextFormattingMode="Ideal"
-        TextOptions.TextRenderingMode="Auto"
-        Background="{StaticResource PageBgBrush}"
-        FontFamily="{DynamicResource MaterialDesignFont}"
-        WindowStartupLocation="CenterScreen" ResizeMode="CanMinimize"
-        BorderBrush="{StaticResource AccentTealBrush}" BorderThickness="1"
+        Title="8BitDo Ultimate 2C Fixer" Height="520" Width="620"
+        MinHeight="440" MinWidth="540"
+        Background="{StaticResource WindowBg}"
+        FontFamily="{StaticResource AppFont}"
+        Foreground="{StaticResource TextPrimary}"
+        WindowStartupLocation="CenterScreen"
+        BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
         Icon="Assets/logo.ico">
 
-    <Grid>
+    <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- Header -->
-            <RowDefinition Height="Auto"/> <!-- Status Cards -->
-            <RowDefinition Height="*"/>    <!-- Logs -->
-            <RowDefinition Height="Auto"/> <!-- Actions Footer -->
+            <RowDefinition Height="Auto"/> <!-- Status & Battery Cards -->
+            <RowDefinition Height="Auto"/> <!-- Action Controls -->
+            <RowDefinition Height="*"/>    <!-- Collapsible Diagnostics Terminal -->
+            <RowDefinition Height="Auto"/> <!-- Footer -->
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Border Background="{StaticResource AccentTealDarkBrush}" Padding="20,15" materialDesign:ElevationAssist.Elevation="Dp3">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+        <Grid Grid.Row="0" Margin="0,0,0,18">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
-                <Image Source="Assets/logo.ico" Width="36" Height="36" VerticalAlignment="Center" Margin="0,0,15,0" />
+            <Image Source="Assets/logo.ico" Width="26" Height="26" VerticalAlignment="Center" Margin="0,0,12,0"/>
 
-                <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="24" FontWeight="Bold" Foreground="{StaticResource HeaderTextBrush}"
-                           Text="{Binding AppTitle, Source={x:Static local:Localization.Instance}}" />
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock Text="{Binding AppTitle, Source={x:Static local:Localization.Instance}}"
+                           FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
+                <TextBlock Text="{Binding InputModeDesc, Source={x:Static local:Localization.Instance}}"
+                           FontSize="11" Foreground="{StaticResource TextMuted}" Margin="0,2,0,0"/>
+            </StackPanel>
 
-                <Button Grid.Column="2" x:Name="BtnLang" Click="BtnLang_Click"
-                        Style="{DynamicResource MaterialDesignOutlinedButton}"
-                        Background="Transparent" Foreground="{StaticResource HeaderTextBrush}" BorderBrush="{StaticResource HeaderTextBrush}"
-                        BorderThickness="1.5" FontWeight="Bold" FontSize="14"
-                        Content="TR" Width="50" Height="32" Padding="0" VerticalAlignment="Center"
-                        Cursor="Hand"/>
-            </Grid>
-        </Border>
+            <!-- Header Controls: Language Toggle & Tray -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button x:Name="BtnLang" Click="BtnLang_Click"
+                        Style="{StaticResource GhostPillBtn}"
+                        Content="TR" Width="42" Margin="0,0,8,0"/>
+                <Button x:Name="BtnMinimizeTray" Click="BtnMinimizeTray_Click"
+                        Style="{StaticResource GhostPillBtn}"
+                        ToolTip="{Binding MinimizeToTrayBtn, Source={x:Static local:Localization.Instance}}"
+                        Padding="8,4">
+                    <TextBlock Text="🗕" FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+                </Button>
+            </StackPanel>
+        </Grid>
 
-        <!-- Status Dashboard -->
-        <UniformGrid Grid.Row="1" Columns="2" Margin="20,20,20,10">
-            <!-- Card 1: Connection Status -->
-            <materialDesign:Card Margin="0,0,10,0" Padding="25" UniformCornerRadius="8" Background="{StaticResource CardBgBrush}" materialDesign:ElevationAssist.Elevation="Dp2">
+        <!-- Status Dashboard (Cards) -->
+        <Grid Grid.Row="1" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.4*"/>
+                <ColumnDefinition Width="1*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Controller Card -->
+            <Border Grid.Column="0" Background="{StaticResource CardBg}"
+                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="16" Margin="0,0,10,0">
                 <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
-                        <materialDesign:PackIcon x:Name="IconConnectionStatus" Kind="BluetoothConnect" Width="24" Height="24" Foreground="{StaticResource AccentTealBrush}" Margin="0,0,8,0"/>
-                        <TextBlock Text="{Binding ConnectionStatusTitle, Source={x:Static local:Localization.Instance}}" FontSize="14" FontWeight="Bold" Foreground="{StaticResource AccentTealBrush}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding ConnectionStatusTitle, Source={x:Static local:Localization.Instance}}"
+                               FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}"/>
+
+                    <TextBlock x:Name="TxtDeviceName" Text="{Binding NoDevice, Source={x:Static local:Localization.Instance}}"
+                               FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"
+                               Margin="0,8,0,4" TextTrimming="CharacterEllipsis"/>
+
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,4,0,0">
+                        <Ellipse x:Name="DotStatus" Width="8" Height="8"
+                                 Fill="{StaticResource StatusIdle}" Margin="0,0,8,0"/>
+                        <TextBlock x:Name="TxtStatusDetail" Text="{Binding Stopped, Source={x:Static local:Localization.Instance}}"
+                                   FontSize="13" Foreground="{StaticResource TextSecondary}"/>
                     </StackPanel>
-                    <TextBlock x:Name="TxtRemapperStatus" Text="{Binding Stopped, Source={x:Static local:Localization.Instance}}" FontSize="28" FontWeight="SemiBold"/>
-                    <TextBlock x:Name="TxtDeviceInfo" Text="{Binding Idle, Source={x:Static local:Localization.Instance}}" FontSize="14" Opacity="0.72" Margin="0,5,0,0"/>
                 </StackPanel>
-            </materialDesign:Card>
+            </Border>
 
-            <!-- Card 2: Battery -->
-            <materialDesign:Card Margin="10,0,0,0" Padding="25" UniformCornerRadius="8" Background="{StaticResource CardBgBrush}" materialDesign:ElevationAssist.Elevation="Dp2">
+            <!-- Battery Card -->
+            <Border Grid.Column="1" Background="{StaticResource CardBg}"
+                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="16">
                 <StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
-                        <materialDesign:PackIcon Kind="BatteryMedium" Width="24" Height="24" Foreground="{StaticResource AccentAmberBrush}" Margin="0,0,8,0"/>
-                        <TextBlock Text="{Binding BatteryLevelTitle, Source={x:Static local:Localization.Instance}}" FontSize="14" FontWeight="Bold" Foreground="{StaticResource AccentAmberBrush}" VerticalAlignment="Center"/>
-                    </StackPanel>
                     <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <!-- Battery Icon/Gauge -->
-                        <Grid Width="60" Height="60">
-                             <ProgressBar x:Name="BatteryProgress" Style="{DynamicResource MaterialDesignCircularProgressBar}"
-                                          Value="0" Maximum="100" Width="60" Height="60" Foreground="{StaticResource AccentAmberBrush}"/>
-                             <materialDesign:PackIcon x:Name="IconBatteryBolt" Kind="LightningBolt" Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource AccentAmberBrush}"/>
-                        </Grid>
-
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="25,0,0,0">
-                            <TextBlock x:Name="TxtBatteryLevel" Text="--%" FontSize="32" FontWeight="SemiBold"/>
-                            <TextBlock x:Name="TxtBatteryDevice" Text="{Binding NoDevice, Source={x:Static local:Localization.Instance}}" FontSize="14" Opacity="0.72" Margin="0,5,0,0"/>
-                        </StackPanel>
+                        <TextBlock Text="{Binding BatteryLevelTitle, Source={x:Static local:Localization.Instance}}"
+                                   FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}"/>
+                        <TextBlock x:Name="TxtBatteryPercent" Text="--%" HorizontalAlignment="Right"
+                                   FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}"/>
                     </Grid>
-                </StackPanel>
-            </materialDesign:Card>
-        </UniformGrid>
 
-        <!-- Logs Console -->
-        <materialDesign:Card Grid.Row="2" Margin="20,10,20,15" UniformCornerRadius="8" Background="{StaticResource CardBgBrush}" materialDesign:ElevationAssist.Elevation="Dp2">
+                    <ProgressBar x:Name="ProgressBattery" Style="{StaticResource MinimalProgressBar}"
+                                 Value="0" Maximum="100" Margin="0,14,0,10"
+                                 Foreground="{StaticResource TextSecondary}"/>
+
+                    <TextBlock x:Name="TxtBatteryDevice" Text="{Binding NoDevice, Source={x:Static local:Localization.Instance}}"
+                               FontSize="12" Foreground="{StaticResource TextMuted}" TextTrimming="CharacterEllipsis"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Actions Bar -->
+        <Grid Grid.Row="2" Margin="0,0,0,14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="0" x:Name="BtnStart" Click="BtnStart_Click"
+                    Style="{StaticResource AccentActionBtn}"
+                    Content="{Binding StartServiceBtn, Source={x:Static local:Localization.Instance}}"
+                    Width="130" Height="36" Margin="0,0,10,0"/>
+
+            <Button Grid.Column="1" x:Name="BtnStop" Click="BtnStop_Click"
+                    Style="{StaticResource PrimaryActionBtn}"
+                    Content="{Binding StopServiceBtn, Source={x:Static local:Localization.Instance}}"
+                    IsEnabled="False" Width="130" Height="36"/>
+
+            <Button Grid.Column="3" x:Name="BtnToggleLogs" Click="BtnToggleLogs_Click"
+                    Style="{StaticResource GhostPillBtn}"
+                    Content="{Binding ToggleLogsText, Source={x:Static local:Localization.Instance}}"
+                    Padding="12,6"/>
+        </Grid>
+
+        <!-- Collapsible Diagnostics Terminal -->
+        <Border Grid.Row="3" x:Name="PanelLogs" Background="{StaticResource HeaderBg}"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                CornerRadius="8" Padding="12" Margin="0,0,0,14">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <Border Background="{StaticResource AccentTealDarkBrush}" CornerRadius="8,8,0,0" Padding="15,8">
-                    <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="ConsoleLine" Width="18" Height="18" Foreground="{StaticResource HeaderTextBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="Terminal" Foreground="{StaticResource HeaderTextBrush}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Border>
+                <Grid Grid.Row="0" Margin="0,0,0,8">
+                    <TextBlock Text="Terminal" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
+                    <Button x:Name="BtnClearLogs" Click="BtnClearLogs_Click"
+                            Style="{StaticResource GhostPillBtn}" HorizontalAlignment="Right"
+                            Content="{Binding ClearLogsBtn, Source={x:Static local:Localization.Instance}}"
+                            Padding="8,2" FontSize="11"/>
+                </Grid>
 
-                <ScrollViewer Grid.Row="1" x:Name="LogScroller" VerticalScrollBarVisibility="Auto" Margin="5">
-                    <TextBox x:Name="TxtLogs" Margin="10" IsReadOnly="True"
-                             TextWrapping="Wrap" BorderThickness="0" FontFamily="Consolas" FontSize="13"
-                             Foreground="{StaticResource HeaderTextBrush}" Background="Transparent"/>
+                <ScrollViewer Grid.Row="1" x:Name="LogScroller" VerticalScrollBarVisibility="Auto">
+                    <TextBox x:Name="TxtLogs" IsReadOnly="True" TextWrapping="Wrap"
+                             BorderThickness="0" Background="Transparent"
+                             FontFamily="{StaticResource MonoFont}" FontSize="12"
+                             Foreground="{StaticResource TextSecondary}"/>
                 </ScrollViewer>
             </Grid>
-        </materialDesign:Card>
+        </Border>
 
-        <!-- Actions Footer -->
-        <Grid Grid.Row="3" Margin="20,10,20,25">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            
-            <TextBlock Text="{Binding FooterText, Source={x:Static local:Localization.Instance}}" VerticalAlignment="Center" Opacity="0.62" FontSize="12"/>
-            
-            <Button Grid.Column="1" x:Name="BtnStop" Click="BtnStop_Click" 
-                    Style="{DynamicResource MaterialDesignOutlinedButton}" 
-                    Margin="0,0,15,0" IsEnabled="False" Width="160" Height="40"
-                    materialDesign:ButtonAssist.CornerRadius="8">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="StopCircleOutline" Width="20" Height="20" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding StopServiceBtn, Source={x:Static local:Localization.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                </StackPanel>
-            </Button>
-            
-            <Button Grid.Column="2" x:Name="BtnStart" Click="BtnStart_Click" 
-                    Style="{DynamicResource MaterialDesignRaisedButton}" 
-                    Width="160" Height="40"
-                    materialDesign:ButtonAssist.CornerRadius="8">
-                <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="PlayCircleOutline" Width="20" Height="20" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding StartServiceBtn, Source={x:Static local:Localization.Instance}}" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                </StackPanel>
-            </Button>
+        <!-- Footer -->
+        <Grid Grid.Row="4">
+            <TextBlock Text="{Binding FooterText, Source={x:Static local:Localization.Instance}}"
+                       FontSize="11" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center"/>
         </Grid>
     </Grid>
 </Window>

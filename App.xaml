@@ -1,21 +1,157 @@
 <Application x:Class="BitDoFixer.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
         <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <materialDesign:BundledTheme BaseTheme="Dark" PrimaryColor="Teal" SecondaryColor="Amber" />
-            </ResourceDictionary.MergedDictionaries>
+            <!-- Neutral Dark Palette (Zero Neon, Zero Gradients) -->
+            <SolidColorBrush x:Key="WindowBg" Color="#121214"/>
+            <SolidColorBrush x:Key="HeaderBg" Color="#16161A"/>
+            <SolidColorBrush x:Key="CardBg" Color="#18181C"/>
+            <SolidColorBrush x:Key="CardHoverBg" Color="#1F1F24"/>
+            <SolidColorBrush x:Key="BorderBrush" Color="#27272E"/>
+            <SolidColorBrush x:Key="BorderLightBrush" Color="#3F3F46"/>
 
-            <!-- Explicit accent colors: guaranteed to render regardless of theme resource resolution -->
-            <SolidColorBrush x:Key="AccentTealBrush" Color="#2DD9C2"/>
-            <SolidColorBrush x:Key="AccentTealDarkBrush" Color="#0D4A43"/>
-            <SolidColorBrush x:Key="AccentAmberBrush" Color="#FFC94A"/>
-            <SolidColorBrush x:Key="HeaderTextBrush" Color="#F2FFFC"/>
-            <SolidColorBrush x:Key="CardBgBrush" Color="#23282A"/>
-            <SolidColorBrush x:Key="PageBgBrush" Color="#161A1B"/>
+            <!-- Typography Colors -->
+            <SolidColorBrush x:Key="TextPrimary" Color="#F4F4F5"/>
+            <SolidColorBrush x:Key="TextSecondary" Color="#A1A1AA"/>
+            <SolidColorBrush x:Key="TextMuted" Color="#71717A"/>
+
+            <!-- Status Indicator Dots & Badges -->
+            <SolidColorBrush x:Key="StatusConnected" Color="#22C55E"/>
+            <SolidColorBrush x:Key="StatusSearching" Color="#F59E0B"/>
+            <SolidColorBrush x:Key="StatusDisconnected" Color="#EF4444"/>
+            <SolidColorBrush x:Key="StatusIdle" Color="#71717A"/>
+
+            <!-- Clean Font Family -->
+            <FontFamily x:Key="AppFont">Segoe UI Variable Text, Segoe UI, sans-serif</FontFamily>
+            <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas, monospace</FontFamily>
+
+            <!-- Base Flat Button Style -->
+            <Style x:Key="PrimaryActionBtn" TargetType="Button">
+                <Setter Property="Background" Value="#27272F"/>
+                <Setter Property="Foreground" Value="#F4F4F5"/>
+                <Setter Property="FontFamily" Value="{StaticResource AppFont}"/>
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="BorderBrush" Value="#383842"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Padding" Value="14,8"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="border" Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="6">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  Margin="{TemplateBinding Padding}"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#32323D"/>
+                                    <Setter TargetName="border" Property="BorderBrush" Value="#4C4C59"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#202026"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="border" Property="Opacity" Value="0.38"/>
+                                    <Setter Property="Cursor" Value="Arrow"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Accent Button (White / High Contrast Minimalist) -->
+            <Style x:Key="AccentActionBtn" TargetType="Button" BasedOn="{StaticResource PrimaryActionBtn}">
+                <Setter Property="Background" Value="#E4E4E7"/>
+                <Setter Property="Foreground" Value="#09090B"/>
+                <Setter Property="BorderBrush" Value="#E4E4E7"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="border" Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="6">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  Margin="{TemplateBinding Padding}"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#FFFFFF"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#D4D4D8"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="border" Property="Opacity" Value="0.35"/>
+                                    <Setter Property="Cursor" Value="Arrow"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Ghost / Pill Button Style -->
+            <Style x:Key="GhostPillBtn" TargetType="Button">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="#A1A1AA"/>
+                <Setter Property="FontFamily" Value="{StaticResource AppFont}"/>
+                <Setter Property="FontSize" Value="12"/>
+                <Setter Property="FontWeight" Value="Medium"/>
+                <Setter Property="BorderBrush" Value="#27272E"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Padding" Value="10,4"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="border" Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="4">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  Margin="{TemplateBinding Padding}"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#1F1F26"/>
+                                    <Setter Property="Foreground" Value="#F4F4F5"/>
+                                    <Setter TargetName="border" Property="BorderBrush" Value="#3F3F46"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#18181C"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Minimal Horizontal Flat ProgressBar -->
+            <Style x:Key="MinimalProgressBar" TargetType="ProgressBar">
+                <Setter Property="Height" Value="6"/>
+                <Setter Property="Background" Value="#27272E"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ProgressBar">
+                            <Border Background="{TemplateBinding Background}" CornerRadius="3">
+                                <Grid x:Name="PART_Track">
+                                    <Rectangle x:Name="PART_Indicator" HorizontalAlignment="Left"
+                                               Fill="{TemplateBinding Foreground}" RadiusX="3" RadiusY="3"/>
+                                </Grid>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
