@@ -118,11 +118,12 @@ void Remapper::UninitViGEm() {
     }
 }
 
-bool Remapper::Start(HWND hwnd, LogCallback logCb, StatusCallback statusCb) {
+bool Remapper::Start(HWND hwnd, LogCallback logCb, StatusCallback statusCb, InputCallback inputCb) {
     if (m_running.load()) return true;
 
     m_logCallback = std::move(logCb);
     m_statusCallback = std::move(statusCb);
+    m_inputCallback = std::move(inputCb);
 
     if (!InitViGEm()) {
         return false;
@@ -224,11 +225,12 @@ void Remapper::WorkerLoop(HWND hwnd) {
                 }
             }
 
-            // Normalization
-            SHORT lx = ApplyDeadzone(NormalizeAxis(state.lX));
-            SHORT ly = NegateAxis(ApplyDeadzone(NormalizeAxis(state.lY)));
-            SHORT rx = ApplyDeadzone(NormalizeAxis(state.lZ));
-            SHORT ry = NegateAxis(ApplyDeadzone(NormalizeAxis(state.lRz)));
+            // Normalization & Dynamic Deadzone
+            int curDz = m_deadzone.load();
+            SHORT lx = ApplyDeadzone(NormalizeAxis(state.lX), curDz);
+            SHORT ly = NegateAxis(ApplyDeadzone(NormalizeAxis(state.lY), curDz));
+            SHORT rx = ApplyDeadzone(NormalizeAxis(state.lZ), curDz);
+            SHORT ry = NegateAxis(ApplyDeadzone(NormalizeAxis(state.lRz), curDz));
 
             BYTE lt = state.rgbButtons[8] ? 255 : 0;
             BYTE rt = state.rgbButtons[9] ? 255 : 0;
@@ -272,6 +274,8 @@ void Remapper::WorkerLoop(HWND hwnd) {
                     Sleep(5);
                     continue;
                 }
+            } else if (m_inputCallback) {
+                m_inputCallback(report);
             }
 
             idleTicks = 0;
@@ -305,8 +309,9 @@ SHORT Remapper::NormalizeAxis(LONG v) {
     return static_cast<SHORT>(centered);
 }
 
-SHORT Remapper::ApplyDeadzone(SHORT v) {
-    if (v > -Deadzone && v < Deadzone) return 0;
+SHORT Remapper::ApplyDeadzone(SHORT v, int dz) {
+    if (dz <= 0) return v;
+    if (v > -dz && v < dz) return 0;
     return v;
 }
 

@@ -21,15 +21,19 @@ enum class RemapperStatus {
 
 using LogCallback = std::function<void(const std::wstring&)>;
 using StatusCallback = std::function<void(RemapperStatus, const std::wstring&)>;
+using InputCallback = std::function<void(const XUSB_REPORT&)>;
 
 class Remapper {
 public:
     Remapper();
     ~Remapper();
 
-    bool Start(HWND hwnd, LogCallback logCb, StatusCallback statusCb);
+    bool Start(HWND hwnd, LogCallback logCb, StatusCallback statusCb, InputCallback inputCb = nullptr);
     void Stop();
     bool IsRunning() const { return m_running.load(); }
+
+    void SetDeadzone(int dz) { m_deadzone.store(dz); }
+    int GetDeadzone() const { return m_deadzone.load(); }
 
 private:
     void WorkerLoop(HWND hwnd);
@@ -37,13 +41,15 @@ private:
     void UninitViGEm();
 
     static SHORT NormalizeAxis(LONG v);
-    static SHORT ApplyDeadzone(SHORT v);
+    static SHORT ApplyDeadzone(SHORT v, int dz);
     static SHORT NegateAxis(SHORT v);
 
     std::atomic<bool> m_running{false};
+    std::atomic<int> m_deadzone{4000};
     std::thread m_workerThread;
     LogCallback m_logCallback;
     StatusCallback m_statusCallback;
+    InputCallback m_inputCallback;
 
     HMODULE m_hViGEmDll{nullptr};
     PVIGEM_CLIENT m_vigemClient{nullptr};

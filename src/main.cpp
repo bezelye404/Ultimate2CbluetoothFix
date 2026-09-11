@@ -73,6 +73,7 @@ constexpr int WM_TRAYICON           = WM_USER + 1;
 constexpr int WM_UPDATE_LOG         = WM_USER + 2;
 constexpr int WM_UPDATE_STATUS      = WM_USER + 3;
 constexpr int WM_UPDATE_BATTERY     = WM_USER + 4;
+constexpr int WM_UPDATE_INPUT       = WM_USER + 5;
 
 constexpr int IDC_BTN_START         = 101;
 constexpr int IDC_BTN_STOP          = 102;
@@ -81,6 +82,12 @@ constexpr int IDC_BTN_TRAY          = 104;
 constexpr int IDC_BTN_CLEAR_LOGS    = 105;
 constexpr int IDC_EDIT_LOGS         = 106;
 constexpr int IDC_CHK_MINIMIZE_CLOSE= 107;
+constexpr int IDC_BTN_SETTINGS      = 108;
+constexpr int IDC_CHK_START_WINDOWS = 109;
+constexpr int IDC_CHK_AUTO_START    = 110;
+constexpr int IDC_CHK_LOW_BATTERY   = 111;
+constexpr int IDC_BTN_DEADZONE      = 112;
+constexpr int IDC_BTN_SETTINGS_BACK = 113;
 
 constexpr int IDM_TRAY_OPEN         = 201;
 constexpr int IDM_TRAY_EXIT         = 202;
@@ -91,11 +98,27 @@ HWND g_hWnd                         = nullptr;
 HWND g_hBtnStart                    = nullptr;
 HWND g_hBtnStop                     = nullptr;
 HWND g_hBtnLang                     = nullptr;
+HWND g_hBtnSettings                 = nullptr;
 HWND g_hBtnTray                     = nullptr;
 HWND g_hBtnClearLogs                = nullptr;
 HWND g_hEditLogs                    = nullptr;
+
+HWND g_hChkStartWindows             = nullptr;
 HWND g_hChkMinimizeClose            = nullptr;
+HWND g_hChkAutoStart                = nullptr;
+HWND g_hChkLowBattery               = nullptr;
+HWND g_hBtnDeadzone                 = nullptr;
+HWND g_hBtnSettingsBack             = nullptr;
+
+bool g_showSettings                 = false;
 bool g_minimizeOnClose              = true;
+bool g_startWithWindows             = false;
+bool g_autoStartService             = true;
+bool g_lowBatteryAlert              = true;
+int g_deadzoneLevel                 = 2; // 0=0%, 1=8%, 2=12%, 3=20%
+const int kDeadzoneValues[]         = { 0, 2600, 4000, 6500 };
+bool g_batteryWarningSent           = false;
+XUSB_REPORT g_liveInput             = {};
 
 HFONT g_hFontTitle                  = nullptr;
 HFONT g_hFontBody                   = nullptr;
@@ -146,6 +169,65 @@ void AppendLogMessage(const std::wstring& msg) {
     SendMessageW(g_hEditLogs, EM_SCROLLCARET, 0, 0);
 }
 
+bool CheckStartWithWindows() {
+    HKEY hKey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+        DWORD type = 0;
+        DWORD size = 0;
+        LONG res = RegQueryValueExW(hKey, L"8BitDoUltimate2CFixer", NULL, &type, NULL, &size);
+        RegCloseKey(hKey);
+        return (res == ERROR_SUCCESS);
+    }
+    return false;
+}
+
+void ApplyStartWithWindows(bool enable) {
+    HKEY hKey;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_SET_VALUE, &hKey) == ERROR_SUCCESS) {
+        if (enable) {
+            wchar_t path[MAX_PATH];
+            GetModuleFileNameW(NULL, path, MAX_PATH);
+            std::wstring cmd = L"\"" + std::wstring(path) + L"\" --minimized";
+            RegSetValueExW(hKey, L"8BitDoUltimate2CFixer", 0, REG_SZ, (const BYTE*)cmd.c_str(), (DWORD)((cmd.length() + 1) * sizeof(wchar_t)));
+        } else {
+            RegDeleteValueW(hKey, L"8BitDoUltimate2CFixer");
+        }
+        RegCloseKey(hKey);
+    }
+}
+
+void UpdateDeadzoneButtonText() {
+    auto& loc = Localization::Instance();
+    std::wstring dzText = loc.Get(StringId::DeadzoneLabel) + L": ";
+    switch (g_deadzoneLevel) {
+        case 0: dzText += loc.Get(StringId::DeadzoneOff); break;
+        case 1: dzText += loc.Get(StringId::DeadzoneLow); break;
+        case 2: dzText += loc.Get(StringId::DeadzoneNormal); break;
+        case 3: dzText += loc.Get(StringId::DeadzoneHigh); break;
+    }
+    SetWindowTextW(g_hBtnDeadzone, dzText.c_str());
+}
+
+void SwitchView(bool showSettings) {
+    g_showSettings = showSettings;
+    int showMain = showSettings ? SW_HIDE : SW_SHOW;
+    int showSet = showSettings ? SW_SHOW : SW_HIDE;
+
+    ShowWindow(g_hBtnStart, showMain);
+    ShowWindow(g_hBtnStop, showMain);
+    ShowWindow(g_hBtnClearLogs, showMain);
+    ShowWindow(g_hEditLogs, showMain);
+
+    ShowWindow(g_hChkStartWindows, showSet);
+    ShowWindow(g_hChkMinimizeClose, showSet);
+    ShowWindow(g_hChkAutoStart, showSet);
+    ShowWindow(g_hChkLowBattery, showSet);
+    ShowWindow(g_hBtnDeadzone, showSet);
+    ShowWindow(g_hBtnSettingsBack, showSet);
+
+    InvalidateRect(g_hWnd, NULL, TRUE);
+}
+
 void UpdateTrayTooltip() {
     if (!g_trayCreated) return;
     auto& loc = Localization::Instance();
@@ -171,7 +253,12 @@ void UpdateUIStrings() {
     SetWindowTextW(g_hBtnStop, loc.Get(StringId::StopBtn).c_str());
     SetWindowTextW(g_hBtnClearLogs, loc.Get(StringId::ClearBtn).c_str());
     SetWindowTextW(g_hBtnLang, loc.IsEnglish() ? L"TR" : L"EN");
+    SetWindowTextW(g_hChkStartWindows, loc.Get(StringId::StartWithWindows).c_str());
     SetWindowTextW(g_hChkMinimizeClose, loc.Get(StringId::MinimizeOnClose).c_str());
+    SetWindowTextW(g_hChkAutoStart, loc.Get(StringId::AutoStartService).c_str());
+    SetWindowTextW(g_hChkLowBattery, loc.Get(StringId::LowBatteryNotification).c_str());
+    SetWindowTextW(g_hBtnSettingsBack, loc.Get(StringId::SettingsBack).c_str());
+    UpdateDeadzoneButtonText();
     UpdateTrayTooltip();
     InvalidateRect(g_hWnd, NULL, TRUE);
 }
@@ -190,6 +277,7 @@ void StartServices() {
     InvalidateRect(g_hWnd, NULL, FALSE);
 
     g_remapper = std::make_unique<Remapper>();
+    g_remapper->SetDeadzone(kDeadzoneValues[g_deadzoneLevel]);
     g_remapper->Start(
         g_hWnd,
         [](const std::wstring& msg) {
@@ -199,6 +287,10 @@ void StartServices() {
         [](RemapperStatus status, const std::wstring& devName) {
             auto* pName = new std::wstring(devName);
             PostMessageW(g_hWnd, WM_UPDATE_STATUS, (WPARAM)status, (LPARAM)pName);
+        },
+        [](const XUSB_REPORT& report) {
+            auto* pRep = new XUSB_REPORT(report);
+            PostMessageW(g_hWnd, WM_UPDATE_INPUT, (WPARAM)pRep, 0);
         }
     );
 
@@ -351,6 +443,22 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
 
     auto& loc = Localization::Instance();
 
+    if (g_showSettings) {
+        // MARK: Settings View Card
+        RECT cardSettings = { S(20), S(56), clientRc.right - S(20), clientRc.bottom - S(20) };
+        DrawCard(memDC, cardSettings);
+
+        SelectObject(memDC, g_hFontTitle);
+        SetTextColor(memDC, UI::ColorTextPrimary);
+        TextOutW(memDC, S(36), S(72), loc.Get(StringId::SettingsTitle).c_str(), (int)loc.Get(StringId::SettingsTitle).length());
+
+        BitBlt(hdc, 0, 0, clientRc.right, clientRc.bottom, memDC, 0, 0, SRCCOPY);
+        SelectObject(memDC, oldBmp);
+        DeleteObject(memBitmap);
+        DeleteDC(memDC);
+        return;
+    }
+
     // MARK: Header
     SelectObject(memDC, g_hFontTitle);
     SetTextColor(memDC, UI::ColorTextPrimary);
@@ -389,6 +497,81 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
 
     SetTextColor(memDC, UI::ColorTextSecondary);
     TextOutW(memDC, S(50), S(118), statusText.c_str(), (int)statusText.length());
+
+    // MARK: Live Input Telemetry (Sticks & Triggers inside Status Card)
+    if (g_currentStatus == RemapperStatus::Connected) {
+        int visX = cardStatus.right - S(175);
+        int visY = cardStatus.top + S(16);
+
+        RECT lsBox = { visX, visY, visX + S(32), visY + S(32) };
+        RECT rsBox = { visX + S(38), visY, visX + S(70), visY + S(32) };
+        HBRUSH hStickBg = CreateSolidBrush(RGB(28, 28, 35));
+        HPEN hStickPen = CreatePen(PS_SOLID, 1, UI::ColorCardBorder);
+        HBRUSH hOldB = (HBRUSH)SelectObject(memDC, hStickBg);
+        HPEN hOldP = (HPEN)SelectObject(memDC, hStickPen);
+        RoundRect(memDC, lsBox.left, lsBox.top, lsBox.right, lsBox.bottom, S(4), S(4));
+        RoundRect(memDC, rsBox.left, rsBox.top, rsBox.right, rsBox.bottom, S(4), S(4));
+
+        int lsDotX = lsBox.left + S(16) + (g_liveInput.sThumbLX * S(11)) / 32768;
+        int lsDotY = lsBox.top + S(16) - (g_liveInput.sThumbLY * S(11)) / 32768;
+        int rsDotX = rsBox.left + S(16) + (g_liveInput.sThumbRX * S(11)) / 32768;
+        int rsDotY = rsBox.top + S(16) - (g_liveInput.sThumbRY * S(11)) / 32768;
+
+        SelectObject(memDC, hOldB);
+        SelectObject(memDC, hOldP);
+        DeleteObject(hStickBg);
+        DeleteObject(hStickPen);
+
+        HBRUSH hDotBr = CreateSolidBrush(UI::ColorStatusGreen);
+        HPEN hNullP = CreatePen(PS_NULL, 0, 0);
+        SelectObject(memDC, hDotBr);
+        SelectObject(memDC, hNullP);
+        Ellipse(memDC, lsDotX - S(3), lsDotY - S(3), lsDotX + S(3), lsDotY + S(3));
+        Ellipse(memDC, rsDotX - S(3), rsDotY - S(3), rsDotX + S(3), rsDotY + S(3));
+        DeleteObject(hDotBr);
+        DeleteObject(hNullP);
+
+        struct BtnDef { const wchar_t* lbl; USHORT m; int x; int y; };
+        BtnDef bArr[] = {
+            { L"X", XUSB_GAMEPAD_X, visX + S(78), visY + S(9) },
+            { L"Y", XUSB_GAMEPAD_Y, visX + S(91), visY + S(2) },
+            { L"A", XUSB_GAMEPAD_A, visX + S(91), visY + S(16) },
+            { L"B", XUSB_GAMEPAD_B, visX + S(104), visY + S(9) }
+        };
+        SelectObject(memDC, g_hFontSmall);
+        SetBkMode(memDC, TRANSPARENT);
+        for (const auto& b : bArr) {
+            bool on = (g_liveInput.wButtons & b.m) != 0;
+            HBRUSH hb = CreateSolidBrush(on ? UI::ColorStatusGreen : RGB(32, 32, 40));
+            RECT brc = { b.x, b.y, b.x + S(12), b.y + S(12) };
+            FillRect(memDC, &brc, hb);
+            DeleteObject(hb);
+            SetTextColor(memDC, on ? RGB(10, 20, 15) : UI::ColorTextMuted);
+            DrawTextW(memDC, b.lbl, 1, &brc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        }
+
+        RECT ltRc = { visX + S(122), visY + S(4), visX + S(130), visY + S(28) };
+        RECT rtRc = { visX + S(134), visY + S(4), visX + S(142), visY + S(28) };
+        HBRUSH htbg = CreateSolidBrush(RGB(32, 32, 40));
+        FillRect(memDC, &ltRc, htbg);
+        FillRect(memDC, &rtRc, htbg);
+        DeleteObject(htbg);
+
+        if (g_liveInput.bLeftTrigger > 0) {
+            int fh = (g_liveInput.bLeftTrigger * S(24)) / 255;
+            RECT frc = { ltRc.left, ltRc.bottom - fh, ltRc.right, ltRc.bottom };
+            HBRUSH hf = CreateSolidBrush(UI::ColorStatusGreen);
+            FillRect(memDC, &frc, hf);
+            DeleteObject(hf);
+        }
+        if (g_liveInput.bRightTrigger > 0) {
+            int fh = (g_liveInput.bRightTrigger * S(24)) / 255;
+            RECT frc = { rtRc.left, rtRc.bottom - fh, rtRc.right, rtRc.bottom };
+            HBRUSH hf = CreateSolidBrush(UI::ColorStatusGreen);
+            FillRect(memDC, &frc, hf);
+            DeleteObject(hf);
+        }
+    }
 
     // MARK: Battery Card
     RECT cardBattery = { clientRc.right - S(216), S(56), clientRc.right - S(20), S(146) };
@@ -459,22 +642,19 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             GetClientRect(hwnd, &rc);
             auto& loc = Localization::Instance();
 
-            // MARK: Controls
+            // MARK: Controls (Main View)
             g_hBtnStart = CreateWindowW(L"BUTTON", L"Start Service", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
                 S(20), S(158), S(134), S(34), hwnd, (HMENU)(INT_PTR)IDC_BTN_START, GetModuleHandleW(NULL), NULL);
 
             g_hBtnStop = CreateWindowW(L"BUTTON", L"Stop Service", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW | WS_DISABLED,
                 S(164), S(158), S(134), S(34), hwnd, (HMENU)(INT_PTR)IDC_BTN_STOP, GetModuleHandleW(NULL), NULL);
 
-            g_hChkMinimizeClose = CreateWindowW(L"BUTTON", loc.Get(StringId::MinimizeOnClose).c_str(),
-                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX,
-                rc.right - S(236), S(164), S(216), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_MINIMIZE_CLOSE, GetModuleHandleW(NULL), NULL);
-            SendMessageW(g_hChkMinimizeClose, WM_SETFONT, (WPARAM)g_hFontSmall, TRUE);
-            SendMessageW(g_hChkMinimizeClose, BM_SETCHECK, g_minimizeOnClose ? BST_CHECKED : BST_UNCHECKED, 0);
-            SetWindowTheme(g_hChkMinimizeClose, L"DarkMode_Explorer", NULL);
-
+            // MARK: Top-Right Controls
             g_hBtnLang = CreateWindowW(L"BUTTON", L"TR", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
-                rc.right - S(108), S(16), S(38), S(26), hwnd, (HMENU)(INT_PTR)IDC_BTN_LANG, GetModuleHandleW(NULL), NULL);
+                rc.right - S(154), S(16), S(38), S(26), hwnd, (HMENU)(INT_PTR)IDC_BTN_LANG, GetModuleHandleW(NULL), NULL);
+
+            g_hBtnSettings = CreateWindowW(L"BUTTON", L"⚙", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
+                rc.right - S(108), S(16), S(38), S(26), hwnd, (HMENU)(INT_PTR)IDC_BTN_SETTINGS, GetModuleHandleW(NULL), NULL);
 
             g_hBtnTray = CreateWindowW(L"BUTTON", L"_", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
                 rc.right - S(62), S(16), S(38), S(26), hwnd, (HMENU)(INT_PTR)IDC_BTN_TRAY, GetModuleHandleW(NULL), NULL);
@@ -492,6 +672,44 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             SendMessageW(g_hEditLogs, WM_SETFONT, (WPARAM)g_hFontMono, TRUE);
             SetWindowTheme(g_hEditLogs, L"DarkMode_Explorer", NULL);
 
+            // MARK: Settings View Controls (Hidden by default)
+            g_hChkStartWindows = CreateWindowW(L"BUTTON", loc.Get(StringId::StartWithWindows).c_str(),
+                WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
+                S(40), S(110), S(380), S(24), hwnd, (HMENU)(INT_PTR)IDC_CHK_START_WINDOWS, GetModuleHandleW(NULL), NULL);
+            SendMessageW(g_hChkStartWindows, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
+            SendMessageW(g_hChkStartWindows, BM_SETCHECK, g_startWithWindows ? BST_CHECKED : BST_UNCHECKED, 0);
+            SetWindowTheme(g_hChkStartWindows, L"DarkMode_Explorer", NULL);
+
+            g_hChkMinimizeClose = CreateWindowW(L"BUTTON", loc.Get(StringId::MinimizeOnClose).c_str(),
+                WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
+                S(40), S(144), S(380), S(24), hwnd, (HMENU)(INT_PTR)IDC_CHK_MINIMIZE_CLOSE, GetModuleHandleW(NULL), NULL);
+            SendMessageW(g_hChkMinimizeClose, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
+            SendMessageW(g_hChkMinimizeClose, BM_SETCHECK, g_minimizeOnClose ? BST_CHECKED : BST_UNCHECKED, 0);
+            SetWindowTheme(g_hChkMinimizeClose, L"DarkMode_Explorer", NULL);
+
+            g_hChkAutoStart = CreateWindowW(L"BUTTON", loc.Get(StringId::AutoStartService).c_str(),
+                WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
+                S(40), S(178), S(380), S(24), hwnd, (HMENU)(INT_PTR)IDC_CHK_AUTO_START, GetModuleHandleW(NULL), NULL);
+            SendMessageW(g_hChkAutoStart, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
+            SendMessageW(g_hChkAutoStart, BM_SETCHECK, g_autoStartService ? BST_CHECKED : BST_UNCHECKED, 0);
+            SetWindowTheme(g_hChkAutoStart, L"DarkMode_Explorer", NULL);
+
+            g_hChkLowBattery = CreateWindowW(L"BUTTON", loc.Get(StringId::LowBatteryNotification).c_str(),
+                WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
+                S(40), S(212), S(380), S(24), hwnd, (HMENU)(INT_PTR)IDC_CHK_LOW_BATTERY, GetModuleHandleW(NULL), NULL);
+            SendMessageW(g_hChkLowBattery, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
+            SendMessageW(g_hChkLowBattery, BM_SETCHECK, g_lowBatteryAlert ? BST_CHECKED : BST_UNCHECKED, 0);
+            SetWindowTheme(g_hChkLowBattery, L"DarkMode_Explorer", NULL);
+
+            g_hBtnDeadzone = CreateWindowW(L"BUTTON", L"",
+                WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
+                S(40), S(256), S(280), S(34), hwnd, (HMENU)(INT_PTR)IDC_BTN_DEADZONE, GetModuleHandleW(NULL), NULL);
+
+            g_hBtnSettingsBack = CreateWindowW(L"BUTTON", loc.Get(StringId::SettingsBack).c_str(),
+                WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
+                S(40), S(304), S(120), S(34), hwnd, (HMENU)(INT_PTR)IDC_BTN_SETTINGS_BACK, GetModuleHandleW(NULL), NULL);
+
+            UpdateDeadzoneButtonText();
             SetupTray(hwnd);
             UpdateUIStrings();
             AppendLogMessage(Localization::Instance().Get(StringId::LogAppReady));
@@ -501,7 +719,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         case WM_DRAWITEM: {
             LPDRAWITEMSTRUCT dis = (LPDRAWITEMSTRUCT)lParam;
             if (dis->CtlType == ODT_BUTTON) {
-                bool isAccent = (dis->CtlID == IDC_BTN_START);
+                bool isAccent = (dis->CtlID == IDC_BTN_START || dis->CtlID == IDC_BTN_SETTINGS_BACK);
                 DrawModernButton(dis, isAccent);
                 return TRUE;
             }
@@ -511,8 +729,29 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         case WM_COMMAND: {
             int id = LOWORD(wParam);
             switch (id) {
+                case IDC_BTN_SETTINGS:
+                    SwitchView(!g_showSettings);
+                    break;
+                case IDC_BTN_SETTINGS_BACK:
+                    SwitchView(false);
+                    break;
+                case IDC_CHK_START_WINDOWS:
+                    g_startWithWindows = (SendMessageW(g_hChkStartWindows, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                    ApplyStartWithWindows(g_startWithWindows);
+                    break;
                 case IDC_CHK_MINIMIZE_CLOSE:
                     g_minimizeOnClose = (SendMessageW(g_hChkMinimizeClose, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                    break;
+                case IDC_CHK_AUTO_START:
+                    g_autoStartService = (SendMessageW(g_hChkAutoStart, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                    break;
+                case IDC_CHK_LOW_BATTERY:
+                    g_lowBatteryAlert = (SendMessageW(g_hChkLowBattery, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                    break;
+                case IDC_BTN_DEADZONE:
+                    g_deadzoneLevel = (g_deadzoneLevel + 1) % 4;
+                    UpdateDeadzoneButtonText();
+                    if (g_remapper) g_remapper->SetDeadzone(kDeadzoneValues[g_deadzoneLevel]);
                     break;
                 case IDC_BTN_START: StartServices(); break;
                 case IDC_BTN_STOP:  StopServices(); break;
@@ -533,6 +772,19 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 case IDM_TRAY_EXIT:
                     DestroyWindow(hwnd);
                     break;
+            }
+            return 0;
+        }
+
+        case WM_UPDATE_INPUT: {
+            auto* pRep = reinterpret_cast<XUSB_REPORT*>(wParam);
+            if (pRep) {
+                g_liveInput = *pRep;
+                delete pRep;
+                if (!g_showSettings) {
+                    RECT rcStatus = { S(20), S(56), S(450), S(146) };
+                    InvalidateRect(hwnd, &rcStatus, FALSE);
+                }
             }
             return 0;
         }
@@ -565,6 +817,23 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 g_batteryDevice = *pName;
                 delete pName;
             }
+
+            // MARK: Low Battery Toast Notification
+            if (g_batteryLevel > 0 && g_batteryLevel <= 15 && !g_batteryWarningSent && g_lowBatteryAlert) {
+                g_batteryWarningSent = true;
+                auto& loc = Localization::Instance();
+                g_nid.uFlags |= NIF_INFO;
+                wcsncpy_s(g_nid.szInfoTitle, loc.Get(StringId::LowBatteryAlertTitle).c_str(), _TRUNCATE);
+                wchar_t buf[256];
+                swprintf_s(buf, loc.Get(StringId::LowBatteryAlertMsg).c_str(), g_batteryLevel);
+                wcsncpy_s(g_nid.szInfo, buf, _TRUNCATE);
+                g_nid.dwInfoFlags = NIIF_WARNING;
+                Shell_NotifyIconW(NIM_MODIFY, &g_nid);
+                g_nid.uFlags &= ~NIF_INFO;
+            } else if (g_batteryLevel > 20) {
+                g_batteryWarningSent = false;
+            }
+
             UpdateTrayTooltip();
             InvalidateRect(hwnd, NULL, FALSE);
             return 0;
@@ -574,10 +843,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         case WM_CTLCOLOREDIT: {
             HDC hdcCtrl = (HDC)wParam;
             HWND hwndCtrl = (HWND)lParam;
-            if (hwndCtrl == g_hChkMinimizeClose) {
+            if (hwndCtrl == g_hChkMinimizeClose || hwndCtrl == g_hChkStartWindows || hwndCtrl == g_hChkAutoStart || hwndCtrl == g_hChkLowBattery) {
                 SetTextColor(hdcCtrl, UI::ColorTextSecondary);
-                SetBkColor(hdcCtrl, UI::ColorWindowBg);
-                return (LRESULT)g_hBrWindowBg;
+                SetBkColor(hdcCtrl, UI::ColorCardBg);
+                return (LRESULT)g_hBrCardBg;
             }
             if (hwndCtrl == g_hEditLogs) {
                 SetTextColor(hdcCtrl, UI::ColorTextSecondary);
@@ -638,8 +907,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 } // namespace
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
-    // 1. Enable Per-Monitor DPI Awareness V2 (Stops Windows from bitmap-stretching and blurring the UI)
     InitDpiAwareness();
+
+    g_startWithWindows = CheckStartWithWindows();
 
     INITCOMMONCONTROLSEX icex = {};
     icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
@@ -677,8 +947,34 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     }
 
     UI::EnableImmersiveDarkMode(g_hWnd);
+
+    int argc = 0;
+    LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    bool startMinimized = false;
+    if (argv) {
+        for (int i = 1; i < argc; ++i) {
+            if (wcscmp(argv[i], L"--minimized") == 0 || wcscmp(argv[i], L"-m") == 0) {
+                startMinimized = true;
+                break;
+            }
+        }
+        LocalFree(argv);
+    }
+
+    if (startMinimized) {
+        nCmdShow = SW_HIDE;
+    }
+
     ShowWindow(g_hWnd, nCmdShow);
     UpdateWindow(g_hWnd);
+
+    if (startMinimized) {
+        MinimizeToTray();
+    }
+
+    if (g_autoStartService) {
+        StartServices();
+    }
 
     MSG msg = {};
     while (GetMessageW(&msg, NULL, 0, 0)) {
