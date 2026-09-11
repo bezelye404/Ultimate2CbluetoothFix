@@ -8,6 +8,9 @@
 #define NTDDI_VERSION 0x0A000003
 #endif
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -39,7 +42,7 @@ inline void InitDpiAwareness() {
         typedef BOOL (WINAPI *pfn_SetDpi)(void*);
         auto fn = (pfn_SetDpi)GetProcAddress(hUser32, "SetProcessDpiAwarenessContext");
         if (fn) {
-            fn((void*)-4); // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+            fn((void*)(intptr_t)-4); // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
         }
     }
 }
@@ -387,7 +390,7 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     RECT pctRc = { cardBattery.left + S(16), S(80), cardBattery.right - S(16), S(102) };
     DrawTextW(memDC, pctStr.c_str(), (int)pctStr.length(), &pctRc, DT_RIGHT | DT_SINGLELINE);
 
-    // Minimal Horizontal Battery Bar
+    // MARK: Battery Bar
     RECT trackRc = { cardBattery.left + S(16), S(110), cardBattery.right - S(16), S(116) };
     HBRUSH hTrackBr = CreateSolidBrush(UI::ColorCardBorder);
     FillRect(memDC, &trackRc, hTrackBr);
@@ -395,7 +398,7 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
 
     if (g_batteryLevel > 0) {
         int trackWidth = trackRc.right - trackRc.left;
-        int fillWidth = (trackWidth * std::min(g_batteryLevel, 100)) / 100;
+        int fillWidth = (trackWidth * (std::min)(g_batteryLevel, 100)) / 100;
         RECT fillRc = { trackRc.left, trackRc.top, trackRc.left + fillWidth, trackRc.bottom };
         COLORREF fillCol = (g_batteryLevel <= 20) ? UI::ColorStatusRed : (g_batteryLevel <= 50 ? UI::ColorStatusAmber : UI::ColorStatusGreen);
         HBRUSH hFillBr = CreateSolidBrush(fillCol);
@@ -446,30 +449,28 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             RECT rc;
             GetClientRect(hwnd, &rc);
 
-            // Start Service button (Owner-drawn dark button)
+            // MARK: Controls
             g_hBtnStart = CreateWindowW(L"BUTTON", L"Start Service", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
-                S(20), S(170), S(140), S(36), hwnd, (HMENU)IDC_BTN_START, GetModuleHandleW(NULL), NULL);
+                S(20), S(170), S(140), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_START, GetModuleHandleW(NULL), NULL);
 
-            // Stop Service button (Owner-drawn dark button)
             g_hBtnStop = CreateWindowW(L"BUTTON", L"Stop Service", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW | WS_DISABLED,
-                S(170), S(170), S(140), S(36), hwnd, (HMENU)IDC_BTN_STOP, GetModuleHandleW(NULL), NULL);
+                S(170), S(170), S(140), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_STOP, GetModuleHandleW(NULL), NULL);
 
-            // Language button (Top-Right)
             g_hBtnLang = CreateWindowW(L"BUTTON", L"TR", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
-                rc.right - S(108), S(16), S(38), S(26), hwnd, (HMENU)IDC_BTN_LANG, GetModuleHandleW(NULL), NULL);
+                rc.right - S(108), S(16), S(38), S(26), hwnd, (HMENU)(INT_PTR)IDC_BTN_LANG, GetModuleHandleW(NULL), NULL);
 
-            // Tray button (Top-Right)
             g_hBtnTray = CreateWindowW(L"BUTTON", L"_", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
-                rc.right - S(62), S(16), S(38), S(26), hwnd, (HMENU)IDC_BTN_TRAY, GetModuleHandleW(NULL), NULL);
+                rc.right - S(62), S(16), S(38), S(26), hwnd, (HMENU)(INT_PTR)IDC_BTN_TRAY, GetModuleHandleW(NULL), NULL);
 
-            // Clear Logs button
             g_hBtnClearLogs = CreateWindowW(L"BUTTON", L"Clear", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
-                rc.right - S(82), S(240), S(54), S(22), hwnd, (HMENU)IDC_BTN_CLEAR_LOGS, GetModuleHandleW(NULL), NULL);
+                rc.right - S(82), S(240), S(54), S(22), hwnd, (HMENU)(INT_PTR)IDC_BTN_CLEAR_LOGS, GetModuleHandleW(NULL), NULL);
 
-            // Terminal Logs Box (Border-free flat inside card)
+            // MARK: Terminal Logs
+            int editHeight = rc.bottom - S(320);
+            if (editHeight < S(150)) editHeight = S(150);
             g_hEditLogs = CreateWindowExW(0, L"EDIT", L"",
                 WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
-                S(32), S(268), rc.right - S(64), S(170), hwnd, (HMENU)IDC_EDIT_LOGS, GetModuleHandleW(NULL), NULL);
+                S(32), S(268), rc.right - S(64), editHeight, hwnd, (HMENU)(INT_PTR)IDC_EDIT_LOGS, GetModuleHandleW(NULL), NULL);
 
             SendMessageW(g_hEditLogs, WM_SETFONT, (WPARAM)g_hFontMono, TRUE);
 

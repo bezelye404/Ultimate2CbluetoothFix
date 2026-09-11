@@ -10,6 +10,8 @@ if(MSVC)
     add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/await>)
 endif()
 
+add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
+
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
