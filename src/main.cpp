@@ -8,8 +8,7 @@
 #include <vector>
 #include <deque>
 #include <memory>
-#include <sstream>
-#include <iomanip>
+#include <algorithm>
 #include "UIStyles.h"
 #include "Localization.h"
 #include "Remapper.h"
@@ -69,6 +68,9 @@ std::wstring g_deviceName;
 RemapperStatus g_currentStatus      = RemapperStatus::Stopped;
 int g_batteryLevel                  = -1;
 std::wstring g_batteryDevice;
+
+int g_dpi = 96;
+int S(int val) { return MulDiv(val, g_dpi, 96); }
 
 void TrimWorkingSet() {
     SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
@@ -177,7 +179,7 @@ void SetupTray(HWND hwnd) {
     g_nid.uCallbackMessage = WM_TRAYICON;
     g_nid.hIcon = LoadIconW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(1));
     if (!g_nid.hIcon) {
-        g_nid.hIcon = LoadIconW(NULL, IDI_APPLICATION);
+        g_nid.hIcon = LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
     }
     wcscpy_s(g_nid.szTip, L"8BitDo Ultimate 2C Fixer");
     g_trayCreated = Shell_NotifyIconW(NIM_ADD, &g_nid);
@@ -212,11 +214,55 @@ void DrawCard(HDC hdc, const RECT& rc) {
     HPEN hOldPen = (HPEN)SelectObject(hdc, hPen);
     HBRUSH hOldBr = (HBRUSH)SelectObject(hdc, g_hBrCardBg);
 
-    RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, 10, 10);
+    RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, S(8), S(8));
 
     SelectObject(hdc, hOldBr);
     SelectObject(hdc, hOldPen);
     DeleteObject(hPen);
+}
+
+void DrawModernButton(LPDRAWITEMSTRUCT dis, bool isAccent = false) {
+    HDC hdc = dis->hDC;
+    RECT rc = dis->rcItem;
+    bool isPressed = (dis->itemState & ODS_SELECTED);
+    bool isDisabled = (dis->itemState & ODS_DISABLED);
+
+    COLORREF bg = isAccent ? UI::ColorButtonAccent : UI::ColorButtonBg;
+    COLORREF border = isAccent ? UI::ColorButtonAccent : UI::ColorCardBorder;
+    COLORREF text = isAccent ? UI::ColorButtonAccentText : UI::ColorTextPrimary;
+
+    if (isDisabled) {
+        bg = RGB(24, 24, 28);
+        border = RGB(35, 35, 42);
+        text = UI::ColorTextMuted;
+    } else if (isPressed) {
+        bg = isAccent ? RGB(210, 210, 214) : RGB(30, 30, 36);
+    }
+
+    HBRUSH hBr = CreateSolidBrush(bg);
+    HPEN hPen = CreatePen(PS_SOLID, 1, border);
+    HBRUSH hOldBr = (HBRUSH)SelectObject(hdc, hBr);
+    HPEN hOldPen = (HPEN)SelectObject(hdc, hPen);
+
+    RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, S(6), S(6));
+
+    SelectObject(hdc, hOldBr);
+    SelectObject(hdc, hOldPen);
+    DeleteObject(hBr);
+    DeleteObject(hPen);
+
+    // Button text
+    wchar_t textBuf[128];
+    GetWindowTextW(dis->hwndItem, textBuf, 128);
+
+    SetBkMode(hdc, TRANSPARENT);
+    SetTextColor(hdc, text);
+    SelectObject(hdc, g_hFontBody);
+
+    if (isPressed) {
+        OffsetRect(&rc, 0, 1);
+    }
+    DrawTextW(hdc, textBuf, -1, &rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 }
 
 void PaintDashboard(HWND hwnd, HDC hdc) {
@@ -236,24 +282,24 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     // 1. Header Title & Subtitle
     SelectObject(memDC, g_hFontTitle);
     SetTextColor(memDC, UI::ColorTextPrimary);
-    TextOutW(memDC, 20, 18, loc.Get(StringId::AppTitle).c_str(), (int)loc.Get(StringId::AppTitle).length());
+    TextOutW(memDC, S(20), S(16), loc.Get(StringId::AppTitle).c_str(), (int)loc.Get(StringId::AppTitle).length());
 
     SelectObject(memDC, g_hFontSmall);
     SetTextColor(memDC, UI::ColorTextMuted);
-    TextOutW(memDC, 20, 42, loc.Get(StringId::ModeDesc).c_str(), (int)loc.Get(StringId::ModeDesc).length());
+    TextOutW(memDC, S(20), S(42), loc.Get(StringId::ModeDesc).c_str(), (int)loc.Get(StringId::ModeDesc).length());
 
     // 2. Card 1: Controller Status
-    RECT cardStatus = { 20, 72, 360, 160 };
+    RECT cardStatus = { S(20), S(68), clientRc.right - S(230), S(156) };
     DrawCard(memDC, cardStatus);
 
     SelectObject(memDC, g_hFontSmall);
     SetTextColor(memDC, UI::ColorTextMuted);
-    TextOutW(memDC, 36, 86, loc.Get(StringId::StatusTitle).c_str(), (int)loc.Get(StringId::StatusTitle).length());
+    TextOutW(memDC, S(36), S(82), loc.Get(StringId::StatusTitle).c_str(), (int)loc.Get(StringId::StatusTitle).length());
 
     SelectObject(memDC, g_hFontTitle);
     SetTextColor(memDC, UI::ColorTextPrimary);
     std::wstring devName = g_deviceName.empty() ? loc.Get(StringId::NoDevice) : g_deviceName;
-    TextOutW(memDC, 36, 106, devName.c_str(), (int)devName.length());
+    TextOutW(memDC, S(36), S(102), devName.c_str(), (int)devName.length());
 
     // Status Dot
     COLORREF dotColor = UI::ColorStatusGray;
@@ -274,7 +320,7 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     HBRUSH hOldBrush = (HBRUSH)SelectObject(memDC, hDotBrush);
     HPEN hOldPen = (HPEN)SelectObject(memDC, hNoPen);
 
-    Ellipse(memDC, 36, 136, 44, 144);
+    Ellipse(memDC, S(36), S(132), S(44), S(140));
 
     SelectObject(memDC, hOldBrush);
     SelectObject(memDC, hOldPen);
@@ -283,32 +329,33 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
 
     SelectObject(memDC, g_hFontBody);
     SetTextColor(memDC, UI::ColorTextSecondary);
-    TextOutW(memDC, 50, 133, statusText.c_str(), (int)statusText.length());
+    TextOutW(memDC, S(50), S(128), statusText.c_str(), (int)statusText.length());
 
     // 3. Card 2: Battery Status
-    RECT cardBattery = { 375, 72, 600, 160 };
+    RECT cardBattery = { clientRc.right - S(216), S(68), clientRc.right - S(20), S(156) };
     DrawCard(memDC, cardBattery);
 
     SelectObject(memDC, g_hFontSmall);
     SetTextColor(memDC, UI::ColorTextMuted);
-    TextOutW(memDC, 390, 86, loc.Get(StringId::BatteryTitle).c_str(), (int)loc.Get(StringId::BatteryTitle).length());
+    TextOutW(memDC, cardBattery.left + S(16), S(82), loc.Get(StringId::BatteryTitle).c_str(), (int)loc.Get(StringId::BatteryTitle).length());
 
     // Battery percentage
     std::wstring pctStr = (g_batteryLevel >= 0) ? (std::to_wstring(g_batteryLevel) + L"%") : L"--%";
     SelectObject(memDC, g_hFontTitle);
     SetTextColor(memDC, UI::ColorTextPrimary);
-    RECT pctRc = { 390, 84, 584, 106 };
+    RECT pctRc = { cardBattery.left + S(16), S(80), cardBattery.right - S(16), S(102) };
     DrawTextW(memDC, pctStr.c_str(), (int)pctStr.length(), &pctRc, DT_RIGHT | DT_SINGLELINE);
 
     // Minimal Horizontal Battery Bar
-    RECT trackRc = { 390, 116, 584, 122 };
+    RECT trackRc = { cardBattery.left + S(16), S(110), cardBattery.right - S(16), S(116) };
     HBRUSH hTrackBr = CreateSolidBrush(UI::ColorCardBorder);
     FillRect(memDC, &trackRc, hTrackBr);
     DeleteObject(hTrackBr);
 
     if (g_batteryLevel > 0) {
-        int fillWidth = ((584 - 390) * min(g_batteryLevel, 100)) / 100;
-        RECT fillRc = { 390, 116, 390 + fillWidth, 122 };
+        int trackWidth = trackRc.right - trackRc.left;
+        int fillWidth = (trackWidth * std::min(g_batteryLevel, 100)) / 100;
+        RECT fillRc = { trackRc.left, trackRc.top, trackRc.left + fillWidth, trackRc.bottom };
         COLORREF fillCol = (g_batteryLevel <= 20) ? UI::ColorStatusRed : (g_batteryLevel <= 50 ? UI::ColorStatusAmber : UI::ColorStatusGreen);
         HBRUSH hFillBr = CreateSolidBrush(fillCol);
         FillRect(memDC, &fillRc, hFillBr);
@@ -318,12 +365,20 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     SelectObject(memDC, g_hFontSmall);
     SetTextColor(memDC, UI::ColorTextMuted);
     std::wstring bDevName = g_batteryDevice.empty() ? loc.Get(StringId::NoDevice) : g_batteryDevice;
-    TextOutW(memDC, 390, 133, bDevName.c_str(), (int)bDevName.length());
+    TextOutW(memDC, cardBattery.left + S(16), S(128), bDevName.c_str(), (int)bDevName.length());
+
+    // Card for logs/terminal background
+    RECT cardTerminal = { S(20), S(236), clientRc.right - S(20), clientRc.bottom - S(32) };
+    DrawCard(memDC, cardTerminal);
+
+    SelectObject(memDC, g_hFontSmall);
+    SetTextColor(memDC, UI::ColorTextMuted);
+    TextOutW(memDC, S(36), S(244), loc.Get(StringId::LogsTitle).c_str(), (int)loc.Get(StringId::LogsTitle).length());
 
     // 4. Footer
     SelectObject(memDC, g_hFontSmall);
     SetTextColor(memDC, UI::ColorTextMuted);
-    TextOutW(memDC, 20, clientRc.bottom - 24, loc.Get(StringId::Footer).c_str(), (int)loc.Get(StringId::Footer).length());
+    TextOutW(memDC, S(22), clientRc.bottom - S(22), loc.Get(StringId::Footer).c_str(), (int)loc.Get(StringId::Footer).length());
 
     BitBlt(hdc, 0, 0, clientRc.right, clientRc.bottom, memDC, 0, 0, SRCCOPY);
 
@@ -335,51 +390,62 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
         case WM_CREATE: {
-            g_hFontTitle = CreateFontW(19, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
-            g_hFontBody  = CreateFontW(14, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
-            g_hFontSmall = CreateFontW(12, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
-            g_hFontMono  = CreateFontW(13, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, FIXED_PITCH, L"Consolas");
+            g_dpi = GetDpiForWindow(hwnd);
+            if (g_dpi == 0) g_dpi = 96;
+
+            g_hFontTitle = CreateFontW(-MulDiv(15, g_dpi, 72), 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
+            g_hFontBody  = CreateFontW(-MulDiv(11, g_dpi, 72), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
+            g_hFontSmall = CreateFontW(-MulDiv(9, g_dpi, 72), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH, L"Segoe UI");
+            g_hFontMono  = CreateFontW(-MulDiv(10, g_dpi, 72), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, FIXED_PITCH, L"Cascadia Mono, Consolas");
 
             g_hBrWindowBg = CreateSolidBrush(UI::ColorWindowBg);
             g_hBrCardBg   = CreateSolidBrush(UI::ColorCardBg);
-            g_hBrEditBg   = CreateSolidBrush(RGB(22, 22, 26));
+            g_hBrEditBg   = CreateSolidBrush(UI::ColorCardBg);
 
-            // Start Service button
-            g_hBtnStart = CreateWindowW(L"BUTTON", L"Start Service", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-                20, 172, 130, 36, hwnd, (HMENU)IDC_BTN_START, GetModuleHandleW(NULL), NULL);
+            RECT rc;
+            GetClientRect(hwnd, &rc);
 
-            // Stop Service button
-            g_hBtnStop = CreateWindowW(L"BUTTON", L"Stop Service", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON | WS_DISABLED,
-                160, 172, 130, 36, hwnd, (HMENU)IDC_BTN_STOP, GetModuleHandleW(NULL), NULL);
+            // Start Service button (Owner-drawn dark button)
+            g_hBtnStart = CreateWindowW(L"BUTTON", L"Start Service", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
+                S(20), S(170), S(140), S(36), hwnd, (HMENU)IDC_BTN_START, GetModuleHandleW(NULL), NULL);
 
-            // Language button
-            g_hBtnLang = CreateWindowW(L"BUTTON", L"TR", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-                510, 18, 42, 26, hwnd, (HMENU)IDC_BTN_LANG, GetModuleHandleW(NULL), NULL);
+            // Stop Service button (Owner-drawn dark button)
+            g_hBtnStop = CreateWindowW(L"BUTTON", L"Stop Service", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW | WS_DISABLED,
+                S(170), S(170), S(140), S(36), hwnd, (HMENU)IDC_BTN_STOP, GetModuleHandleW(NULL), NULL);
 
-            // Tray button
-            g_hBtnTray = CreateWindowW(L"BUTTON", L"_", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-                558, 18, 42, 26, hwnd, (HMENU)IDC_BTN_TRAY, GetModuleHandleW(NULL), NULL);
+            // Language button (Top-Right)
+            g_hBtnLang = CreateWindowW(L"BUTTON", L"TR", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
+                rc.right - S(108), S(16), S(38), S(26), hwnd, (HMENU)IDC_BTN_LANG, GetModuleHandleW(NULL), NULL);
+
+            // Tray button (Top-Right)
+            g_hBtnTray = CreateWindowW(L"BUTTON", L"_", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
+                rc.right - S(62), S(16), S(38), S(26), hwnd, (HMENU)IDC_BTN_TRAY, GetModuleHandleW(NULL), NULL);
 
             // Clear Logs button
-            g_hBtnClearLogs = CreateWindowW(L"BUTTON", L"Clear", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-                536, 218, 64, 22, hwnd, (HMENU)IDC_BTN_CLEAR_LOGS, GetModuleHandleW(NULL), NULL);
+            g_hBtnClearLogs = CreateWindowW(L"BUTTON", L"Clear", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
+                rc.right - S(82), S(240), S(54), S(22), hwnd, (HMENU)IDC_BTN_CLEAR_LOGS, GetModuleHandleW(NULL), NULL);
 
-            // Terminal Logs Box
-            g_hEditLogs = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
+            // Terminal Logs Box (Border-free flat inside card)
+            g_hEditLogs = CreateWindowExW(0, L"EDIT", L"",
                 WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
-                20, 244, 580, 220, hwnd, (HMENU)IDC_EDIT_LOGS, GetModuleHandleW(NULL), NULL);
+                S(32), S(268), rc.right - S(64), S(170), hwnd, (HMENU)IDC_EDIT_LOGS, GetModuleHandleW(NULL), NULL);
 
             SendMessageW(g_hEditLogs, WM_SETFONT, (WPARAM)g_hFontMono, TRUE);
-            SendMessageW(g_hBtnStart, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
-            SendMessageW(g_hBtnStop, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
-            SendMessageW(g_hBtnLang, WM_SETFONT, (WPARAM)g_hFontSmall, TRUE);
-            SendMessageW(g_hBtnTray, WM_SETFONT, (WPARAM)g_hFontSmall, TRUE);
-            SendMessageW(g_hBtnClearLogs, WM_SETFONT, (WPARAM)g_hFontSmall, TRUE);
 
             SetupTray(hwnd);
             UpdateUIStrings();
             AppendLogMessage(Localization::Instance().Get(StringId::LogAppReady));
             return 0;
+        }
+
+        case WM_DRAWITEM: {
+            LPDRAWITEMSTRUCT dis = (LPDRAWITEMSTRUCT)lParam;
+            if (dis->CtlType == ODT_BUTTON) {
+                bool isAccent = (dis->CtlID == IDC_BTN_START);
+                DrawModernButton(dis, isAccent);
+                return TRUE;
+            }
+            break;
         }
 
         case WM_COMMAND: {
@@ -445,7 +511,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             HWND hwndCtrl = (HWND)lParam;
             if (hwndCtrl == g_hEditLogs) {
                 SetTextColor(hdcEdit, UI::ColorTextSecondary);
-                SetBkColor(hdcEdit, RGB(22, 22, 26));
+                SetBkColor(hdcEdit, UI::ColorCardBg);
                 return (LRESULT)g_hBrEditBg;
             }
             break;
@@ -490,6 +556,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 } // namespace
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
+    // 1. Enable Per-Monitor DPI Awareness V2 (Stops Windows from bitmap-stretching and blurring the UI)
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+
     INITCOMMONCONTROLSEX icex = {};
     icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
     icex.dwICC = ICC_STANDARD_CLASSES | ICC_PROGRESS_CLASS;
@@ -502,18 +571,22 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     wc.lpfnWndProc = WndProc;
     wc.hInstance = hInstance;
     wc.lpszClassName = CLASS_NAME;
-    wc.hCursor = LoadCursorW(NULL, IDC_ARROW);
+    wc.hCursor = LoadCursorW(NULL, (LPCWSTR)IDC_ARROW);
     wc.hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(1));
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 
     RegisterClassExW(&wc);
+
+    UINT dpi = GetDpiForSystem();
+    int winWidth = MulDiv(640, dpi, 96);
+    int winHeight = MulDiv(510, dpi, 96);
 
     g_hWnd = CreateWindowExW(
         0,
         CLASS_NAME,
         L"8BitDo Ultimate 2C Fixer",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
-        CW_USEDEFAULT, CW_USEDEFAULT, 636, 520,
+        CW_USEDEFAULT, CW_USEDEFAULT, winWidth, winHeight,
         NULL, NULL, hInstance, NULL
     );
 
