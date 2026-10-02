@@ -40,7 +40,7 @@ std::wstring Localization::Get(StringId id) const {
             case StringId::NoDevice: return L"No Device Detected";
             case StringId::Idle: return L"Idle";
             case StringId::WaitingReconnect: return L"Waiting for controller...";
-            case StringId::LogAppReady: return L"Application ready (C++ Native).";
+            case StringId::LogAppReady: return L"Application ready.";
             case StringId::LogServicesStarting: return L"Starting remapper and battery services...";
             case StringId::LogServicesStopping: return L"Stopping services...";
             case StringId::LogMapperStart: return L"DirectInput -> Virtual Xbox 360 remapper started.";
@@ -87,7 +87,7 @@ std::wstring Localization::Get(StringId id) const {
             case StringId::NoDevice: return L"Cihaz Alg\x0131lanmad\x0131";
             case StringId::Idle: return L"Bo\x015Fta";
             case StringId::WaitingReconnect: return L"Kolun a\x00E7\x0131lmas\x0131 bekleniyor...";
-            case StringId::LogAppReady: return L"Uygulama haz\x0131r (Yerel C++).";
+            case StringId::LogAppReady: return L"Uygulama haz\x0131r.";
             case StringId::LogServicesStarting: return L"Servisler ba\x015Flat\x0131l\x0131yor...";
             case StringId::LogServicesStopping: return L"Servisler durduruluyor...";
             case StringId::LogMapperStart: return L"DirectInput -> Sanal Xbox 360 remapper ba\x015Flat\x0131ld\x0131.";
