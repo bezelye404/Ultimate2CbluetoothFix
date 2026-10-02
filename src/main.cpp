@@ -88,6 +88,8 @@ constexpr int IDC_CHK_AUTO_START    = 110;
 constexpr int IDC_CHK_LOW_BATTERY   = 111;
 constexpr int IDC_BTN_DEADZONE      = 112;
 constexpr int IDC_BTN_SETTINGS_BACK = 113;
+constexpr int IDC_CHK_SWAP_AB       = 114;
+constexpr int IDC_CHK_SWAP_XY       = 115;
 
 constexpr int IDM_TRAY_OPEN         = 201;
 constexpr int IDM_TRAY_EXIT         = 202;
@@ -107,6 +109,8 @@ HWND g_hChkStartWindows             = nullptr;
 HWND g_hChkMinimizeClose            = nullptr;
 HWND g_hChkAutoStart                = nullptr;
 HWND g_hChkLowBattery               = nullptr;
+HWND g_hChkSwapAB                   = nullptr;
+HWND g_hChkSwapXY                   = nullptr;
 HWND g_hBtnDeadzone                 = nullptr;
 HWND g_hBtnSettingsBack             = nullptr;
 
@@ -115,6 +119,8 @@ bool g_minimizeOnClose              = true;
 bool g_startWithWindows             = false;
 bool g_autoStartService             = true;
 bool g_lowBatteryAlert              = true;
+bool g_swapAB                       = false;
+bool g_swapXY                       = false;
 int g_deadzoneLevel                 = 2; // 0=0%, 1=8%, 2=12%, 3=20%
 const int kDeadzoneValues[]         = { 0, 2600, 4000, 6500 };
 bool g_batteryWarningSent           = false;
@@ -222,6 +228,8 @@ void SwitchView(bool showSettings) {
     ShowWindow(g_hChkMinimizeClose, showSet);
     ShowWindow(g_hChkAutoStart, showSet);
     ShowWindow(g_hChkLowBattery, showSet);
+    ShowWindow(g_hChkSwapAB, showSet);
+    ShowWindow(g_hChkSwapXY, showSet);
     ShowWindow(g_hBtnDeadzone, showSet);
     ShowWindow(g_hBtnSettingsBack, showSet);
 
@@ -257,6 +265,8 @@ void UpdateUIStrings() {
     SetWindowTextW(g_hChkMinimizeClose, loc.Get(StringId::MinimizeOnClose).c_str());
     SetWindowTextW(g_hChkAutoStart, loc.Get(StringId::AutoStartService).c_str());
     SetWindowTextW(g_hChkLowBattery, loc.Get(StringId::LowBatteryNotification).c_str());
+    SetWindowTextW(g_hChkSwapAB, loc.Get(StringId::SwapAB).c_str());
+    SetWindowTextW(g_hChkSwapXY, loc.Get(StringId::SwapXY).c_str());
     SetWindowTextW(g_hBtnSettingsBack, loc.Get(StringId::SettingsBack).c_str());
     UpdateDeadzoneButtonText();
     UpdateTrayTooltip();
@@ -278,6 +288,8 @@ void StartServices() {
 
     g_remapper = std::make_unique<Remapper>();
     g_remapper->SetDeadzone(kDeadzoneValues[g_deadzoneLevel]);
+    g_remapper->SetSwapAB(g_swapAB);
+    g_remapper->SetSwapXY(g_swapXY);
     g_remapper->Start(
         g_hWnd,
         [](const std::wstring& msg) {
@@ -675,39 +687,53 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             // MARK: Settings View Controls (Hidden by default)
             g_hChkStartWindows = CreateWindowW(L"BUTTON", loc.Get(StringId::StartWithWindows).c_str(),
                 WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
-                S(40), S(110), S(380), S(24), hwnd, (HMENU)(INT_PTR)IDC_CHK_START_WINDOWS, GetModuleHandleW(NULL), NULL);
+                S(40), S(102), S(380), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_START_WINDOWS, GetModuleHandleW(NULL), NULL);
             SendMessageW(g_hChkStartWindows, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
             SendMessageW(g_hChkStartWindows, BM_SETCHECK, g_startWithWindows ? BST_CHECKED : BST_UNCHECKED, 0);
             SetWindowTheme(g_hChkStartWindows, L"DarkMode_Explorer", NULL);
 
             g_hChkMinimizeClose = CreateWindowW(L"BUTTON", loc.Get(StringId::MinimizeOnClose).c_str(),
                 WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
-                S(40), S(144), S(380), S(24), hwnd, (HMENU)(INT_PTR)IDC_CHK_MINIMIZE_CLOSE, GetModuleHandleW(NULL), NULL);
+                S(40), S(130), S(380), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_MINIMIZE_CLOSE, GetModuleHandleW(NULL), NULL);
             SendMessageW(g_hChkMinimizeClose, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
             SendMessageW(g_hChkMinimizeClose, BM_SETCHECK, g_minimizeOnClose ? BST_CHECKED : BST_UNCHECKED, 0);
             SetWindowTheme(g_hChkMinimizeClose, L"DarkMode_Explorer", NULL);
 
             g_hChkAutoStart = CreateWindowW(L"BUTTON", loc.Get(StringId::AutoStartService).c_str(),
                 WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
-                S(40), S(178), S(380), S(24), hwnd, (HMENU)(INT_PTR)IDC_CHK_AUTO_START, GetModuleHandleW(NULL), NULL);
+                S(40), S(158), S(380), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_AUTO_START, GetModuleHandleW(NULL), NULL);
             SendMessageW(g_hChkAutoStart, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
             SendMessageW(g_hChkAutoStart, BM_SETCHECK, g_autoStartService ? BST_CHECKED : BST_UNCHECKED, 0);
             SetWindowTheme(g_hChkAutoStart, L"DarkMode_Explorer", NULL);
 
             g_hChkLowBattery = CreateWindowW(L"BUTTON", loc.Get(StringId::LowBatteryNotification).c_str(),
                 WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
-                S(40), S(212), S(380), S(24), hwnd, (HMENU)(INT_PTR)IDC_CHK_LOW_BATTERY, GetModuleHandleW(NULL), NULL);
+                S(40), S(186), S(380), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_LOW_BATTERY, GetModuleHandleW(NULL), NULL);
             SendMessageW(g_hChkLowBattery, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
             SendMessageW(g_hChkLowBattery, BM_SETCHECK, g_lowBatteryAlert ? BST_CHECKED : BST_UNCHECKED, 0);
             SetWindowTheme(g_hChkLowBattery, L"DarkMode_Explorer", NULL);
 
+            g_hChkSwapAB = CreateWindowW(L"BUTTON", loc.Get(StringId::SwapAB).c_str(),
+                WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
+                S(40), S(214), S(380), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_SWAP_AB, GetModuleHandleW(NULL), NULL);
+            SendMessageW(g_hChkSwapAB, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
+            SendMessageW(g_hChkSwapAB, BM_SETCHECK, g_swapAB ? BST_CHECKED : BST_UNCHECKED, 0);
+            SetWindowTheme(g_hChkSwapAB, L"DarkMode_Explorer", NULL);
+
+            g_hChkSwapXY = CreateWindowW(L"BUTTON", loc.Get(StringId::SwapXY).c_str(),
+                WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
+                S(40), S(242), S(380), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_SWAP_XY, GetModuleHandleW(NULL), NULL);
+            SendMessageW(g_hChkSwapXY, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
+            SendMessageW(g_hChkSwapXY, BM_SETCHECK, g_swapXY ? BST_CHECKED : BST_UNCHECKED, 0);
+            SetWindowTheme(g_hChkSwapXY, L"DarkMode_Explorer", NULL);
+
             g_hBtnDeadzone = CreateWindowW(L"BUTTON", L"",
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(40), S(256), S(280), S(34), hwnd, (HMENU)(INT_PTR)IDC_BTN_DEADZONE, GetModuleHandleW(NULL), NULL);
+                S(40), S(276), S(280), S(32), hwnd, (HMENU)(INT_PTR)IDC_BTN_DEADZONE, GetModuleHandleW(NULL), NULL);
 
             g_hBtnSettingsBack = CreateWindowW(L"BUTTON", loc.Get(StringId::SettingsBack).c_str(),
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(40), S(304), S(120), S(34), hwnd, (HMENU)(INT_PTR)IDC_BTN_SETTINGS_BACK, GetModuleHandleW(NULL), NULL);
+                S(40), S(318), S(120), S(32), hwnd, (HMENU)(INT_PTR)IDC_BTN_SETTINGS_BACK, GetModuleHandleW(NULL), NULL);
 
             UpdateDeadzoneButtonText();
             SetupTray(hwnd);
@@ -747,6 +773,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     break;
                 case IDC_CHK_LOW_BATTERY:
                     g_lowBatteryAlert = (SendMessageW(g_hChkLowBattery, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                    break;
+                case IDC_CHK_SWAP_AB:
+                    g_swapAB = (SendMessageW(g_hChkSwapAB, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                    if (g_remapper) g_remapper->SetSwapAB(g_swapAB);
+                    break;
+                case IDC_CHK_SWAP_XY:
+                    g_swapXY = (SendMessageW(g_hChkSwapXY, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                    if (g_remapper) g_remapper->SetSwapXY(g_swapXY);
                     break;
                 case IDC_BTN_DEADZONE:
                     g_deadzoneLevel = (g_deadzoneLevel + 1) % 4;
@@ -843,7 +877,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         case WM_CTLCOLOREDIT: {
             HDC hdcCtrl = (HDC)wParam;
             HWND hwndCtrl = (HWND)lParam;
-            if (hwndCtrl == g_hChkMinimizeClose || hwndCtrl == g_hChkStartWindows || hwndCtrl == g_hChkAutoStart || hwndCtrl == g_hChkLowBattery) {
+            if (hwndCtrl == g_hChkMinimizeClose || hwndCtrl == g_hChkStartWindows || hwndCtrl == g_hChkAutoStart || hwndCtrl == g_hChkLowBattery || hwndCtrl == g_hChkSwapAB || hwndCtrl == g_hChkSwapXY) {
                 SetTextColor(hdcCtrl, UI::ColorTextSecondary);
                 SetBkColor(hdcCtrl, UI::ColorCardBg);
                 return (LRESULT)g_hBrCardBg;

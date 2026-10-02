@@ -235,11 +235,19 @@ void Remapper::WorkerLoop(HWND hwnd) {
             BYTE lt = state.rgbButtons[8] ? 255 : 0;
             BYTE rt = state.rgbButtons[9] ? 255 : 0;
 
+            bool swapAB = m_swapAB.load();
+            bool swapXY = m_swapXY.load();
+
+            USHORT btnA = swapAB ? XUSB_GAMEPAD_B : XUSB_GAMEPAD_A;
+            USHORT btnB = swapAB ? XUSB_GAMEPAD_A : XUSB_GAMEPAD_B;
+            USHORT btnX = swapXY ? XUSB_GAMEPAD_Y : XUSB_GAMEPAD_X;
+            USHORT btnY = swapXY ? XUSB_GAMEPAD_X : XUSB_GAMEPAD_Y;
+
             USHORT buttons = 0;
-            if (state.rgbButtons[0])  buttons |= XUSB_GAMEPAD_A;
-            if (state.rgbButtons[1])  buttons |= XUSB_GAMEPAD_B;
-            if (state.rgbButtons[3])  buttons |= XUSB_GAMEPAD_X;
-            if (state.rgbButtons[4])  buttons |= XUSB_GAMEPAD_Y;
+            if (state.rgbButtons[0])  buttons |= btnA;
+            if (state.rgbButtons[1])  buttons |= btnB;
+            if (state.rgbButtons[3])  buttons |= btnX;
+            if (state.rgbButtons[4])  buttons |= btnY;
             if (state.rgbButtons[6])  buttons |= XUSB_GAMEPAD_LEFT_SHOULDER;
             if (state.rgbButtons[7])  buttons |= XUSB_GAMEPAD_RIGHT_SHOULDER;
             if (state.rgbButtons[10]) buttons |= XUSB_GAMEPAD_BACK;

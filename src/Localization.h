@@ -20,6 +20,8 @@ enum class StringId {
     StartWithWindows,
     AutoStartService,
     LowBatteryNotification,
+    SwapAB,
+    SwapXY,
     DeadzoneLabel,
     DeadzoneOff,
     DeadzoneLow,

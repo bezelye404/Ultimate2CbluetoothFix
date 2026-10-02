@@ -35,6 +35,12 @@ public:
     void SetDeadzone(int dz) { m_deadzone.store(dz); }
     int GetDeadzone() const { return m_deadzone.load(); }
 
+    void SetSwapAB(bool swap) { m_swapAB.store(swap); }
+    bool GetSwapAB() const { return m_swapAB.load(); }
+
+    void SetSwapXY(bool swap) { m_swapXY.store(swap); }
+    bool GetSwapXY() const { return m_swapXY.load(); }
+
 private:
     void WorkerLoop(HWND hwnd);
     bool InitViGEm();
@@ -46,6 +52,8 @@ private:
 
     std::atomic<bool> m_running{false};
     std::atomic<int> m_deadzone{4000};
+    std::atomic<bool> m_swapAB{false};
+    std::atomic<bool> m_swapXY{false};
     std::thread m_workerThread;
     LogCallback m_logCallback;
     StatusCallback m_statusCallback;

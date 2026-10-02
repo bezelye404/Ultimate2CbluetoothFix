@@ -20,6 +20,8 @@ std::wstring Localization::Get(StringId id) const {
             case StringId::StartWithWindows: return L"Start with Windows";
             case StringId::AutoStartService: return L"Auto-start service on launch";
             case StringId::LowBatteryNotification: return L"Low battery notification (<=15%)";
+            case StringId::SwapAB: return L"Swap A / B buttons";
+            case StringId::SwapXY: return L"Swap X / Y buttons";
             case StringId::DeadzoneLabel: return L"Stick Drift / Deadzone";
             case StringId::DeadzoneOff: return L"Off (0%)";
             case StringId::DeadzoneLow: return L"Low (8%)";
@@ -65,6 +67,8 @@ std::wstring Localization::Get(StringId id) const {
             case StringId::StartWithWindows: return L"Windows ile ba\x015Flat";
             case StringId::AutoStartService: return L"A\x00E7\x0131l\x0131\x015Fta servisi otomatik ba\x015Flat";
             case StringId::LowBatteryNotification: return L"D\x00FC\x015F\x00FCk pil bildirimi (<=\x002515)";
+            case StringId::SwapAB: return L"A / B tu\x015Flar\x0131n\x0131 de\x011Fi\x015Ftir";
+            case StringId::SwapXY: return L"X / Y tu\x015Flar\x0131n\x0131 de\x011Fi\x015Ftir";
             case StringId::DeadzoneLabel: return L"Stick Drift / \x00D6l\x00FC B\x00F6lge";
             case StringId::DeadzoneOff: return L"Kapal\x0131 (\x00250)";
             case StringId::DeadzoneLow: return L"D\x00FC\x015F\x00FCk (\x00258)";
