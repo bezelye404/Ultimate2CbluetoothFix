@@ -9,7 +9,7 @@
 #pragma comment(lib, "dinput8.lib")
 #pragma comment(lib, "dxguid.lib")
 
-namespace BitDoFixer {
+namespace Ultimate2CFixer {
 
 namespace {
     constexpr int Deadzone = 4000;
@@ -328,4 +328,4 @@ SHORT Remapper::NegateAxis(SHORT v) {
     return -v;
 }
 
-} // namespace BitDoFixer
+} // namespace Ultimate2CFixer

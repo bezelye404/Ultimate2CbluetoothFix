@@ -18,7 +18,7 @@
 #define HAS_WINRT_BLE 0
 #endif
 
-namespace BitDoFixer {
+namespace Ultimate2CFixer {
 
 BatteryMonitor::BatteryMonitor() = default;
 
@@ -147,4 +147,4 @@ void BatteryMonitor::PollBattery() {
 #endif
 }
 
-} // namespace BitDoFixer
+} // namespace Ultimate2CFixer

@@ -1,11 +1,11 @@
 #include "Localization.h"
 
-namespace BitDoFixer {
+namespace Ultimate2CFixer {
 
 std::wstring Localization::Get(StringId id) const {
     if (m_isEnglish) {
         switch (id) {
-            case StringId::AppTitle: return L"8BitDo Ultimate 2C Fixer";
+            case StringId::AppTitle: return L"Ultimate2CFixer";
             case StringId::StatusTitle: return L"CONTROLLER STATUS";
             case StringId::BatteryTitle: return L"BATTERY";
             case StringId::ModeDesc: return L"DirectInput -> XInput (Xbox 360)";
@@ -29,7 +29,7 @@ std::wstring Localization::Get(StringId id) const {
             case StringId::DeadzoneHigh: return L"High (20%)";
             case StringId::SettingsBack: return L"Back";
             case StringId::LiveInputTitle: return L"LIVE INPUT TEST";
-            case StringId::LowBatteryAlertTitle: return L"8BitDo Battery Low";
+            case StringId::LowBatteryAlertTitle: return L"Ultimate2C Battery Low";
             case StringId::LowBatteryAlertMsg: return L"Battery is at %d%%. Please charge your controller.";
             case StringId::TrayOpen: return L"Open";
             case StringId::TrayExit: return L"Exit";
@@ -52,7 +52,7 @@ std::wstring Localization::Get(StringId id) const {
         }
     } else {
         switch (id) {
-            case StringId::AppTitle: return L"8BitDo Ultimate 2C D\x00FCzeltici";
+            case StringId::AppTitle: return L"Ultimate2CFixer";
             case StringId::StatusTitle: return L"KONTROLC\x00DC DURUMU";
             case StringId::BatteryTitle: return L"P\x0130L";
             case StringId::ModeDesc: return L"DirectInput -> XInput (Xbox 360)";
@@ -76,7 +76,7 @@ std::wstring Localization::Get(StringId id) const {
             case StringId::DeadzoneHigh: return L"Y\x00FCksek (\x002520)";
             case StringId::SettingsBack: return L"Geri";
             case StringId::LiveInputTitle: return L"CANLI G\x0130RD\x0130 TEST\x0130";
-            case StringId::LowBatteryAlertTitle: return L"8BitDo Pili D\x00FC\x015Ft\x00FC";
+            case StringId::LowBatteryAlertTitle: return L"Ultimate2C Pili D\x00FC\x015Ft\x00FC";
             case StringId::LowBatteryAlertMsg: return L"Pil seviyesi \x0025%d. L\x00FCtfen kolu \x015Farj edin.";
             case StringId::TrayOpen: return L"A\x00E7";
             case StringId::TrayExit: return L"\x00C7\x0131k\x0131\x015F";
@@ -100,4 +100,4 @@ std::wstring Localization::Get(StringId id) const {
     }
 }
 
-} // namespace BitDoFixer
+} // namespace Ultimate2CFixer

@@ -10,7 +10,7 @@
 #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
 #endif
 
-namespace BitDoFixer {
+namespace Ultimate2CFixer {
 namespace UI {
 
 constexpr COLORREF ColorWindowBg          = RGB(15, 15, 18);     // #0F0F12
@@ -39,4 +39,4 @@ inline void EnableImmersiveDarkMode(HWND hwnd) {
 }
 
 } // namespace UI
-} // namespace BitDoFixer
+} // namespace Ultimate2CFixer

@@ -5,7 +5,7 @@
 #include <thread>
 #include <atomic>
 
-namespace BitDoFixer {
+namespace Ultimate2CFixer {
 
 using BatteryCallback = std::function<void(const std::wstring& devName, int level)>;
 using LogCallback = std::function<void(const std::wstring&)>;
@@ -30,4 +30,4 @@ private:
     std::wstring m_cachedDeviceId;
 };
 
-} // namespace BitDoFixer
+} // namespace Ultimate2CFixer

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(8bitdofixer LANGUAGES CXX)
+project(Ultimate2CFixer LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -25,9 +25,9 @@ set(SOURCES
     src/resource.rc
 )
 
-add_executable(8bitdofixer WIN32 ${SOURCES})
+add_executable(Ultimate2CFixer WIN32 ${SOURCES})
 
-target_link_libraries(8bitdofixer PRIVATE
+target_link_libraries(Ultimate2CFixer PRIVATE
     dinput8
     dxguid
     dwmapi
@@ -37,17 +37,17 @@ target_link_libraries(8bitdofixer PRIVATE
 )
 
 if(MSVC)
-    target_link_libraries(8bitdofixer PRIVATE windowsapp)
+    target_link_libraries(Ultimate2CFixer PRIVATE windowsapp)
 endif()
 
 # Automatically locate and copy ViGEmClient.dll next to the executable
 file(GLOB_RECURSE VIGEM_DLLS "$ENV{USERPROFILE}/.nuget/packages/nefarius.vigem.client/*/native/ViGEmClient.dll")
 if(VIGEM_DLLS)
     list(GET VIGEM_DLLS 0 VIGEM_DLL_PATH)
-    add_custom_command(TARGET 8bitdofixer POST_BUILD
+    add_custom_command(TARGET Ultimate2CFixer POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${VIGEM_DLL_PATH}"
-        "$<TARGET_FILE_DIR:8bitdofixer>/ViGEmClient.dll"
+        "$<TARGET_FILE_DIR:Ultimate2CFixer>/ViGEmClient.dll"
         COMMENT "Copying ViGEmClient.dll to target directory"
     )
 endif()

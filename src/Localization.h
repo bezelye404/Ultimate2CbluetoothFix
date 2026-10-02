@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace BitDoFixer {
+namespace Ultimate2CFixer {
 
 enum class StringId {
     AppTitle,
@@ -67,4 +67,4 @@ private:
     bool m_isEnglish;
 };
 
-} // namespace BitDoFixer
+} // namespace Ultimate2CFixer

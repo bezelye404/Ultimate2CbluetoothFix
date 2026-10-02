@@ -34,7 +34,7 @@
 #pragma comment(lib, "uxtheme.lib")
 #pragma comment(linker, "\"/manifestdependency:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
-using namespace BitDoFixer;
+using namespace Ultimate2CFixer;
 
 namespace {
 
@@ -180,7 +180,10 @@ bool CheckStartWithWindows() {
     if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
         DWORD type = 0;
         DWORD size = 0;
-        LONG res = RegQueryValueExW(hKey, L"8BitDoUltimate2CFixer", NULL, &type, NULL, &size);
+        LONG res = RegQueryValueExW(hKey, L"Ultimate2CFixer", NULL, &type, NULL, &size);
+        if (res != ERROR_SUCCESS) {
+            res = RegQueryValueExW(hKey, L"8BitDoUltimate2CFixer", NULL, &type, NULL, &size);
+        }
         RegCloseKey(hKey);
         return (res == ERROR_SUCCESS);
     }
@@ -190,13 +193,14 @@ bool CheckStartWithWindows() {
 void ApplyStartWithWindows(bool enable) {
     HKEY hKey;
     if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_SET_VALUE, &hKey) == ERROR_SUCCESS) {
+        RegDeleteValueW(hKey, L"8BitDoUltimate2CFixer");
         if (enable) {
             wchar_t path[MAX_PATH];
             GetModuleFileNameW(NULL, path, MAX_PATH);
             std::wstring cmd = L"\"" + std::wstring(path) + L"\" --minimized";
-            RegSetValueExW(hKey, L"8BitDoUltimate2CFixer", 0, REG_SZ, (const BYTE*)cmd.c_str(), (DWORD)((cmd.length() + 1) * sizeof(wchar_t)));
+            RegSetValueExW(hKey, L"Ultimate2CFixer", 0, REG_SZ, (const BYTE*)cmd.c_str(), (DWORD)((cmd.length() + 1) * sizeof(wchar_t)));
         } else {
-            RegDeleteValueW(hKey, L"8BitDoUltimate2CFixer");
+            RegDeleteValueW(hKey, L"Ultimate2CFixer");
         }
         RegCloseKey(hKey);
     }
@@ -239,7 +243,7 @@ void SwitchView(bool showSettings) {
 void UpdateTrayTooltip() {
     if (!g_trayCreated) return;
     auto& loc = Localization::Instance();
-    std::wstring tip = L"8BitDo Ultimate 2C";
+    std::wstring tip = L"Ultimate2CFixer";
     if (g_currentStatus == RemapperStatus::Connected) {
         tip += L": " + loc.Get(StringId::StatusConnected);
         if (g_batteryLevel >= 0) {
@@ -354,7 +358,7 @@ void SetupTray(HWND hwnd) {
     if (!g_nid.hIcon) {
         g_nid.hIcon = LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
     }
-    wcscpy_s(g_nid.szTip, L"8BitDo Ultimate 2C Fixer");
+    wcscpy_s(g_nid.szTip, L"Ultimate2CFixer");
     g_trayCreated = Shell_NotifyIconW(NIM_ADD, &g_nid);
 }
 
@@ -950,7 +954,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     icex.dwICC = ICC_STANDARD_CLASSES | ICC_PROGRESS_CLASS;
     InitCommonControlsEx(&icex);
 
-    const wchar_t CLASS_NAME[] = L"BitDoFixer_Native_Class";
+    const wchar_t CLASS_NAME[] = L"Ultimate2CFixer_Class";
 
     WNDCLASSEXW wc = {};
     wc.cbSize = sizeof(WNDCLASSEXW);
@@ -970,7 +974,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     g_hWnd = CreateWindowExW(
         0,
         CLASS_NAME,
-        L"8BitDo Ultimate 2C Fixer",
+        L"Ultimate2CFixer",
         WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, winWidth, winHeight,
         NULL, NULL, hInstance, NULL

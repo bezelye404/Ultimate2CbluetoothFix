@@ -1,6 +1,6 @@
-# 8BitDo Ultimate 2C Bluetooth Fixer (C++ Native)
+# Ultimate2CFixer
 
-A lightweight, native Windows C++ application that remaps 8BitDo Ultimate 2C controllers (connected via Bluetooth) to a virtual XInput (Xbox 360) controller with battery monitoring, auto-reconnect, dirty-checking, and system tray support.
+A lightweight Windows application that remaps 8BitDo Ultimate 2C controllers (connected via Bluetooth) to a virtual XInput (Xbox 360) controller with battery monitoring, auto-reconnect, dirty-checking, stick drift protection, and system tray support.
 
 ![C++](https://img.shields.io/badge/C++-20-00599C?logo=c%2B%2B)
 ![Windows](https://img.shields.io/badge/Windows-10+-0078D6?logo=windows)
@@ -43,7 +43,7 @@ cmake ..
 cmake --build . --config Release
 ```
 
-The output executable `8bitdofixer.exe` will be generated in `build/Release/`.
+The output executable `Ultimate2CFixer.exe` will be generated in `build/Release/`.
 
 ---
 
@@ -51,7 +51,7 @@ The output executable `8bitdofixer.exe` will be generated in `build/Release/`.
 
 1. Install the [ViGEmBus Driver](https://github.com/nefarius/ViGEmBus/releases).
 2. Turn on your 8BitDo Ultimate 2C in **Bluetooth mode** and pair it with Windows.
-3. Launch `8bitdofixer.exe`.
+3. Launch `Ultimate2CFixer.exe`.
 4. Click **Start Service** (or press the Tray button to hide to background).
 
 

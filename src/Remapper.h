@@ -10,7 +10,7 @@
 #include <atomic>
 #include "../include/ViGEm/Client.h"
 
-namespace BitDoFixer {
+namespace Ultimate2CFixer {
 
 enum class RemapperStatus {
     Searching,
@@ -85,4 +85,4 @@ private:
     pfn_vigem_target_x360_update m_fn_target_update{nullptr};
 };
 
-} // namespace BitDoFixer
+} // namespace Ultimate2CFixer
