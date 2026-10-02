@@ -83,3 +83,4 @@ coverage/
 *.dll
 *.so
 *.dylib
+AGENTS.md
