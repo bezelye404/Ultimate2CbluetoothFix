@@ -137,6 +137,7 @@ HBRUSH g_hBrEditBg                  = nullptr;
 
 NOTIFYICONDATAW g_nid               = {};
 bool g_trayCreated                  = false;
+UINT g_uTaskbarRestartMsg           = 0;
 
 std::unique_ptr<Remapper> g_remapper;
 std::unique_ptr<BatteryMonitor> g_batteryMonitor;
@@ -255,7 +256,9 @@ void UpdateTrayTooltip() {
         tip += L": " + loc.Get(StringId::StatusStopped);
     }
     wcsncpy_s(g_nid.szTip, tip.c_str(), _TRUNCATE);
+    g_nid.uFlags = NIF_TIP;
     Shell_NotifyIconW(NIM_MODIFY, &g_nid);
+    g_nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
 }
 
 void UpdateUIStrings() {
@@ -349,17 +352,41 @@ void StopServices() {
 }
 
 void SetupTray(HWND hwnd) {
+    if (g_trayCreated) {
+        Shell_NotifyIconW(NIM_DELETE, &g_nid);
+        g_trayCreated = false;
+    }
+
+    memset(&g_nid, 0, sizeof(NOTIFYICONDATAW));
     g_nid.cbSize = sizeof(NOTIFYICONDATAW);
     g_nid.hWnd = hwnd;
     g_nid.uID = 1001;
     g_nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
     g_nid.uCallbackMessage = WM_TRAYICON;
-    g_nid.hIcon = LoadIconW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(1));
-    if (!g_nid.hIcon) {
-        g_nid.hIcon = LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
+
+    int cxSm = GetSystemMetrics(SM_CXSMICON);
+    int cySm = GetSystemMetrics(SM_CYSMICON);
+    HICON hSm = (HICON)LoadImageW(
+        GetModuleHandleW(NULL),
+        MAKEINTRESOURCEW(1),
+        IMAGE_ICON,
+        cxSm,
+        cySm,
+        LR_DEFAULTCOLOR | LR_SHARED
+    );
+    if (!hSm) {
+        hSm = LoadIconW(GetModuleHandleW(NULL), MAKEINTRESOURCEW(1));
     }
+    if (!hSm) {
+        hSm = LoadIconW(NULL, (LPCWSTR)IDI_APPLICATION);
+    }
+    g_nid.hIcon = hSm;
     wcscpy_s(g_nid.szTip, L"Ultimate2CFixer");
     g_trayCreated = Shell_NotifyIconW(NIM_ADD, &g_nid);
+    if (g_trayCreated) {
+        g_nid.uVersion = NOTIFYICON_VERSION_4;
+        Shell_NotifyIconW(NIM_SETVERSION, &g_nid);
+    }
 }
 
 void MinimizeToTray() {
@@ -640,8 +667,22 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
 }
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (msg != 0 && msg == g_uTaskbarRestartMsg) {
+        SetupTray(hwnd);
+        UpdateTrayTooltip();
+        return 0;
+    }
+
     switch (msg) {
+        case WM_SIZE: {
+            if (wParam == SIZE_MINIMIZED) {
+                TrimWorkingSet();
+            }
+            break;
+        }
+
         case WM_CREATE: {
+            g_uTaskbarRestartMsg = RegisterWindowMessageW(L"TaskbarCreated");
             g_dpi = SafeGetDpiForWindow(hwnd);
             if (g_dpi == 0) g_dpi = 96;
 
@@ -956,13 +997,21 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
 
     const wchar_t CLASS_NAME[] = L"Ultimate2CFixer_Class";
 
+    int cxSm = GetSystemMetrics(SM_CXSMICON);
+    int cySm = GetSystemMetrics(SM_CYSMICON);
+    HICON hIconBig = (HICON)LoadImageW(hInstance, MAKEINTRESOURCEW(1), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_SHARED);
+    HICON hIconSm = (HICON)LoadImageW(hInstance, MAKEINTRESOURCEW(1), IMAGE_ICON, cxSm, cySm, LR_DEFAULTCOLOR | LR_SHARED);
+    if (!hIconBig) hIconBig = LoadIconW(hInstance, MAKEINTRESOURCEW(1));
+    if (!hIconSm) hIconSm = hIconBig;
+
     WNDCLASSEXW wc = {};
     wc.cbSize = sizeof(WNDCLASSEXW);
     wc.lpfnWndProc = WndProc;
     wc.hInstance = hInstance;
     wc.lpszClassName = CLASS_NAME;
     wc.hCursor = LoadCursorW(NULL, (LPCWSTR)IDC_ARROW);
-    wc.hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(1));
+    wc.hIcon = hIconBig;
+    wc.hIconSm = hIconSm;
     wc.hbrBackground = CreateSolidBrush(UI::ColorWindowBg);
 
     RegisterClassExW(&wc);
@@ -983,6 +1032,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     if (!g_hWnd) {
         return 0;
     }
+
+    SendMessageW(g_hWnd, WM_SETICON, ICON_BIG, (LPARAM)hIconBig);
+    SendMessageW(g_hWnd, WM_SETICON, ICON_SMALL, (LPARAM)hIconSm);
 
     UI::EnableImmersiveDarkMode(g_hWnd);
 
