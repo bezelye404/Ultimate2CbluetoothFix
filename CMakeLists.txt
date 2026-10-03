@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(MSVC)
-    add_compile_options(/W4 /utf-8 /permissive- /EHsc)
+    add_compile_options(/W4 /utf-8 /permissive- /EHsc /wd4828)
     # Enable C++/WinRT if available
     add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/await>)
 endif()
@@ -15,6 +15,7 @@ add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/vigem
 )
 
 set(SOURCES
@@ -23,6 +24,7 @@ set(SOURCES
     src/BatteryMonitor.cpp
     src/Localization.cpp
     src/DriverInstaller.cpp
+    src/vigem/ViGEmClient.cpp
     src/resource.rc
 )
 
@@ -36,20 +38,9 @@ target_link_libraries(Ultimate2CFixer PRIVATE
     shell32
     uxtheme
     urlmon
+    setupapi
 )
 
 if(MSVC)
     target_link_libraries(Ultimate2CFixer PRIVATE windowsapp)
-endif()
-
-# Automatically locate and copy ViGEmClient.dll next to the executable
-file(GLOB_RECURSE VIGEM_DLLS "$ENV{USERPROFILE}/.nuget/packages/nefarius.vigem.client/*/native/ViGEmClient.dll")
-if(VIGEM_DLLS)
-    list(GET VIGEM_DLLS 0 VIGEM_DLL_PATH)
-    add_custom_command(TARGET Ultimate2CFixer POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${VIGEM_DLL_PATH}"
-        "$<TARGET_FILE_DIR:Ultimate2CFixer>/ViGEmClient.dll"
-        COMMENT "Copying ViGEmClient.dll to target directory"
-    )
 endif()

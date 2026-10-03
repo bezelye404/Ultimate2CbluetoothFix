@@ -55,30 +55,8 @@ private:
     StatusCallback m_statusCallback;
     InputCallback m_inputCallback;
 
-    HMODULE m_hViGEmDll{nullptr};
     PVIGEM_CLIENT m_vigemClient{nullptr};
     PVIGEM_TARGET m_vigemTarget{nullptr};
-
-    // ViGEm function pointers
-    typedef PVIGEM_CLIENT (*pfn_vigem_alloc)();
-    typedef void (*pfn_vigem_free)(PVIGEM_CLIENT);
-    typedef VIGEM_ERROR (*pfn_vigem_connect)(PVIGEM_CLIENT);
-    typedef void (*pfn_vigem_disconnect)(PVIGEM_CLIENT);
-    typedef PVIGEM_TARGET (*pfn_vigem_target_x360_alloc)();
-    typedef void (*pfn_vigem_target_free)(PVIGEM_TARGET);
-    typedef VIGEM_ERROR (*pfn_vigem_target_add)(PVIGEM_CLIENT, PVIGEM_TARGET);
-    typedef VIGEM_ERROR (*pfn_vigem_target_remove)(PVIGEM_CLIENT, PVIGEM_TARGET);
-    typedef VIGEM_ERROR (*pfn_vigem_target_x360_update)(PVIGEM_CLIENT, PVIGEM_TARGET, XUSB_REPORT);
-
-    pfn_vigem_alloc m_fn_alloc{nullptr};
-    pfn_vigem_free m_fn_free{nullptr};
-    pfn_vigem_connect m_fn_connect{nullptr};
-    pfn_vigem_disconnect m_fn_disconnect{nullptr};
-    pfn_vigem_target_x360_alloc m_fn_target_alloc{nullptr};
-    pfn_vigem_target_free m_fn_target_free{nullptr};
-    pfn_vigem_target_add m_fn_target_add{nullptr};
-    pfn_vigem_target_remove m_fn_target_remove{nullptr};
-    pfn_vigem_target_x360_update m_fn_target_update{nullptr};
 };
 
 } // namespace Ultimate2CFixer

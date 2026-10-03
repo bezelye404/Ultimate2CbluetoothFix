@@ -44,54 +44,35 @@ Remapper::~Remapper() {
 }
 
 bool Remapper::InitViGEm() {
-    m_hViGEmDll = LoadLibraryW(L"ViGEmClient.dll");
-    if (!m_hViGEmDll) {
-        if (m_logCallback) m_logCallback(L"ERROR: ViGEmClient.dll could not be loaded. Please ensure ViGEmBus is installed.");
+    m_vigemClient = vigem_alloc();
+    if (!m_vigemClient) {
+        if (m_logCallback) m_logCallback(L"ERROR: Could not allocate ViGEm client.");
         return false;
     }
 
-    m_fn_alloc = (pfn_vigem_alloc)GetProcAddress(m_hViGEmDll, "vigem_alloc");
-    m_fn_free = (pfn_vigem_free)GetProcAddress(m_hViGEmDll, "vigem_free");
-    m_fn_connect = (pfn_vigem_connect)GetProcAddress(m_hViGEmDll, "vigem_connect");
-    m_fn_disconnect = (pfn_vigem_disconnect)GetProcAddress(m_hViGEmDll, "vigem_disconnect");
-    m_fn_target_alloc = (pfn_vigem_target_x360_alloc)GetProcAddress(m_hViGEmDll, "vigem_target_x360_alloc");
-    m_fn_target_free = (pfn_vigem_target_free)GetProcAddress(m_hViGEmDll, "vigem_target_free");
-    m_fn_target_add = (pfn_vigem_target_add)GetProcAddress(m_hViGEmDll, "vigem_target_add");
-    m_fn_target_remove = (pfn_vigem_target_remove)GetProcAddress(m_hViGEmDll, "vigem_target_remove");
-    m_fn_target_update = (pfn_vigem_target_x360_update)GetProcAddress(m_hViGEmDll, "vigem_target_x360_update");
-
-    if (!m_fn_alloc || !m_fn_connect || !m_fn_target_alloc || !m_fn_target_add || !m_fn_target_update) {
-        if (m_logCallback) m_logCallback(L"ERROR: Incompatible ViGEmClient.dll exports.");
-        FreeLibrary(m_hViGEmDll);
-        m_hViGEmDll = nullptr;
-        return false;
-    }
-
-    m_vigemClient = m_fn_alloc();
-    if (!m_vigemClient) return false;
-
-    VIGEM_ERROR err = m_fn_connect(m_vigemClient);
+    VIGEM_ERROR err = vigem_connect(m_vigemClient);
     if (!VIGEM_SUCCESS(err)) {
         if (m_logCallback) m_logCallback(L"ERROR: Could not connect to ViGEmBus driver.");
-        m_fn_free(m_vigemClient);
+        vigem_free(m_vigemClient);
         m_vigemClient = nullptr;
         return false;
     }
 
-    m_vigemTarget = m_fn_target_alloc();
+    m_vigemTarget = vigem_target_x360_alloc();
     if (!m_vigemTarget) {
-        m_fn_disconnect(m_vigemClient);
-        m_fn_free(m_vigemClient);
+        vigem_disconnect(m_vigemClient);
+        vigem_free(m_vigemClient);
         m_vigemClient = nullptr;
         return false;
     }
 
-    err = m_fn_target_add(m_vigemClient, m_vigemTarget);
+    err = vigem_target_add(m_vigemClient, m_vigemTarget);
     if (!VIGEM_SUCCESS(err)) {
-        m_fn_target_free(m_vigemTarget);
-        m_fn_disconnect(m_vigemClient);
-        m_fn_free(m_vigemClient);
+        if (m_logCallback) m_logCallback(L"ERROR: Could not plugin virtual Xbox 360 controller.");
+        vigem_target_free(m_vigemTarget);
         m_vigemTarget = nullptr;
+        vigem_disconnect(m_vigemClient);
+        vigem_free(m_vigemClient);
         m_vigemClient = nullptr;
         return false;
     }
@@ -100,21 +81,17 @@ bool Remapper::InitViGEm() {
 }
 
 void Remapper::UninitViGEm() {
-    if (m_vigemClient && m_vigemTarget && m_fn_target_remove) {
-        m_fn_target_remove(m_vigemClient, m_vigemTarget);
-    }
-    if (m_vigemTarget && m_fn_target_free) {
-        m_fn_target_free(m_vigemTarget);
+    if (m_vigemTarget) {
+        if (m_vigemClient) {
+            vigem_target_remove(m_vigemClient, m_vigemTarget);
+        }
+        vigem_target_free(m_vigemTarget);
         m_vigemTarget = nullptr;
     }
-    if (m_vigemClient && m_fn_disconnect && m_fn_free) {
-        m_fn_disconnect(m_vigemClient);
-        m_fn_free(m_vigemClient);
+    if (m_vigemClient) {
+        vigem_disconnect(m_vigemClient);
+        vigem_free(m_vigemClient);
         m_vigemClient = nullptr;
-    }
-    if (m_hViGEmDll) {
-        FreeLibrary(m_hViGEmDll);
-        m_hViGEmDll = nullptr;
     }
 }
 
@@ -236,10 +213,10 @@ void Remapper::WorkerLoop(HWND hwnd) {
             BYTE rt = state.rgbButtons[9] ? 255 : 0;
 
             bool nintendoMode = m_nintendoMode.load();
-            USHORT btnA = nintendoMode ? XUSB_GAMEPAD_B : XUSB_GAMEPAD_A;
-            USHORT btnB = nintendoMode ? XUSB_GAMEPAD_A : XUSB_GAMEPAD_B;
-            USHORT btnX = nintendoMode ? XUSB_GAMEPAD_Y : XUSB_GAMEPAD_X;
-            USHORT btnY = nintendoMode ? XUSB_GAMEPAD_X : XUSB_GAMEPAD_Y;
+            USHORT btnA = static_cast<USHORT>(nintendoMode ? XUSB_GAMEPAD_B : XUSB_GAMEPAD_A);
+            USHORT btnB = static_cast<USHORT>(nintendoMode ? XUSB_GAMEPAD_A : XUSB_GAMEPAD_B);
+            USHORT btnX = static_cast<USHORT>(nintendoMode ? XUSB_GAMEPAD_Y : XUSB_GAMEPAD_X);
+            USHORT btnY = static_cast<USHORT>(nintendoMode ? XUSB_GAMEPAD_X : XUSB_GAMEPAD_Y);
 
             USHORT buttons = 0;
             if (state.rgbButtons[0])  buttons |= btnA;
@@ -287,8 +264,8 @@ void Remapper::WorkerLoop(HWND hwnd) {
             idleTicks = 0;
             prevReport = report;
 
-            if (m_vigemClient && m_vigemTarget && m_fn_target_update) {
-                m_fn_target_update(m_vigemClient, m_vigemTarget, report);
+            if (m_vigemClient && m_vigemTarget) {
+                vigem_target_x360_update(m_vigemClient, m_vigemTarget, report);
             }
 
             Sleep(5);
