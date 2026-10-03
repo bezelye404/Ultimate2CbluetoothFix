@@ -1,73 +1,117 @@
-# 8BitDo Ultimate 2C Bluetooth Fixer
+# Ultimate2CFixer
 
-A modern Windows application that remaps 8BitDo Ultimate 2C controllers (connected via Bluetooth) to a virtual XInput (Xbox 360) controller. It also supports battery monitoring and force feedback. (Unfortunately due to hardware restrictions rumble/vibration is not available in 8bitdo Ultimate 2C Wireless.)
+<div align="center">
 
-![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)
-![Windows](https://img.shields.io/badge/Windows-10+-0078D6?logo=windows)
-![License](https://img.shields.io/badge/License-MIT-green)
+![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?logo=c%2B%2B&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011%20(x64)-0078D6?logo=windows&logoColor=white)
+![ViGEmBus](https://img.shields.io/badge/Driver-ViGEmBus-blueviolet)
+![Polling Rate](https://img.shields.io/badge/Polling%20Rate-Up%20to%201000%20Hz-orange)
+![License](https://img.shields.io/badge/License-MIT-success)
 
----
+DirectInput-to-XInput remapper and companion utility for the 8BitDo Ultimate 2C controller in Bluetooth mode on Windows.
 
-## ✨ Features
+[Overview](#-overview) • [Features](#-features) • [Installation & Usage](#-installation--usage) • [Hardware Axis Mapping](#-hardware-axis-mapping) • [Building from Source](#-building-from-source) • [License](#-license)
 
-- 🎮 **Controller Remapping**: Flawlessly maps the 8BitDo Ultimate 2C Bluetooth DirectInput layout to a virtual Xbox 360 controller.
-- 📳 **Rumble / Force Feedback Support**: Direct mapping of XInput motor vibration commands back to the controller via DirectInput force feedback actuators. (Read Known Limitations)
-- 🔋 **Battery Monitoring**: Reads and displays the real-time battery level of the controller using Bluetooth GATT services.
-- 🎨 **Modern UI**: A fully overhauled, responsive, and clean user interface powered by Material Design, featuring dynamic status indicators.
-- 🌐 **English / Turkish**: Full localization support with automatic language detection and switching.
+</div>
 
 ---
 
-## 📋 Requirements
+## 📖 Overview
 
-### For Users (Run/Release)
-* Windows 10 (Build 19041 or later)
-* [ViGEmBus Driver](https://github.com/nefarius/ViGEmBus/releases) — **Required** (This is the virtual controller driver that emulates the Xbox 360 pad).
+When connected via Bluetooth on Windows, the 8BitDo Ultimate 2C controller communicates via DirectInput rather than XInput. Additionally, the right analog stick is exposed on DirectInput `lZ` and `lRz` axes.
 
-### For Developers (Build)
-* .NET 10 SDK
+Because most modern Windows games expect an XInput device, Ultimate2CFixer reads the DirectInput state from the controller, maps the inputs accordingly, and feeds them into a virtual Xbox 360 controller using ViGEmBus.
+
+---
+
+## ⚙️ Features
+
+* **DirectInput to XInput Translation:** Maps Left Stick (`lX`, `lY`), Right Stick (`lZ`, `lRz`), triggers, and buttons to a virtual Xbox 360 gamepad.
+* **Configurable Polling Rate:** Update intervals of 125 Hz (8 ms), 250 Hz (4 ms), 500 Hz (2 ms), and 1000 Hz (1 ms).
+* **Stick Response Curves:** Linear (1:1), Smooth Aim (cubic S-curve), and Aggressive (square-root).
+* **Optional Hair Trigger:** User-configurable toggle that maps any trigger pull beyond the deadzone directly to full activation (255).
+* **Live Input Telemetry:** Visual indicators for analog sticks, ABXY layout, LB/RB bumpers, and LT/RT analog triggers.
+* **Battery Status:** Reads battery percentage via Windows WinRT Bluetooth Low Energy (BLE) GATT service.
+* **System Tray & Resource Trimming:** Flushes physical working set memory when minimized to the system tray.
+* **Settings Persistence:** Saves user preferences to the Windows Registry (`HKCU\Software\Ultimate2CFixer\Settings`).
+* **Localization:** English and Turkish interface support.
 
 ---
 
 ## 🚀 Installation & Usage
 
-1. Download the latest release (`8bitdofixer.exe`) from the [Releases](../../releases) section.
-2. Install the [ViGEmBus Driver](https://github.com/nefarius/ViGEmBus/releases) if you haven't already.
-3. Turn on your controller in **Bluetooth mode** (Bluetooth/Android mode) and pair it with Windows.
-4. Launch `8bitdofixer.exe`.
-5. Click **Start** to run the remapper service. The app will:
-   * Detect the connected controller.
-   * Emulate a virtual Xbox 360 controller.
-   * Start remapping inputs and routing rumble signals.
-   * Periodically check and display the battery level.
+### 1. Requirements
+* Windows 10 / 11 (64-bit)
+* [ViGEmBus](https://github.com/nefarius/ViGEmBus) driver (the application prompts to install this if not detected)
+
+### 2. Quick Start
+1. Download `Ultimate2CFixer.exe` from the [Releases](https://github.com/bezelye404/Ultimate2CbluetoothFix/releases) page.
+2. Pair the 8BitDo Ultimate 2C controller via Windows Bluetooth settings.
+3. Open `Ultimate2CFixer.exe` and click **Start Service**.
 
 ---
 
-## 🔌 Dependencies
+## 🎮 Hardware Axis Mapping
 
-The project leverages the following main libraries:
+DirectInput `DIJOYSTATE2` axis layout for the 8BitDo Ultimate 2C in Bluetooth mode:
 
-| Package | Version | Purpose |
-|---------|---------|---------|
-| [MaterialDesignThemes](https://github.com/MaterialDesignInXAML/MaterialDesignInXamlToolkit) | `5.3.0` | Modern UI Theme & Icon pack |
-| [Nefarius.ViGEm.Client](https://github.com/nefarius/ViGEm.Client) | `1.x` | Virtual Xbox 360 emulation |
-| [SharpDX.DirectInput](http://sharpdx.org/) | `4.2.0` | Fetching DirectInput states and sending vibration commands |
+```
+┌────────────────────────────────────────────────────────┐
+│               8BitDo Ultimate 2C (Bluetooth)           │
+├──────────────────────┬─────────────────────────────────┤
+│ DirectInput Field    │ Gamepad Control                 │
+├──────────────────────┼─────────────────────────────────┤
+│ state.lX             │ Left Stick (Horizontal)         │
+│ state.lY             │ Left Stick (Vertical)           │
+│ state.lZ             │ Right Stick (Horizontal)        │
+│ state.lRz            │ Right Stick (Vertical)          │
+│ state.rglSlider[0]   │ Left Trigger (LT) Analog Depth  │
+│ state.rglSlider[1]   │ Right Trigger (RT) Analog Depth │
+│ state.rgbButtons[6]  │ Left Bumper (LB)                │
+│ state.rgbButtons[7]  │ Right Bumper (RB)               │
+│ state.rgbButtons[8]  │ Left Trigger (LT) Digital Click │
+│ state.rgbButtons[9]  │ Right Trigger (RT) Digital Click│
+└──────────────────────┴─────────────────────────────────┘
+```
+
+> [!NOTE]
+> The Right Stick is mapped to `lZ` and `lRz`, not `lRx`/`lRy`.
 
 ---
 
-## ⚠️ Known Issues
+## 🔨 Building from Source
 
-* **Trigger Axes:** The triggers function as digital buttons. Another issue due to hardware limitations since Bluetooh mode is built considering Android at the first place.
+### Prerequisites
+* Windows 10 / 11 (64-bit)
+* Visual Studio 2022 with C++ desktop workload
+* CMake 3.20 or newer
+
+### Build Instructions
+```powershell
+# Clone the repository
+git clone https://github.com/bezelye404/Ultimate2CbluetoothFix.git
+cd Ultimate2CbluetoothFix
+
+# Configure
+cmake -B build -S .
+
+# Build Release executable
+cmake --build build --config Release
+```
+
+The compiled binary will be placed at:
+```
+build/Release/Ultimate2CFixer.exe
+```
+
 ---
 
 ## 📝 License
 
-Distributed under the **MIT License**. Feel free to use and contribute to the project.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🙏 Credits
+## 🙏 Acknowledgments
 
-* [ViGEmBus](https://github.com/nefarius/ViGEmBus) by Nefarius
-* [MaterialDesignInXAML](https://github.com/MaterialDesignInXAML/MaterialDesignInXamlToolkit)
-* [SharpDX](https://github.com/sharpdx/SharpDX)
+* [ViGEmBus](https://github.com/nefarius/ViGEmBus) by Benjamin Höglinger-Stelzer (Nefarius).
