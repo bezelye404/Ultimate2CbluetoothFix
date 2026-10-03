@@ -27,6 +27,7 @@
 #include "Localization.h"
 #include "Remapper.h"
 #include "BatteryMonitor.h"
+#include "DriverInstaller.h"
 
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "shell32.lib")
@@ -72,8 +73,10 @@ inline UINT SafeGetDpiForSystem() {
 constexpr int WM_TRAYICON           = WM_USER + 1;
 constexpr int WM_UPDATE_LOG         = WM_USER + 2;
 constexpr int WM_UPDATE_STATUS      = WM_USER + 3;
-constexpr int WM_UPDATE_BATTERY     = WM_USER + 4;
-constexpr int WM_UPDATE_INPUT       = WM_USER + 5;
+constexpr int WM_UPDATE_BATTERY         = WM_USER + 4;
+constexpr int WM_UPDATE_INPUT           = WM_USER + 5;
+constexpr int WM_DRIVER_INSTALL_DONE     = WM_USER + 6;
+constexpr int WM_DRIVER_INSTALL_PROGRESS = WM_USER + 7;
 
 constexpr int IDC_BTN_START         = 101;
 constexpr int IDC_BTN_STOP          = 102;
@@ -88,8 +91,7 @@ constexpr int IDC_CHK_AUTO_START    = 110;
 constexpr int IDC_CHK_LOW_BATTERY   = 111;
 constexpr int IDC_BTN_DEADZONE      = 112;
 constexpr int IDC_BTN_SETTINGS_BACK = 113;
-constexpr int IDC_CHK_SWAP_AB       = 114;
-constexpr int IDC_CHK_SWAP_XY       = 115;
+constexpr int IDC_CHK_NINTENDO_MODE = 114;
 
 constexpr int IDM_TRAY_OPEN         = 201;
 constexpr int IDM_TRAY_EXIT         = 202;
@@ -109,8 +111,7 @@ HWND g_hChkStartWindows             = nullptr;
 HWND g_hChkMinimizeClose            = nullptr;
 HWND g_hChkAutoStart                = nullptr;
 HWND g_hChkLowBattery               = nullptr;
-HWND g_hChkSwapAB                   = nullptr;
-HWND g_hChkSwapXY                   = nullptr;
+HWND g_hChkNintendoMode             = nullptr;
 HWND g_hBtnDeadzone                 = nullptr;
 HWND g_hBtnSettingsBack             = nullptr;
 
@@ -119,8 +120,9 @@ bool g_minimizeOnClose              = true;
 bool g_startWithWindows             = false;
 bool g_autoStartService             = true;
 bool g_lowBatteryAlert              = true;
-bool g_swapAB                       = false;
-bool g_swapXY                       = false;
+bool g_nintendoMode                 = false;
+bool g_driverInstalled              = false;
+bool g_driverInstalling             = false;
 int g_deadzoneLevel                 = 2; // 0=0%, 1=8%, 2=12%, 3=20%
 const int kDeadzoneValues[]         = { 0, 2600, 4000, 6500 };
 bool g_batteryWarningSent           = false;
@@ -233,8 +235,7 @@ void SwitchView(bool showSettings) {
     ShowWindow(g_hChkMinimizeClose, showSet);
     ShowWindow(g_hChkAutoStart, showSet);
     ShowWindow(g_hChkLowBattery, showSet);
-    ShowWindow(g_hChkSwapAB, showSet);
-    ShowWindow(g_hChkSwapXY, showSet);
+    ShowWindow(g_hChkNintendoMode, showSet);
     ShowWindow(g_hBtnDeadzone, showSet);
     ShowWindow(g_hBtnSettingsBack, showSet);
 
@@ -264,7 +265,11 @@ void UpdateTrayTooltip() {
 void UpdateUIStrings() {
     auto& loc = Localization::Instance();
     SetWindowTextW(g_hWnd, loc.Get(StringId::AppTitle).c_str());
-    SetWindowTextW(g_hBtnStart, loc.Get(StringId::StartBtn).c_str());
+    if (!g_driverInstalled) {
+        SetWindowTextW(g_hBtnStart, loc.Get(StringId::InstallDriverBtn).c_str());
+    } else {
+        SetWindowTextW(g_hBtnStart, (g_remapper && g_remapper->IsRunning()) ? loc.Get(StringId::StopBtn).c_str() : loc.Get(StringId::StartBtn).c_str());
+    }
     SetWindowTextW(g_hBtnStop, loc.Get(StringId::StopBtn).c_str());
     SetWindowTextW(g_hBtnClearLogs, loc.Get(StringId::ClearBtn).c_str());
     SetWindowTextW(g_hBtnLang, loc.IsEnglish() ? L"TR" : L"EN");
@@ -272,15 +277,35 @@ void UpdateUIStrings() {
     SetWindowTextW(g_hChkMinimizeClose, loc.Get(StringId::MinimizeOnClose).c_str());
     SetWindowTextW(g_hChkAutoStart, loc.Get(StringId::AutoStartService).c_str());
     SetWindowTextW(g_hChkLowBattery, loc.Get(StringId::LowBatteryNotification).c_str());
-    SetWindowTextW(g_hChkSwapAB, loc.Get(StringId::SwapAB).c_str());
-    SetWindowTextW(g_hChkSwapXY, loc.Get(StringId::SwapXY).c_str());
+    SetWindowTextW(g_hChkNintendoMode, loc.Get(StringId::NintendoMode).c_str());
     SetWindowTextW(g_hBtnSettingsBack, loc.Get(StringId::SettingsBack).c_str());
     UpdateDeadzoneButtonText();
     UpdateTrayTooltip();
     InvalidateRect(g_hWnd, NULL, TRUE);
 }
 
+void TriggerDriverInstall() {
+    if (g_driverInstalling) return;
+    g_driverInstalling = true;
+    EnableWindow(g_hBtnStart, FALSE);
+    auto& loc = Localization::Instance();
+    AppendLogMessage(loc.Get(StringId::DriverInstalling));
+    StartViGEmBusInstall(
+        g_hWnd,
+        [](int pct, const std::wstring&) {
+            PostMessageW(g_hWnd, WM_DRIVER_INSTALL_PROGRESS, (WPARAM)pct, 0);
+        },
+        [](bool success, const std::wstring&) {
+            PostMessageW(g_hWnd, WM_DRIVER_INSTALL_DONE, (WPARAM)(success ? 1 : 0), 0);
+        }
+    );
+}
+
 void StartServices() {
+    if (!g_driverInstalled) {
+        TriggerDriverInstall();
+        return;
+    }
     if (g_remapper && g_remapper->IsRunning()) return;
 
     EnableWindow(g_hBtnStart, FALSE);
@@ -295,8 +320,7 @@ void StartServices() {
 
     g_remapper = std::make_unique<Remapper>();
     g_remapper->SetDeadzone(kDeadzoneValues[g_deadzoneLevel]);
-    g_remapper->SetSwapAB(g_swapAB);
-    g_remapper->SetSwapXY(g_swapXY);
+    g_remapper->SetNintendoMode(g_nintendoMode);
     g_remapper->Start(
         g_hWnd,
         [](const std::wstring& msg) {
@@ -759,32 +783,45 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             SendMessageW(g_hChkLowBattery, BM_SETCHECK, g_lowBatteryAlert ? BST_CHECKED : BST_UNCHECKED, 0);
             SetWindowTheme(g_hChkLowBattery, L"DarkMode_Explorer", NULL);
 
-            g_hChkSwapAB = CreateWindowW(L"BUTTON", loc.Get(StringId::SwapAB).c_str(),
+            g_hChkNintendoMode = CreateWindowW(L"BUTTON", loc.Get(StringId::NintendoMode).c_str(),
                 WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
-                S(40), S(214), S(380), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_SWAP_AB, GetModuleHandleW(NULL), NULL);
-            SendMessageW(g_hChkSwapAB, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
-            SendMessageW(g_hChkSwapAB, BM_SETCHECK, g_swapAB ? BST_CHECKED : BST_UNCHECKED, 0);
-            SetWindowTheme(g_hChkSwapAB, L"DarkMode_Explorer", NULL);
-
-            g_hChkSwapXY = CreateWindowW(L"BUTTON", loc.Get(StringId::SwapXY).c_str(),
-                WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
-                S(40), S(242), S(380), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_SWAP_XY, GetModuleHandleW(NULL), NULL);
-            SendMessageW(g_hChkSwapXY, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
-            SendMessageW(g_hChkSwapXY, BM_SETCHECK, g_swapXY ? BST_CHECKED : BST_UNCHECKED, 0);
-            SetWindowTheme(g_hChkSwapXY, L"DarkMode_Explorer", NULL);
+                S(40), S(214), S(380), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_NINTENDO_MODE, GetModuleHandleW(NULL), NULL);
+            SendMessageW(g_hChkNintendoMode, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
+            SendMessageW(g_hChkNintendoMode, BM_SETCHECK, g_nintendoMode ? BST_CHECKED : BST_UNCHECKED, 0);
+            SetWindowTheme(g_hChkNintendoMode, L"DarkMode_Explorer", NULL);
 
             g_hBtnDeadzone = CreateWindowW(L"BUTTON", L"",
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(40), S(276), S(280), S(32), hwnd, (HMENU)(INT_PTR)IDC_BTN_DEADZONE, GetModuleHandleW(NULL), NULL);
+                S(40), S(252), S(280), S(32), hwnd, (HMENU)(INT_PTR)IDC_BTN_DEADZONE, GetModuleHandleW(NULL), NULL);
 
             g_hBtnSettingsBack = CreateWindowW(L"BUTTON", loc.Get(StringId::SettingsBack).c_str(),
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(40), S(318), S(120), S(32), hwnd, (HMENU)(INT_PTR)IDC_BTN_SETTINGS_BACK, GetModuleHandleW(NULL), NULL);
+                S(40), S(296), S(120), S(32), hwnd, (HMENU)(INT_PTR)IDC_BTN_SETTINGS_BACK, GetModuleHandleW(NULL), NULL);
 
             UpdateDeadzoneButtonText();
             SetupTray(hwnd);
+
+            // MARK: Driver & First-Launch Check
+            g_driverInstalled = IsViGEmBusInstalled();
+            bool isFirstRun = false;
+            HKEY hAppKey;
+            if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\Ultimate2CFixer", 0, NULL, 0, KEY_READ | KEY_WRITE, NULL, &hAppKey, NULL) == ERROR_SUCCESS) {
+                DWORD val = 0, size = sizeof(val);
+                if (RegQueryValueExW(hAppKey, L"FirstRunDone", NULL, NULL, (LPBYTE)&val, &size) != ERROR_SUCCESS) {
+                    isFirstRun = true;
+                    val = 1;
+                    RegSetValueExW(hAppKey, L"FirstRunDone", 0, REG_DWORD, (const BYTE*)&val, sizeof(val));
+                }
+                RegCloseKey(hAppKey);
+            }
+
             UpdateUIStrings();
-            AppendLogMessage(Localization::Instance().Get(StringId::LogAppReady));
+            AppendLogMessage(loc.Get(StringId::LogAppReady));
+            if (isFirstRun && g_driverInstalled) {
+                AppendLogMessage(loc.Get(StringId::DriverReadyFirstRun));
+            } else if (!g_driverInstalled) {
+                AppendLogMessage(loc.Get(StringId::DriverMissing));
+            }
             return 0;
         }
 
@@ -820,13 +857,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 case IDC_CHK_LOW_BATTERY:
                     g_lowBatteryAlert = (SendMessageW(g_hChkLowBattery, BM_GETCHECK, 0, 0) == BST_CHECKED);
                     break;
-                case IDC_CHK_SWAP_AB:
-                    g_swapAB = (SendMessageW(g_hChkSwapAB, BM_GETCHECK, 0, 0) == BST_CHECKED);
-                    if (g_remapper) g_remapper->SetSwapAB(g_swapAB);
-                    break;
-                case IDC_CHK_SWAP_XY:
-                    g_swapXY = (SendMessageW(g_hChkSwapXY, BM_GETCHECK, 0, 0) == BST_CHECKED);
-                    if (g_remapper) g_remapper->SetSwapXY(g_swapXY);
+                case IDC_CHK_NINTENDO_MODE:
+                    g_nintendoMode = (SendMessageW(g_hChkNintendoMode, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                    if (g_remapper) g_remapper->SetNintendoMode(g_nintendoMode);
                     break;
                 case IDC_BTN_DEADZONE:
                     g_deadzoneLevel = (g_deadzoneLevel + 1) % 4;
@@ -919,11 +952,38 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             return 0;
         }
 
+        case WM_DRIVER_INSTALL_PROGRESS: {
+            int pct = (int)wParam;
+            auto& loc = Localization::Instance();
+            wchar_t buf[128];
+            swprintf_s(buf, loc.Get(StringId::DriverDownloading).c_str(), pct);
+            SetWindowTextW(g_hBtnStart, buf);
+            return 0;
+        }
+
+        case WM_DRIVER_INSTALL_DONE: {
+            bool success = (wParam == 1);
+            g_driverInstalling = false;
+            g_driverInstalled = success;
+            auto& loc = Localization::Instance();
+            EnableWindow(g_hBtnStart, TRUE);
+            UpdateUIStrings();
+            if (success) {
+                AppendLogMessage(loc.Get(StringId::DriverSuccess));
+                if (g_autoStartService) {
+                    StartServices();
+                }
+            } else {
+                AppendLogMessage(loc.Get(StringId::DriverFailed));
+            }
+            return 0;
+        }
+
         case WM_CTLCOLORSTATIC:
         case WM_CTLCOLOREDIT: {
             HDC hdcCtrl = (HDC)wParam;
             HWND hwndCtrl = (HWND)lParam;
-            if (hwndCtrl == g_hChkMinimizeClose || hwndCtrl == g_hChkStartWindows || hwndCtrl == g_hChkAutoStart || hwndCtrl == g_hChkLowBattery || hwndCtrl == g_hChkSwapAB || hwndCtrl == g_hChkSwapXY) {
+            if (hwndCtrl == g_hChkMinimizeClose || hwndCtrl == g_hChkStartWindows || hwndCtrl == g_hChkAutoStart || hwndCtrl == g_hChkLowBattery || hwndCtrl == g_hChkNintendoMode) {
                 SetTextColor(hdcCtrl, UI::ColorTextSecondary);
                 SetBkColor(hdcCtrl, UI::ColorCardBg);
                 return (LRESULT)g_hBrCardBg;

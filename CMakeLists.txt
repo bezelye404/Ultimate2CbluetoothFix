@@ -22,6 +22,7 @@ set(SOURCES
     src/Remapper.cpp
     src/BatteryMonitor.cpp
     src/Localization.cpp
+    src/DriverInstaller.cpp
     src/resource.rc
 )
 
@@ -34,6 +35,7 @@ target_link_libraries(Ultimate2CFixer PRIVATE
     comctl32
     shell32
     uxtheme
+    urlmon
 )
 
 if(MSVC)

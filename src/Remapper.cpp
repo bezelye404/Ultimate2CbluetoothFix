@@ -235,13 +235,11 @@ void Remapper::WorkerLoop(HWND hwnd) {
             BYTE lt = state.rgbButtons[8] ? 255 : 0;
             BYTE rt = state.rgbButtons[9] ? 255 : 0;
 
-            bool swapAB = m_swapAB.load();
-            bool swapXY = m_swapXY.load();
-
-            USHORT btnA = swapAB ? XUSB_GAMEPAD_B : XUSB_GAMEPAD_A;
-            USHORT btnB = swapAB ? XUSB_GAMEPAD_A : XUSB_GAMEPAD_B;
-            USHORT btnX = swapXY ? XUSB_GAMEPAD_Y : XUSB_GAMEPAD_X;
-            USHORT btnY = swapXY ? XUSB_GAMEPAD_X : XUSB_GAMEPAD_Y;
+            bool nintendoMode = m_nintendoMode.load();
+            USHORT btnA = nintendoMode ? XUSB_GAMEPAD_B : XUSB_GAMEPAD_A;
+            USHORT btnB = nintendoMode ? XUSB_GAMEPAD_A : XUSB_GAMEPAD_B;
+            USHORT btnX = nintendoMode ? XUSB_GAMEPAD_Y : XUSB_GAMEPAD_X;
+            USHORT btnY = nintendoMode ? XUSB_GAMEPAD_X : XUSB_GAMEPAD_Y;
 
             USHORT buttons = 0;
             if (state.rgbButtons[0])  buttons |= btnA;
