@@ -238,9 +238,9 @@ void Remapper::WorkerLoop(HWND hwnd) {
             continue;
         }
 
-        // Cache idle resting positions of trigger axes (Z Axis = LT, Z Rotation = RT)
-        m_idleZ = testState.lZ;
-        m_idleRz = testState.lRz;
+        // Cache idle resting positions of trigger axes/sliders
+        m_idleSlider0 = testState.rglSlider[0];
+        m_idleSlider1 = testState.rglSlider[1];
         m_idleRx = testState.lRx;
         m_idleRy = testState.lRy;
 
@@ -294,14 +294,19 @@ void Remapper::WorkerLoop(HWND hwnd) {
             SHORT lx = ApplyResponseCurve(ApplyDeadzone(NormalizeAxis(state.lX), curDz), curve);
             SHORT ly = NegateAxis(ApplyResponseCurve(ApplyDeadzone(NormalizeAxis(state.lY), curDz), curve));
 
-            // Right Stick: lRx (X-Rotation) and lRy (Y-Rotation)
-            SHORT rx = ApplyResponseCurve(ApplyDeadzone(NormalizeAxis(state.lRx), curDz), curve);
-            SHORT ry = NegateAxis(ApplyResponseCurve(ApplyDeadzone(NormalizeAxis(state.lRy), curDz), curve));
+            // Right Stick: lZ (horizontal) and lRz (vertical)
+            SHORT rx = ApplyResponseCurve(ApplyDeadzone(NormalizeAxis(state.lZ), curDz), curve);
+            SHORT ry = NegateAxis(ApplyResponseCurve(ApplyDeadzone(NormalizeAxis(state.lRz), curDz), curve));
 
-            // Triggers: lZ (Z-Axis = Left Trigger) and lRz (Z-Rotation = Right Trigger)
+            // Triggers: Hybrid Analog (Sliders / Rx / Ry) & Digital (LT=Button 8, RT=Button 9)
             bool hair = m_hairTrigger.load();
-            BYTE lt = CalculateTrigger(state.lZ, m_idleZ, state.rgbButtons[8] != 0, hair);
-            BYTE rt = CalculateTrigger(state.lRz, m_idleRz, state.rgbButtons[9] != 0, hair);
+            BYTE lt1 = CalculateTrigger(state.rglSlider[0], m_idleSlider0, state.rgbButtons[8] != 0, hair);
+            BYTE lt2 = CalculateTrigger(state.lRx, m_idleRx, state.rgbButtons[8] != 0, hair);
+            BYTE lt = (std::max)(lt1, lt2);
+
+            BYTE rt1 = CalculateTrigger(state.rglSlider[1], m_idleSlider1, state.rgbButtons[9] != 0, hair);
+            BYTE rt2 = CalculateTrigger(state.lRy, m_idleRy, state.rgbButtons[9] != 0, hair);
+            BYTE rt = (std::max)(rt1, rt2);
 
             bool nintendoMode = m_nintendoMode.load();
             USHORT btnA = static_cast<USHORT>(nintendoMode ? XUSB_GAMEPAD_B : XUSB_GAMEPAD_A);
@@ -445,23 +450,21 @@ SHORT Remapper::ApplyResponseCurve(SHORT v, int curveType) {
 }
 
 BYTE Remapper::CalculateTrigger(LONG axisVal, LONG idleVal, bool btnPressed, bool hairTrigger) {
+    if (btnPressed) {
+        return 255;
+    }
     LONG diff = (axisVal >= idleVal) ? (axisVal - idleVal) : (idleVal - axisVal);
     if (diff < 1500) {
-        return btnPressed ? 255 : 0;
+        return 0;
     }
     if (hairTrigger) {
-        if (diff > 2500 || btnPressed) {
-            return 255;
-        }
+        return 255;
     }
     LONG maxSpan = (idleVal <= 32768) ? (65535 - idleVal) : idleVal;
     if (maxSpan < 1000) maxSpan = 65535;
     LONG scaled = (diff * 255) / maxSpan;
     if (scaled > 255) scaled = 255;
     if (scaled < 0) scaled = 0;
-    if (btnPressed) {
-        return 255;
-    }
     return static_cast<BYTE>(scaled);
 }
 

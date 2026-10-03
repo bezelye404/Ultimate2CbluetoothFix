@@ -549,12 +549,12 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
 
     if (g_showSettings) {
         // MARK: Settings View Card
-        RECT cardSettings = { S(20), S(56), clientRc.right - S(20), clientRc.bottom - S(20) };
+        RECT cardSettings = { S(24), S(56), clientRc.right - S(24), clientRc.bottom - S(20) };
         DrawCard(memDC, cardSettings);
 
         SelectObject(memDC, g_hFontTitle);
         SetTextColor(memDC, UI::ColorTextPrimary);
-        TextOutW(memDC, S(36), S(72), loc.Get(StringId::SettingsTitle).c_str(), (int)loc.Get(StringId::SettingsTitle).length());
+        TextOutW(memDC, S(44), S(72), loc.Get(StringId::SettingsTitle).c_str(), (int)loc.Get(StringId::SettingsTitle).length());
 
         BitBlt(hdc, 0, 0, clientRc.right, clientRc.bottom, memDC, 0, 0, SRCCOPY);
         SelectObject(memDC, oldBmp);
@@ -566,13 +566,13 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     // MARK: Header
     SelectObject(memDC, g_hFontTitle);
     SetTextColor(memDC, UI::ColorTextPrimary);
-    TextOutW(memDC, S(20), S(18), loc.Get(StringId::AppTitle).c_str(), (int)loc.Get(StringId::AppTitle).length());
+    TextOutW(memDC, S(24), S(18), loc.Get(StringId::AppTitle).c_str(), (int)loc.Get(StringId::AppTitle).length());
 
     int topCardTop = S(56);
     int topCardBottom = S(152);
 
     // MARK: Card 1 - Controller Status Card
-    RECT cardStatus = { S(20), topCardTop, S(240), topCardBottom };
+    RECT cardStatus = { S(24), topCardTop, S(264), topCardBottom };
     DrawCard(memDC, cardStatus);
 
     SelectObject(memDC, g_hFontSmall);
@@ -607,16 +607,16 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     TextOutW(memDC, cardStatus.left + S(30), cardStatus.top + S(64), statusText.c_str(), (int)statusText.length());
 
     // MARK: Card 2 - Live Input Telemetry Card
-    RECT cardTelemetry = { S(252), topCardTop, S(468), topCardBottom };
+    RECT cardTelemetry = { S(278), topCardTop, S(558), topCardBottom };
     DrawCard(memDC, cardTelemetry);
 
     SelectObject(memDC, g_hFontSmall);
     SetTextColor(memDC, UI::ColorTextMuted);
-    TextOutW(memDC, cardTelemetry.left + S(14), cardTelemetry.top + S(14), loc.Get(StringId::LiveInputTitle).c_str(), (int)loc.Get(StringId::LiveInputTitle).length());
+    TextOutW(memDC, cardTelemetry.left + S(16), cardTelemetry.top + S(14), loc.Get(StringId::LiveInputTitle).c_str(), (int)loc.Get(StringId::LiveInputTitle).length());
 
     // Mode Badge Pill
     std::wstring badgeText = g_nintendoMode ? L"NINTENDO" : L"XBOX";
-    RECT badgeRc = { cardTelemetry.right - S(74), cardTelemetry.top + S(12), cardTelemetry.right - S(14), cardTelemetry.top + S(26) };
+    RECT badgeRc = { cardTelemetry.right - S(80), cardTelemetry.top + S(12), cardTelemetry.right - S(14), cardTelemetry.top + S(26) };
     HBRUSH hBadgeBg = CreateSolidBrush(RGB(32, 32, 40));
     HPEN hBadgePen = CreatePen(PS_SOLID, 1, UI::ColorCardBorder);
     HBRUSH hOldBr = (HBRUSH)SelectObject(memDC, hBadgeBg);
@@ -636,15 +636,15 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
         swprintf_s(hzBuf, L"%d Hz \u2022 %.1f ms", g_remapper->GetLiveHz(), g_remapper->GetLiveMs());
         SelectObject(memDC, g_hFontSmall);
         SetTextColor(memDC, UI::ColorTextMuted);
-        TextOutW(memDC, cardTelemetry.left + S(14), cardTelemetry.top + S(28), hzBuf, (int)wcslen(hzBuf));
+        TextOutW(memDC, cardTelemetry.left + S(16), cardTelemetry.top + S(28), hzBuf, (int)wcslen(hzBuf));
     }
 
     // Left Stick & Right Stick Boxes
-    int visX = cardTelemetry.left + S(14);
+    int visX = cardTelemetry.left + S(16);
     int visY = cardTelemetry.top + S(42);
 
     RECT lsBox = { visX, visY, visX + S(34), visY + S(34) };
-    RECT rsBox = { visX + S(38), visY, visX + S(72), visY + S(34) };
+    RECT rsBox = { visX + S(40), visY, visX + S(74), visY + S(34) };
     HBRUSH hStickBg = CreateSolidBrush(RGB(24, 24, 30));
     HPEN hStickPen = CreatePen(PS_SOLID, 1, UI::ColorCardBorder);
     hOldBr = (HBRUSH)SelectObject(memDC, hStickBg);
@@ -687,7 +687,7 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     DeleteObject(hNullP);
 
     // Live Dynamic ABXY Diamond (Real-time Nintendo vs Xbox layout)
-    int diaX = visX + S(80);
+    int diaX = visX + S(88);
     struct BtnDef { const wchar_t* lbl; USHORT m; int x; int y; };
     BtnDef bArr[4];
     if (g_nintendoMode) {
@@ -722,8 +722,30 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
         DrawTextW(memDC, b.lbl, 1, &brc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     }
 
+    // LB / RB Bumpers (Shoulder buttons)
+    struct BumperDef { const wchar_t* lbl; USHORT m; RECT rc; };
+    BumperDef bumpers[2] = {
+        { L"LB", XUSB_GAMEPAD_LEFT_SHOULDER,  { visX + S(134), visY + S(8), visX + S(162), visY + S(26) } },
+        { L"RB", XUSB_GAMEPAD_RIGHT_SHOULDER, { visX + S(168), visY + S(8), visX + S(196), visY + S(26) } }
+    };
+
+    for (const auto& bmp : bumpers) {
+        bool on = (g_liveInput.wButtons & bmp.m) != 0;
+        HBRUSH hb = CreateSolidBrush(on ? UI::ColorStatusGreen : RGB(28, 28, 35));
+        HPEN hp = CreatePen(PS_SOLID, 1, on ? UI::ColorStatusGreen : UI::ColorCardBorder);
+        hOldBr = (HBRUSH)SelectObject(memDC, hb);
+        hOldPn = (HPEN)SelectObject(memDC, hp);
+        RoundRect(memDC, bmp.rc.left, bmp.rc.top, bmp.rc.right, bmp.rc.bottom, S(4), S(4));
+        SelectObject(memDC, hOldBr);
+        SelectObject(memDC, hOldPn);
+        DeleteObject(hb);
+        DeleteObject(hp);
+        SetTextColor(memDC, on ? RGB(10, 20, 15) : UI::ColorTextMuted);
+        DrawTextW(memDC, bmp.lbl, 2, const_cast<LPRECT>(&bmp.rc), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    }
+
     // LT / RT Analog Trigger Meters (Smooth Real-time Fill)
-    int trigX = cardTelemetry.right - S(32);
+    int trigX = visX + S(210);
     RECT ltRc = { trigX, visY + S(2), trigX + S(9), visY + S(32) };
     RECT rtRc = { trigX + S(13), visY + S(2), trigX + S(22), visY + S(32) };
     HBRUSH htbg = CreateSolidBrush(RGB(24, 24, 30));
@@ -746,8 +768,8 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
         DeleteObject(hf);
     }
 
-    // MARK: Card 3 - Battery Card (Width 220px, Zero Clipping, Clean Breathing Room)
-    RECT cardBattery = { S(480), topCardTop, clientRc.right - S(20), topCardBottom };
+    // MARK: Card 3 - Battery Card
+    RECT cardBattery = { S(572), topCardTop, clientRc.right - S(24), topCardBottom };
     DrawCard(memDC, cardBattery);
 
     SelectObject(memDC, g_hFontSmall);
@@ -849,23 +871,23 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
             // MARK: Controls (Main View)
             g_hBtnStart = CreateWindowW(L"BUTTON", L"Start Service", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
-                S(20), S(164), S(140), S(34), hwnd, (HMENU)(INT_PTR)IDC_BTN_START, GetModuleHandleW(NULL), NULL);
+                S(24), S(164), S(150), S(34), hwnd, (HMENU)(INT_PTR)IDC_BTN_START, GetModuleHandleW(NULL), NULL);
 
             g_hBtnStop = CreateWindowW(L"BUTTON", L"Stop Service", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW | WS_DISABLED,
-                S(168), S(164), S(140), S(34), hwnd, (HMENU)(INT_PTR)IDC_BTN_STOP, GetModuleHandleW(NULL), NULL);
+                S(184), S(164), S(150), S(34), hwnd, (HMENU)(INT_PTR)IDC_BTN_STOP, GetModuleHandleW(NULL), NULL);
 
             // MARK: Top-Right Controls
             g_hBtnLang = CreateWindowW(L"BUTTON", L"TR", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
-                rc.right - S(154), S(16), S(38), S(26), hwnd, (HMENU)(INT_PTR)IDC_BTN_LANG, GetModuleHandleW(NULL), NULL);
+                rc.right - S(160), S(16), S(38), S(26), hwnd, (HMENU)(INT_PTR)IDC_BTN_LANG, GetModuleHandleW(NULL), NULL);
 
-            g_hBtnSettings = CreateWindowW(L"BUTTON", L"⚙", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
-                rc.right - S(108), S(16), S(38), S(26), hwnd, (HMENU)(INT_PTR)IDC_BTN_SETTINGS, GetModuleHandleW(NULL), NULL);
+            g_hBtnSettings = CreateWindowW(L"BUTTON", L"\u2699", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
+                rc.right - S(112), S(16), S(38), S(26), hwnd, (HMENU)(INT_PTR)IDC_BTN_SETTINGS, GetModuleHandleW(NULL), NULL);
 
             g_hBtnTray = CreateWindowW(L"BUTTON", L"_", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
-                rc.right - S(62), S(16), S(38), S(26), hwnd, (HMENU)(INT_PTR)IDC_BTN_TRAY, GetModuleHandleW(NULL), NULL);
+                rc.right - S(64), S(16), S(38), S(26), hwnd, (HMENU)(INT_PTR)IDC_BTN_TRAY, GetModuleHandleW(NULL), NULL);
 
             g_hBtnClearLogs = CreateWindowW(L"BUTTON", L"Clear", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
-                rc.right - S(82), S(218), S(54), S(22), hwnd, (HMENU)(INT_PTR)IDC_BTN_CLEAR_LOGS, GetModuleHandleW(NULL), NULL);
+                rc.right - S(88), S(218), S(54), S(22), hwnd, (HMENU)(INT_PTR)IDC_BTN_CLEAR_LOGS, GetModuleHandleW(NULL), NULL);
 
             // MARK: Terminal Logs
             int editTop = S(248);
@@ -873,7 +895,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             if (editHeight < S(140)) editHeight = S(140);
             g_hEditLogs = CreateWindowExW(0, L"EDIT", L"",
                 WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
-                S(32), editTop, rc.right - S(64), editHeight, hwnd, (HMENU)(INT_PTR)IDC_EDIT_LOGS, GetModuleHandleW(NULL), NULL);
+                S(38), editTop, rc.right - S(76), editHeight, hwnd, (HMENU)(INT_PTR)IDC_EDIT_LOGS, GetModuleHandleW(NULL), NULL);
 
             SendMessageW(g_hEditLogs, WM_SETFONT, (WPARAM)g_hFontMono, TRUE);
             SetWindowTheme(g_hEditLogs, L"DarkMode_Explorer", NULL);
@@ -881,61 +903,63 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             // MARK: Settings View Controls (Hidden by default)
             g_hChkStartWindows = CreateWindowW(L"BUTTON", loc.Get(StringId::StartWithWindows).c_str(),
                 WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
-                S(40), S(102), S(450), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_START_WINDOWS, GetModuleHandleW(NULL), NULL);
+                S(44), S(106), S(650), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_START_WINDOWS, GetModuleHandleW(NULL), NULL);
             SendMessageW(g_hChkStartWindows, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
             SendMessageW(g_hChkStartWindows, BM_SETCHECK, g_startWithWindows ? BST_CHECKED : BST_UNCHECKED, 0);
             SetWindowTheme(g_hChkStartWindows, L"DarkMode_Explorer", NULL);
 
             g_hChkMinimizeClose = CreateWindowW(L"BUTTON", loc.Get(StringId::MinimizeOnClose).c_str(),
                 WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
-                S(40), S(134), S(450), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_MINIMIZE_CLOSE, GetModuleHandleW(NULL), NULL);
+                S(44), S(136), S(650), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_MINIMIZE_CLOSE, GetModuleHandleW(NULL), NULL);
             SendMessageW(g_hChkMinimizeClose, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
             SendMessageW(g_hChkMinimizeClose, BM_SETCHECK, g_minimizeOnClose ? BST_CHECKED : BST_UNCHECKED, 0);
             SetWindowTheme(g_hChkMinimizeClose, L"DarkMode_Explorer", NULL);
 
             g_hChkAutoStart = CreateWindowW(L"BUTTON", loc.Get(StringId::AutoStartService).c_str(),
                 WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
-                S(40), S(166), S(450), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_AUTO_START, GetModuleHandleW(NULL), NULL);
+                S(44), S(166), S(650), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_AUTO_START, GetModuleHandleW(NULL), NULL);
             SendMessageW(g_hChkAutoStart, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
             SendMessageW(g_hChkAutoStart, BM_SETCHECK, g_autoStartService ? BST_CHECKED : BST_UNCHECKED, 0);
             SetWindowTheme(g_hChkAutoStart, L"DarkMode_Explorer", NULL);
 
             g_hChkLowBattery = CreateWindowW(L"BUTTON", loc.Get(StringId::LowBatteryNotification).c_str(),
                 WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
-                S(40), S(198), S(450), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_LOW_BATTERY, GetModuleHandleW(NULL), NULL);
+                S(44), S(196), S(650), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_LOW_BATTERY, GetModuleHandleW(NULL), NULL);
             SendMessageW(g_hChkLowBattery, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
             SendMessageW(g_hChkLowBattery, BM_SETCHECK, g_lowBatteryAlert ? BST_CHECKED : BST_UNCHECKED, 0);
             SetWindowTheme(g_hChkLowBattery, L"DarkMode_Explorer", NULL);
 
             g_hChkNintendoMode = CreateWindowW(L"BUTTON", loc.Get(StringId::NintendoMode).c_str(),
                 WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
-                S(40), S(220), S(450), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_NINTENDO_MODE, GetModuleHandleW(NULL), NULL);
+                S(44), S(226), S(650), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_NINTENDO_MODE, GetModuleHandleW(NULL), NULL);
             SendMessageW(g_hChkNintendoMode, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
             SendMessageW(g_hChkNintendoMode, BM_SETCHECK, g_nintendoMode ? BST_CHECKED : BST_UNCHECKED, 0);
             SetWindowTheme(g_hChkNintendoMode, L"DarkMode_Explorer", NULL);
 
             g_hChkHairTrigger = CreateWindowW(L"BUTTON", loc.Get(StringId::HairTrigger).c_str(),
                 WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
-                S(40), S(250), S(450), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_HAIR_TRIGGER, GetModuleHandleW(NULL), NULL);
+                S(44), S(256), S(650), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_HAIR_TRIGGER, GetModuleHandleW(NULL), NULL);
             SendMessageW(g_hChkHairTrigger, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
             SendMessageW(g_hChkHairTrigger, BM_SETCHECK, g_hairTrigger ? BST_CHECKED : BST_UNCHECKED, 0);
             SetWindowTheme(g_hChkHairTrigger, L"DarkMode_Explorer", NULL);
 
+            // Row 1 Buttons: Deadzone & Polling Rate
             g_hBtnDeadzone = CreateWindowW(L"BUTTON", L"",
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(40), S(288), S(190), S(32), hwnd, (HMENU)(INT_PTR)IDC_BTN_DEADZONE, GetModuleHandleW(NULL), NULL);
+                S(44), S(296), S(340), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_DEADZONE, GetModuleHandleW(NULL), NULL);
 
             g_hBtnPollingRate = CreateWindowW(L"BUTTON", L"",
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(245), S(288), S(190), S(32), hwnd, (HMENU)(INT_PTR)IDC_BTN_POLLING_RATE, GetModuleHandleW(NULL), NULL);
+                S(400), S(296), S(340), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_POLLING_RATE, GetModuleHandleW(NULL), NULL);
 
+            // Row 2 Buttons: Stick Curve & Back
             g_hBtnCurve = CreateWindowW(L"BUTTON", L"",
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(450), S(288), S(190), S(32), hwnd, (HMENU)(INT_PTR)IDC_BTN_CURVE, GetModuleHandleW(NULL), NULL);
+                S(44), S(344), S(340), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_CURVE, GetModuleHandleW(NULL), NULL);
 
             g_hBtnSettingsBack = CreateWindowW(L"BUTTON", loc.Get(StringId::SettingsBack).c_str(),
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(40), S(334), S(120), S(32), hwnd, (HMENU)(INT_PTR)IDC_BTN_SETTINGS_BACK, GetModuleHandleW(NULL), NULL);
+                S(400), S(344), S(150), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_SETTINGS_BACK, GetModuleHandleW(NULL), NULL);
 
             UpdateDeadzoneButtonText();
             UpdatePollingRateButtonText();
@@ -1047,7 +1071,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
         case WM_UPDATE_INPUT: {
             if (!g_showSettings) {
-                RECT rcTelemetry = { S(252), S(56), S(468), S(152) };
+                RECT rcTelemetry = { S(278), S(56), S(558), S(152) };
                 InvalidateRect(hwnd, &rcTelemetry, FALSE);
             }
             return 0;
@@ -1238,8 +1262,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     RegisterClassExW(&wc);
 
     UINT dpi = SafeGetDpiForSystem();
-    int winWidth = MulDiv(720, dpi, 96);
-    int winHeight = MulDiv(540, dpi, 96);
+    int winWidth = MulDiv(840, dpi, 96);
+    int winHeight = MulDiv(580, dpi, 96);
 
     g_hWnd = CreateWindowExW(
         0,

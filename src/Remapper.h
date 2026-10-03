@@ -79,8 +79,8 @@ private:
     PVIGEM_TARGET m_vigemTarget{nullptr};
     bool m_targetPlugged{false};
 
-    LONG m_idleZ{0};
-    LONG m_idleRz{0};
+    LONG m_idleSlider0{0};
+    LONG m_idleSlider1{0};
     LONG m_idleRx{0};
     LONG m_idleRy{0};
 };
