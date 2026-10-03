@@ -143,6 +143,11 @@ void Remapper::Stop() {
 
     UninitViGEm();
 
+    if (m_inputCallback) {
+        XUSB_REPORT zeroReport = {};
+        m_inputCallback(zeroReport);
+    }
+
     if (m_statusCallback) {
         m_statusCallback(RemapperStatus::Stopped, L"");
     }
@@ -173,26 +178,28 @@ void Remapper::WorkerLoop(HWND hwnd) {
             }
         }
 
-        if (devices.empty()) {
+        // Strictly search for genuine 8BitDo controller
+        const DeviceChoice* targetDevice = nullptr;
+        for (const auto& dev : devices) {
+            if (dev.is8BitDo) {
+                targetDevice = &dev;
+                break;
+            }
+        }
+
+        if (!targetDevice) {
             if (m_targetPlugged && m_vigemClient && m_vigemTarget) {
                 vigem_target_remove(m_vigemClient, m_vigemTarget);
                 m_targetPlugged = false;
             }
             if (m_statusCallback) m_statusCallback(RemapperStatus::Searching, L"");
-            for (int i = 0; i < 20 && m_running.load(); ++i) {
+            for (int i = 0; i < 15 && m_running.load(); ++i) {
                 Sleep(100);
             }
             continue;
         }
 
-        // Prioritize 8BitDo device
-        DeviceChoice chosen = devices[0];
-        for (const auto& dev : devices) {
-            if (dev.is8BitDo) {
-                chosen = dev;
-                break;
-            }
-        }
+        DeviceChoice chosen = *targetDevice;
 
         LPDIRECTINPUTDEVICE8W joystick = nullptr;
         hr = directInput->CreateDevice(chosen.guid, &joystick, NULL);
@@ -216,7 +223,18 @@ void Remapper::WorkerLoop(HWND hwnd) {
             continue;
         }
 
-        // Plug in virtual target on-demand once physical controller is acquired
+        // Verify genuine live communication before announcing connected
+        joystick->Poll();
+        DIJOYSTATE2 testState = {};
+        hr = joystick->GetDeviceState(sizeof(DIJOYSTATE2), &testState);
+        if (FAILED(hr)) {
+            joystick->Unacquire();
+            joystick->Release();
+            Sleep(500);
+            continue;
+        }
+
+        // Plug in virtual target on-demand once physical controller is verified alive
         if (!m_targetPlugged && m_vigemClient && m_vigemTarget) {
             VIGEM_ERROR plugErr = vigem_target_add(m_vigemClient, m_vigemTarget);
             if (VIGEM_SUCCESS(plugErr)) {
@@ -245,6 +263,10 @@ void Remapper::WorkerLoop(HWND hwnd) {
                     if (m_targetPlugged && m_vigemClient && m_vigemTarget) {
                         vigem_target_remove(m_vigemClient, m_vigemTarget);
                         m_targetPlugged = false;
+                    }
+                    if (m_inputCallback) {
+                        XUSB_REPORT zeroReport = {};
+                        m_inputCallback(zeroReport);
                     }
                     break;
                 }
@@ -322,6 +344,11 @@ void Remapper::WorkerLoop(HWND hwnd) {
         if (m_targetPlugged && m_vigemClient && m_vigemTarget) {
             vigem_target_remove(m_vigemClient, m_vigemTarget);
             m_targetPlugged = false;
+        }
+
+        if (m_inputCallback) {
+            XUSB_REPORT zeroReport = {};
+            m_inputCallback(zeroReport);
         }
 
         joystick->Unacquire();

@@ -546,7 +546,7 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
 
     SelectObject(memDC, g_hFontTitle);
     SetTextColor(memDC, UI::ColorTextPrimary);
-    std::wstring devName = g_deviceName.empty() ? loc.Get(StringId::NoDevice) : g_deviceName;
+    std::wstring devName = (g_currentStatus == RemapperStatus::Connected && !g_deviceName.empty()) ? g_deviceName : loc.Get(StringId::NoDevice);
     RECT devNameRc = { cardStatus.left + S(16), cardStatus.top + S(34), cardStatus.right - S(16), cardStatus.top + S(58) };
     DrawTextW(memDC, devName.c_str(), (int)devName.length(), &devNameRc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
@@ -734,7 +734,7 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
 
     SelectObject(memDC, g_hFontSmall);
     SetTextColor(memDC, UI::ColorTextMuted);
-    std::wstring bDevName = g_batteryDevice.empty() ? L"Bluetooth LE" : g_batteryDevice;
+    std::wstring bDevName = (g_batteryLevel >= 0 && !g_batteryDevice.empty()) ? g_batteryDevice : loc.Get(StringId::NoDevice);
     RECT bDevRc = { cardBattery.left + S(14), cardBattery.top + S(64), cardBattery.right - S(14), cardBattery.top + S(84) };
     DrawTextW(memDC, bDevName.c_str(), (int)bDevName.length(), &bDevRc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
@@ -954,7 +954,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
 
         case WM_UPDATE_INPUT: {
-            if (!g_showSettings && g_currentStatus == RemapperStatus::Connected) {
+            if (!g_showSettings) {
                 int gap = S(12);
                 RECT rcTelemetry = { S(260) + gap, S(56), S(260) + gap + S(240), S(152) };
                 InvalidateRect(hwnd, &rcTelemetry, FALSE);
@@ -978,6 +978,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 g_deviceName = *pName;
                 delete pName;
             }
+            if (g_currentStatus != RemapperStatus::Connected) {
+                g_deviceName.clear();
+                memset(&g_liveInput, 0, sizeof(g_liveInput));
+            }
             UpdateTrayTooltip();
             InvalidateRect(hwnd, NULL, FALSE);
             return 0;
@@ -989,6 +993,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             if (pName) {
                 g_batteryDevice = *pName;
                 delete pName;
+            }
+            if (g_batteryLevel < 0) {
+                g_batteryDevice.clear();
             }
 
             // MARK: Low Battery Toast Notification

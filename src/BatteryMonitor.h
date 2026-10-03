@@ -21,13 +21,14 @@ public:
 
 private:
     void WorkerLoop();
-    void PollBattery();
+    bool PollBattery();
 
     std::atomic<bool> m_running{false};
     std::thread m_workerThread;
     LogCallback m_logCallback;
     BatteryCallback m_batteryCallback;
     std::wstring m_cachedDeviceId;
+    int m_lastReportedLevel{-1};
 };
 
 } // namespace Ultimate2CFixer

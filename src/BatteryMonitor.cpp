@@ -43,6 +43,11 @@ void BatteryMonitor::Stop() {
     if (m_workerThread.joinable()) {
         m_workerThread.join();
     }
+    m_lastReportedLevel = -1;
+    m_cachedDeviceId.clear();
+    if (m_batteryCallback) {
+        m_batteryCallback(L"", -1);
+    }
 }
 
 void BatteryMonitor::WorkerLoop() {
@@ -55,47 +60,62 @@ void BatteryMonitor::WorkerLoop() {
     } catch (...) {}
 #endif
 
-    // Initial 2s delay
-    for (int i = 0; i < 20 && m_running.load(); ++i) {
+    // Initial 1s delay
+    for (int i = 0; i < 10 && m_running.load(); ++i) {
         Sleep(100);
     }
 
     while (m_running.load()) {
-        PollBattery();
+        bool connected = PollBattery();
 
-        // 300s interval (check m_running every 500ms)
-        for (int i = 0; i < 600 && m_running.load(); ++i) {
+        // If connected, check every 60s; if searching/disconnected, check every 4s
+        int sleepTicks = connected ? 120 : 8; // 500ms intervals
+        for (int i = 0; i < sleepTicks && m_running.load(); ++i) {
             Sleep(500);
         }
     }
 }
 
-void BatteryMonitor::PollBattery() {
+bool BatteryMonitor::PollBattery() {
 #if HAS_WINRT_BLE
     try {
         namespace ble = winrt::Windows::Devices::Bluetooth::GenericAttributeProfile;
         namespace dev_enum = winrt::Windows::Devices::Enumeration;
         namespace streams = winrt::Windows::Storage::Streams;
+        namespace bt = winrt::Windows::Devices::Bluetooth;
 
         auto readFromId = [this](const std::wstring& id) -> bool {
             try {
                 auto service = ble::GattDeviceService::FromIdAsync(id).get();
                 if (!service) return false;
 
+                // 1. Verify physical connection status
+                auto dev = service.Device();
+                if (!dev || dev.ConnectionStatus() != bt::BluetoothConnectionStatus::Connected) {
+                    return false;
+                }
+
                 auto charResult = service.GetCharacteristicsForUuidAsync(ble::GattCharacteristicUuids::BatteryLevel()).get();
                 if (charResult.Status() == ble::GattCommunicationStatus::Success && charResult.Characteristics().Size() > 0) {
                     auto ch = charResult.Characteristics().GetAt(0);
-                    auto valResult = ch.ReadValueAsync().get();
+
+                    // 2. Uncached read forces genuine over-the-air communication
+                    auto valResult = ch.ReadValueAsync(bt::BluetoothCacheMode::Uncached).get();
                     if (valResult.Status() == ble::GattCommunicationStatus::Success) {
                         auto reader = streams::DataReader::FromBuffer(valResult.Value());
                         uint8_t level = reader.ReadByte();
 
-                        std::wstring devName = service.Device() ? service.Device().Name().c_str() : L"8BitDo";
+                        std::wstring devName = dev.Name().c_str();
+                        if (devName.empty()) devName = L"8BitDo Ultimate 2C Wireless";
+
                         if (m_batteryCallback) {
                             m_batteryCallback(devName, static_cast<int>(level));
                         }
-                        if (m_logCallback) {
-                            m_logCallback(devName + L" Battery: " + std::to_wstring(level) + L"%");
+                        if (m_lastReportedLevel != static_cast<int>(level)) {
+                            m_lastReportedLevel = static_cast<int>(level);
+                            if (m_logCallback) {
+                                m_logCallback(devName + L" Battery: " + std::to_wstring(level) + L"%");
+                            }
                         }
                         return true;
                     }
@@ -107,7 +127,7 @@ void BatteryMonitor::PollBattery() {
         // Try cached device first
         if (!m_cachedDeviceId.empty()) {
             if (readFromId(m_cachedDeviceId)) {
-                return;
+                return true;
             }
             m_cachedDeviceId.clear();
         }
@@ -118,32 +138,36 @@ void BatteryMonitor::PollBattery() {
         for (uint32_t i = 0; i < devices.Size(); ++i) {
             auto dev = devices.GetAt(i);
             std::wstring name = dev.Name().c_str();
+            std::wstring id = dev.Id().c_str();
 
-            std::wstring lower = name;
-            std::transform(lower.begin(), lower.end(), lower.begin(), [](wchar_t c) { return (wchar_t)std::towlower(c); });
+            std::wstring lowerName = name;
+            std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(), [](wchar_t c) { return (wchar_t)std::towlower(c); });
+            std::wstring lowerId = id;
+            std::transform(lowerId.begin(), lowerId.end(), lowerId.begin(), [](wchar_t c) { return (wchar_t)std::towlower(c); });
 
-            if (lower.find(L"8bitdo") != std::wstring::npos) {
-                std::wstring devId = dev.Id().c_str();
-                if (readFromId(devId)) {
-                    m_cachedDeviceId = devId;
-                    break;
+            // Detect 8BitDo hardware by name or Vendor ID (0x2DC8)
+            if (lowerName.find(L"8bitdo") != std::wstring::npos || lowerId.find(L"2dc8") != std::wstring::npos) {
+                if (readFromId(id)) {
+                    m_cachedDeviceId = id;
+                    return true;
                 }
             }
         }
-    } catch (const std::exception& ex) {
-        if (m_logCallback) {
-            std::string msg = ex.what();
-            m_logCallback(L"Battery monitor exception: " + std::wstring(msg.begin(), msg.end()));
-        }
-    } catch (...) {
-        if (m_logCallback) {
-            m_logCallback(Localization::Instance().Get(StringId::LogBatteryError));
-        }
+    } catch (...) {}
+
+    // No active connected 8BitDo battery service found
+    if (m_lastReportedLevel != -1) {
+        m_lastReportedLevel = -1;
     }
+    if (m_batteryCallback) {
+        m_batteryCallback(L"", -1);
+    }
+    return false;
 #else
-    if (m_logCallback) {
-        m_logCallback(L"Notice: C++/WinRT headers not present in current compiler environment; battery monitor stub active.");
+    if (m_batteryCallback) {
+        m_batteryCallback(L"", -1);
     }
+    return false;
 #endif
 }
 
