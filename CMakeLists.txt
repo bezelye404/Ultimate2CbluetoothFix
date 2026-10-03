@@ -39,6 +39,7 @@ target_link_libraries(Ultimate2CFixer PRIVATE
     uxtheme
     urlmon
     setupapi
+    winmm
 )
 
 if(MSVC)

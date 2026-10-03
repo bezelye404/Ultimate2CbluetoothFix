@@ -38,6 +38,18 @@ public:
     void SetNintendoMode(bool enable) { m_nintendoMode.store(enable); }
     bool GetNintendoMode() const { return m_nintendoMode.load(); }
 
+    void SetHairTrigger(bool enable) { m_hairTrigger.store(enable); }
+    bool GetHairTrigger() const { return m_hairTrigger.load(); }
+
+    void SetPollingRate(int hz) { m_pollingRateHz.store(hz); }
+    int GetPollingRate() const { return m_pollingRateHz.load(); }
+
+    void SetResponseCurve(int curve) { m_responseCurve.store(curve); }
+    int GetResponseCurve() const { return m_responseCurve.load(); }
+
+    int GetLiveHz() const { return m_liveHz.load(); }
+    float GetLiveMs() const { return m_liveMs.load(); }
+
 private:
     void WorkerLoop(HWND hwnd);
     bool InitViGEm();
@@ -45,12 +57,19 @@ private:
 
     static SHORT NormalizeAxis(LONG v);
     static SHORT ApplyDeadzone(SHORT v, int dz);
+    static SHORT ApplyResponseCurve(SHORT v, int curveType);
     static SHORT NegateAxis(SHORT v);
-    static BYTE CalculateTrigger(LONG axisVal, LONG idleVal, bool btnPressed);
+    static BYTE CalculateTrigger(LONG axisVal, LONG idleVal, bool btnPressed, bool hairTrigger);
 
     std::atomic<bool> m_running{false};
     std::atomic<int> m_deadzone{4000};
     std::atomic<bool> m_nintendoMode{false};
+    std::atomic<bool> m_hairTrigger{false};
+    std::atomic<int> m_pollingRateHz{250};
+    std::atomic<int> m_responseCurve{0};
+    std::atomic<int> m_liveHz{250};
+    std::atomic<float> m_liveMs{4.0f};
+
     std::thread m_workerThread;
     LogCallback m_logCallback;
     StatusCallback m_statusCallback;
@@ -60,8 +79,8 @@ private:
     PVIGEM_TARGET m_vigemTarget{nullptr};
     bool m_targetPlugged{false};
 
-    LONG m_idleSlider0{0};
-    LONG m_idleSlider1{0};
+    LONG m_idleZ{0};
+    LONG m_idleRz{0};
     LONG m_idleRx{0};
     LONG m_idleRy{0};
 };

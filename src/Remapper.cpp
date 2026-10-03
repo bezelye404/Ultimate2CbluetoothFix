@@ -5,9 +5,13 @@
 #include <vector>
 #include <algorithm>
 #include <cwctype>
+#include <chrono>
+#include <cmath>
+#include <mmsystem.h>
 
 #pragma comment(lib, "dinput8.lib")
 #pragma comment(lib, "dxguid.lib")
+#pragma comment(lib, "winmm.lib")
 
 namespace Ultimate2CFixer {
 
@@ -234,9 +238,9 @@ void Remapper::WorkerLoop(HWND hwnd) {
             continue;
         }
 
-        // Cache idle resting positions of potential trigger axes
-        m_idleSlider0 = testState.rglSlider[0];
-        m_idleSlider1 = testState.rglSlider[1];
+        // Cache idle resting positions of trigger axes (Z Axis = LT, Z Rotation = RT)
+        m_idleZ = testState.lZ;
+        m_idleRz = testState.lRz;
         m_idleRx = testState.lRx;
         m_idleRy = testState.lRy;
 
@@ -254,6 +258,10 @@ void Remapper::WorkerLoop(HWND hwnd) {
         // State cache for dirty checking
         XUSB_REPORT prevReport = {};
         int idleTicks = 0;
+
+        timeBeginPeriod(1);
+        auto lastHzTime = std::chrono::steady_clock::now();
+        int pollCount = 0;
 
         while (m_running.load()) {
             hr = joystick->Poll();
@@ -278,21 +286,22 @@ void Remapper::WorkerLoop(HWND hwnd) {
                 }
             }
 
-            // Normalization & Dynamic Deadzone
+            // Normalization, Deadzone & Response Curve
             int curDz = m_deadzone.load();
-            SHORT lx = ApplyDeadzone(NormalizeAxis(state.lX), curDz);
-            SHORT ly = NegateAxis(ApplyDeadzone(NormalizeAxis(state.lY), curDz));
-            SHORT rx = ApplyDeadzone(NormalizeAxis(state.lZ), curDz);
-            SHORT ry = NegateAxis(ApplyDeadzone(NormalizeAxis(state.lRz), curDz));
+            int curve = m_responseCurve.load();
 
-            // Hybrid Analog & Digital Trigger Evaluation
-            BYTE lt1 = CalculateTrigger(state.rglSlider[0], m_idleSlider0, state.rgbButtons[8] != 0);
-            BYTE lt2 = CalculateTrigger(state.lRx, m_idleRx, state.rgbButtons[8] != 0);
-            BYTE lt = (std::max)(lt1, lt2);
+            // Left Stick: lX and lY
+            SHORT lx = ApplyResponseCurve(ApplyDeadzone(NormalizeAxis(state.lX), curDz), curve);
+            SHORT ly = NegateAxis(ApplyResponseCurve(ApplyDeadzone(NormalizeAxis(state.lY), curDz), curve));
 
-            BYTE rt1 = CalculateTrigger(state.rglSlider[1], m_idleSlider1, state.rgbButtons[9] != 0);
-            BYTE rt2 = CalculateTrigger(state.lRy, m_idleRy, state.rgbButtons[9] != 0);
-            BYTE rt = (std::max)(rt1, rt2);
+            // Right Stick: lRx (X-Rotation) and lRy (Y-Rotation)
+            SHORT rx = ApplyResponseCurve(ApplyDeadzone(NormalizeAxis(state.lRx), curDz), curve);
+            SHORT ry = NegateAxis(ApplyResponseCurve(ApplyDeadzone(NormalizeAxis(state.lRy), curDz), curve));
+
+            // Triggers: lZ (Z-Axis = Left Trigger) and lRz (Z-Rotation = Right Trigger)
+            bool hair = m_hairTrigger.load();
+            BYTE lt = CalculateTrigger(state.lZ, m_idleZ, state.rgbButtons[8] != 0, hair);
+            BYTE rt = CalculateTrigger(state.lRz, m_idleRz, state.rgbButtons[9] != 0, hair);
 
             bool nintendoMode = m_nintendoMode.load();
             USHORT btnA = static_cast<USHORT>(nintendoMode ? XUSB_GAMEPAD_B : XUSB_GAMEPAD_A);
@@ -331,12 +340,27 @@ void Remapper::WorkerLoop(HWND hwnd) {
                 ry
             };
 
+            pollCount++;
+            auto now = std::chrono::steady_clock::now();
+            auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastHzTime).count();
+            if (elapsedMs >= 1000) {
+                int currentHz = static_cast<int>((pollCount * 1000.0f) / elapsedMs);
+                float currentMs = currentHz > 0 ? (1000.0f / currentHz) : 0.0f;
+                m_liveHz.store(currentHz);
+                m_liveMs.store(currentMs);
+                pollCount = 0;
+                lastHzTime = now;
+            }
+
+            int targetHz = m_pollingRateHz.load();
+            DWORD sleepMs = (targetHz >= 1000) ? 1 : (targetHz >= 500 ? 2 : (targetHz >= 250 ? 4 : 8));
+
             // Dirty checking
             bool changed = (memcmp(&report, &prevReport, sizeof(XUSB_REPORT)) != 0);
             if (!changed) {
                 idleTicks++;
                 if (idleTicks < KeepAliveTicks) {
-                    Sleep(5);
+                    Sleep(sleepMs);
                     continue;
                 }
             } else if (m_inputCallback) {
@@ -350,8 +374,10 @@ void Remapper::WorkerLoop(HWND hwnd) {
                 vigem_target_x360_update(m_vigemClient, m_vigemTarget, report);
             }
 
-            Sleep(5);
+            Sleep(sleepMs);
         }
+
+        timeEndPeriod(1);
 
         if (m_targetPlugged && m_vigemClient && m_vigemTarget) {
             vigem_target_remove(m_vigemClient, m_vigemTarget);
@@ -395,10 +421,38 @@ SHORT Remapper::NegateAxis(SHORT v) {
     return -v;
 }
 
-BYTE Remapper::CalculateTrigger(LONG axisVal, LONG idleVal, bool btnPressed) {
+SHORT Remapper::ApplyResponseCurve(SHORT v, int curveType) {
+    if (curveType == 0 || v == 0) return v; // 0 = Linear
+
+    float norm = static_cast<float>(v) / 32767.0f;
+    float sign = (norm >= 0.0f) ? 1.0f : -1.0f;
+    float absNorm = fabsf(norm);
+    if (absNorm > 1.0f) absNorm = 1.0f;
+
+    float resultNorm = absNorm;
+    if (curveType == 1) {
+        // Smooth Aim (S-curve): gentle around deadzone, rapid at outer bounds
+        resultNorm = (absNorm * absNorm * (3.0f - 2.0f * absNorm));
+    } else if (curveType == 2) {
+        // Aggressive: fast snap
+        resultNorm = sqrtf(absNorm);
+    }
+
+    int res = static_cast<int>(sign * resultNorm * 32767.0f);
+    if (res > 32767) res = 32767;
+    if (res < -32768) res = -32768;
+    return static_cast<SHORT>(res);
+}
+
+BYTE Remapper::CalculateTrigger(LONG axisVal, LONG idleVal, bool btnPressed, bool hairTrigger) {
     LONG diff = (axisVal >= idleVal) ? (axisVal - idleVal) : (idleVal - axisVal);
     if (diff < 1500) {
         return btnPressed ? 255 : 0;
+    }
+    if (hairTrigger) {
+        if (diff > 2500 || btnPressed) {
+            return 255;
+        }
     }
     LONG maxSpan = (idleVal <= 32768) ? (65535 - idleVal) : idleVal;
     if (maxSpan < 1000) maxSpan = 65535;

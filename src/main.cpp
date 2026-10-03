@@ -92,6 +92,9 @@ constexpr int IDC_CHK_LOW_BATTERY   = 111;
 constexpr int IDC_BTN_DEADZONE      = 112;
 constexpr int IDC_BTN_SETTINGS_BACK = 113;
 constexpr int IDC_CHK_NINTENDO_MODE = 114;
+constexpr int IDC_CHK_HAIR_TRIGGER  = 115;
+constexpr int IDC_BTN_POLLING_RATE  = 116;
+constexpr int IDC_BTN_CURVE         = 117;
 
 constexpr int IDM_TRAY_OPEN         = 201;
 constexpr int IDM_TRAY_EXIT         = 202;
@@ -112,7 +115,10 @@ HWND g_hChkMinimizeClose            = nullptr;
 HWND g_hChkAutoStart                = nullptr;
 HWND g_hChkLowBattery               = nullptr;
 HWND g_hChkNintendoMode             = nullptr;
+HWND g_hChkHairTrigger              = nullptr;
 HWND g_hBtnDeadzone                 = nullptr;
+HWND g_hBtnPollingRate              = nullptr;
+HWND g_hBtnCurve                    = nullptr;
 HWND g_hBtnSettingsBack             = nullptr;
 
 bool g_showSettings                 = false;
@@ -121,10 +127,14 @@ bool g_startWithWindows             = false;
 bool g_autoStartService             = true;
 bool g_lowBatteryAlert              = true;
 bool g_nintendoMode                 = false;
+bool g_hairTrigger                  = false;
 bool g_driverInstalled              = false;
 bool g_driverInstalling             = false;
 int g_deadzoneLevel                 = 2; // 0=0%, 1=8%, 2=12%, 3=20%
 const int kDeadzoneValues[]         = { 0, 2600, 4000, 6500 };
+int g_pollingRateIndex              = 1; // 0=125Hz, 1=250Hz, 2=500Hz, 3=1000Hz
+const int kPollingRates[]           = { 125, 250, 500, 1000 };
+int g_responseCurve                 = 0; // 0=Linear, 1=Smooth, 2=Aggressive
 bool g_batteryWarningSent           = false;
 XUSB_REPORT g_liveInput             = {};
 
@@ -221,6 +231,23 @@ void UpdateDeadzoneButtonText() {
     SetWindowTextW(g_hBtnDeadzone, dzText.c_str());
 }
 
+void UpdatePollingRateButtonText() {
+    auto& loc = Localization::Instance();
+    std::wstring text = loc.Get(StringId::PollingRateLabel) + L": " + std::to_wstring(kPollingRates[g_pollingRateIndex]) + L" Hz";
+    SetWindowTextW(g_hBtnPollingRate, text.c_str());
+}
+
+void UpdateCurveButtonText() {
+    auto& loc = Localization::Instance();
+    std::wstring text = loc.Get(StringId::CurveLabel) + L": ";
+    switch (g_responseCurve) {
+        case 0: text += loc.Get(StringId::CurveLinear); break;
+        case 1: text += loc.Get(StringId::CurveSmooth); break;
+        case 2: text += loc.Get(StringId::CurveAggressive); break;
+    }
+    SetWindowTextW(g_hBtnCurve, text.c_str());
+}
+
 void SwitchView(bool showSettings) {
     g_showSettings = showSettings;
     int showMain = showSettings ? SW_HIDE : SW_SHOW;
@@ -236,7 +263,10 @@ void SwitchView(bool showSettings) {
     ShowWindow(g_hChkAutoStart, showSet);
     ShowWindow(g_hChkLowBattery, showSet);
     ShowWindow(g_hChkNintendoMode, showSet);
+    ShowWindow(g_hChkHairTrigger, showSet);
     ShowWindow(g_hBtnDeadzone, showSet);
+    ShowWindow(g_hBtnPollingRate, showSet);
+    ShowWindow(g_hBtnCurve, showSet);
     ShowWindow(g_hBtnSettingsBack, showSet);
 
     InvalidateRect(g_hWnd, NULL, TRUE);
@@ -278,8 +308,11 @@ void UpdateUIStrings() {
     SetWindowTextW(g_hChkAutoStart, loc.Get(StringId::AutoStartService).c_str());
     SetWindowTextW(g_hChkLowBattery, loc.Get(StringId::LowBatteryNotification).c_str());
     SetWindowTextW(g_hChkNintendoMode, loc.Get(StringId::NintendoMode).c_str());
+    SetWindowTextW(g_hChkHairTrigger, loc.Get(StringId::HairTrigger).c_str());
     SetWindowTextW(g_hBtnSettingsBack, loc.Get(StringId::SettingsBack).c_str());
     UpdateDeadzoneButtonText();
+    UpdatePollingRateButtonText();
+    UpdateCurveButtonText();
     UpdateTrayTooltip();
     InvalidateRect(g_hWnd, NULL, TRUE);
 }
@@ -321,6 +354,9 @@ void StartServices() {
     g_remapper = std::make_unique<Remapper>();
     g_remapper->SetDeadzone(kDeadzoneValues[g_deadzoneLevel]);
     g_remapper->SetNintendoMode(g_nintendoMode);
+    g_remapper->SetHairTrigger(g_hairTrigger);
+    g_remapper->SetPollingRate(kPollingRates[g_pollingRateIndex]);
+    g_remapper->SetResponseCurve(g_responseCurve);
     g_remapper->Start(
         g_hWnd,
         [](const std::wstring& msg) {
@@ -594,6 +630,15 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     SetTextColor(memDC, g_nintendoMode ? UI::ColorStatusAmber : UI::ColorStatusGreen);
     DrawTextW(memDC, badgeText.c_str(), (int)badgeText.length(), &badgeRc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
+    // Live Polling Rate Readout
+    if (g_remapper && g_currentStatus == RemapperStatus::Connected) {
+        wchar_t hzBuf[64];
+        swprintf_s(hzBuf, L"%d Hz \u2022 %.1f ms", g_remapper->GetLiveHz(), g_remapper->GetLiveMs());
+        SelectObject(memDC, g_hFontSmall);
+        SetTextColor(memDC, UI::ColorTextMuted);
+        TextOutW(memDC, cardTelemetry.left + S(14), cardTelemetry.top + S(28), hzBuf, (int)wcslen(hzBuf));
+    }
+
     // Left Stick & Right Stick Boxes
     int visX = cardTelemetry.left + S(14);
     int visY = cardTelemetry.top + S(42);
@@ -864,20 +909,37 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
             g_hChkNintendoMode = CreateWindowW(L"BUTTON", loc.Get(StringId::NintendoMode).c_str(),
                 WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
-                S(40), S(230), S(450), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_NINTENDO_MODE, GetModuleHandleW(NULL), NULL);
+                S(40), S(220), S(450), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_NINTENDO_MODE, GetModuleHandleW(NULL), NULL);
             SendMessageW(g_hChkNintendoMode, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
             SendMessageW(g_hChkNintendoMode, BM_SETCHECK, g_nintendoMode ? BST_CHECKED : BST_UNCHECKED, 0);
             SetWindowTheme(g_hChkNintendoMode, L"DarkMode_Explorer", NULL);
 
+            g_hChkHairTrigger = CreateWindowW(L"BUTTON", loc.Get(StringId::HairTrigger).c_str(),
+                WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
+                S(40), S(250), S(450), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_HAIR_TRIGGER, GetModuleHandleW(NULL), NULL);
+            SendMessageW(g_hChkHairTrigger, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
+            SendMessageW(g_hChkHairTrigger, BM_SETCHECK, g_hairTrigger ? BST_CHECKED : BST_UNCHECKED, 0);
+            SetWindowTheme(g_hChkHairTrigger, L"DarkMode_Explorer", NULL);
+
             g_hBtnDeadzone = CreateWindowW(L"BUTTON", L"",
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(40), S(272), S(280), S(32), hwnd, (HMENU)(INT_PTR)IDC_BTN_DEADZONE, GetModuleHandleW(NULL), NULL);
+                S(40), S(288), S(190), S(32), hwnd, (HMENU)(INT_PTR)IDC_BTN_DEADZONE, GetModuleHandleW(NULL), NULL);
+
+            g_hBtnPollingRate = CreateWindowW(L"BUTTON", L"",
+                WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
+                S(245), S(288), S(190), S(32), hwnd, (HMENU)(INT_PTR)IDC_BTN_POLLING_RATE, GetModuleHandleW(NULL), NULL);
+
+            g_hBtnCurve = CreateWindowW(L"BUTTON", L"",
+                WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
+                S(450), S(288), S(190), S(32), hwnd, (HMENU)(INT_PTR)IDC_BTN_CURVE, GetModuleHandleW(NULL), NULL);
 
             g_hBtnSettingsBack = CreateWindowW(L"BUTTON", loc.Get(StringId::SettingsBack).c_str(),
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(40), S(320), S(120), S(32), hwnd, (HMENU)(INT_PTR)IDC_BTN_SETTINGS_BACK, GetModuleHandleW(NULL), NULL);
+                S(40), S(334), S(120), S(32), hwnd, (HMENU)(INT_PTR)IDC_BTN_SETTINGS_BACK, GetModuleHandleW(NULL), NULL);
 
             UpdateDeadzoneButtonText();
+            UpdatePollingRateButtonText();
+            UpdateCurveButtonText();
             SetupTray(hwnd);
 
             // MARK: Driver & First-Launch Check
@@ -941,10 +1003,24 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     if (g_remapper) g_remapper->SetNintendoMode(g_nintendoMode);
                     InvalidateRect(hwnd, NULL, TRUE);
                     break;
+                case IDC_CHK_HAIR_TRIGGER:
+                    g_hairTrigger = (SendMessageW(g_hChkHairTrigger, BM_GETCHECK, 0, 0) == BST_CHECKED);
+                    if (g_remapper) g_remapper->SetHairTrigger(g_hairTrigger);
+                    break;
                 case IDC_BTN_DEADZONE:
                     g_deadzoneLevel = (g_deadzoneLevel + 1) % 4;
                     UpdateDeadzoneButtonText();
                     if (g_remapper) g_remapper->SetDeadzone(kDeadzoneValues[g_deadzoneLevel]);
+                    break;
+                case IDC_BTN_POLLING_RATE:
+                    g_pollingRateIndex = (g_pollingRateIndex + 1) % 4;
+                    UpdatePollingRateButtonText();
+                    if (g_remapper) g_remapper->SetPollingRate(kPollingRates[g_pollingRateIndex]);
+                    break;
+                case IDC_BTN_CURVE:
+                    g_responseCurve = (g_responseCurve + 1) % 3;
+                    UpdateCurveButtonText();
+                    if (g_remapper) g_remapper->SetResponseCurve(g_responseCurve);
                     break;
                 case IDC_BTN_START: StartServices(); break;
                 case IDC_BTN_STOP:  StopServices(); break;
@@ -1066,7 +1142,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         case WM_CTLCOLOREDIT: {
             HDC hdcCtrl = (HDC)wParam;
             HWND hwndCtrl = (HWND)lParam;
-            if (hwndCtrl == g_hChkMinimizeClose || hwndCtrl == g_hChkStartWindows || hwndCtrl == g_hChkAutoStart || hwndCtrl == g_hChkLowBattery || hwndCtrl == g_hChkNintendoMode) {
+            if (hwndCtrl == g_hChkMinimizeClose || hwndCtrl == g_hChkStartWindows || hwndCtrl == g_hChkAutoStart || hwndCtrl == g_hChkLowBattery || hwndCtrl == g_hChkNintendoMode || hwndCtrl == g_hChkHairTrigger) {
                 SetTextColor(hdcCtrl, UI::ColorTextSecondary);
                 SetBkColor(hdcCtrl, UI::ColorCardBg);
                 return (LRESULT)g_hBrCardBg;

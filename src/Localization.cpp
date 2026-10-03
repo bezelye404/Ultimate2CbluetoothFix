@@ -21,6 +21,12 @@ std::wstring Localization::Get(StringId id) const {
             case StringId::AutoStartService: return L"Auto-start service on launch";
             case StringId::LowBatteryNotification: return L"Low battery notification (<=15%)";
             case StringId::NintendoMode: return L"Nintendo Mode";
+            case StringId::HairTrigger: return L"Hair Trigger (instant pull)";
+            case StringId::PollingRateLabel: return L"Polling Rate";
+            case StringId::CurveLabel: return L"Stick Curve";
+            case StringId::CurveLinear: return L"Linear (1:1)";
+            case StringId::CurveSmooth: return L"Smooth Aim";
+            case StringId::CurveAggressive: return L"Aggressive";
             case StringId::DriverReadyFirstRun: return L"Gamepad driver (ViGEmBus) detected and ready. Have fun!";
             case StringId::DriverMissing: return L"Gamepad driver (ViGEmBus) is required to play.";
             case StringId::InstallDriverBtn: return L"Install Driver";
@@ -74,6 +80,12 @@ std::wstring Localization::Get(StringId id) const {
             case StringId::AutoStartService: return L"A\x00E7\x0131l\x0131\x015Fta servisi otomatik ba\x015Flat";
             case StringId::LowBatteryNotification: return L"D\x00FC\x015F\x00FCk pil bildirimi (<=\x002515)";
             case StringId::NintendoMode: return L"Nintendo Mode";
+            case StringId::HairTrigger: return L"Hair Trigger (an\x0131nda tetik)";
+            case StringId::PollingRateLabel: return L"Yoklama H\x0131z\x0131 (Polling Rate)";
+            case StringId::CurveLabel: return L"Stick E\x011Frisi";
+            case StringId::CurveLinear: return L"Lineer (1:1)";
+            case StringId::CurveSmooth: return L"Yumu\x015Fak Ni\x015Fan (Smooth)";
+            case StringId::CurveAggressive: return L"Agresif";
             case StringId::DriverReadyFirstRun: return L"Gerekli gamepad s\x00FCr\x00FCc\x00FCs\x00FC (ViGEmBus) sisteminizde haz\x0131r. \x0130yi oyunlar!";
             case StringId::DriverMissing: return L"Oynamak i\x00E7in gamepad s\x00FCr\x00FCc\x00FCs\x00FC (ViGEmBus) gerekiyor.";
             case StringId::InstallDriverBtn: return L"S\x00FCr\x00FCc\x00FCy\x00FC Kur";
