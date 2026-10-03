@@ -18,7 +18,11 @@ namespace {
     struct DeviceChoice {
         GUID guid;
         std::wstring name;
+        std::wstring displayName;
+        DWORD vid;
+        DWORD pid;
         bool is8BitDo;
+        bool isVirtual;
     };
 
     std::wstring ToLower(std::wstring str) {
@@ -28,11 +32,38 @@ namespace {
 
     BOOL CALLBACK EnumDevicesCallback(LPCDIDEVICEINSTANCEW lpddi, LPVOID pvRef) {
         auto* list = reinterpret_cast<std::vector<DeviceChoice>*>(pvRef);
-        std::wstring name = lpddi->tszInstanceName;
-        std::wstring lower = ToLower(name);
-        bool is8 = (lower.find(L"8bitdo") != std::wstring::npos);
 
-        list->push_back({ lpddi->guidInstance, name, is8 });
+        DWORD vid = LOWORD(lpddi->guidProduct.Data1);
+        DWORD pid = HIWORD(lpddi->guidProduct.Data1);
+        std::wstring instName = lpddi->tszInstanceName;
+        std::wstring prodName = lpddi->tszProductName;
+        std::wstring lowerInst = ToLower(instName);
+        std::wstring lowerProd = ToLower(prodName);
+
+        // Filter out virtual Xbox 360 controller (Microsoft VID 0x045E, PID 0x028E) to prevent loopback
+        bool isVirtual = (vid == 0x045E && (pid == 0x028E || pid == 0x02A1 || pid == 0x028F)) ||
+                         (lowerInst.find(L"vigem") != std::wstring::npos) ||
+                         (lowerProd.find(L"vigem") != std::wstring::npos);
+
+        // Detect 8BitDo hardware (Vendor ID 0x2DC8) or name
+        bool is8BitDo = (vid == 0x2DC8) ||
+                        (lowerInst.find(L"8bitdo") != std::wstring::npos) ||
+                        (lowerProd.find(L"8bitdo") != std::wstring::npos);
+
+        std::wstring displayName;
+        if (is8BitDo) {
+            if (lowerProd.find(L"ultimate") != std::wstring::npos || lowerProd.find(L"8bitdo") != std::wstring::npos) {
+                displayName = prodName;
+            } else if (lowerInst.find(L"8bitdo") != std::wstring::npos) {
+                displayName = instName;
+            } else {
+                displayName = L"8BitDo Ultimate 2C Wireless";
+            }
+        } else {
+            displayName = prodName.empty() ? instName : prodName;
+        }
+
+        list->push_back({ lpddi->guidInstance, instName, displayName, vid, pid, is8BitDo, isVirtual });
         return DIENUM_CONTINUE;
     }
 }
@@ -66,24 +97,15 @@ bool Remapper::InitViGEm() {
         return false;
     }
 
-    err = vigem_target_add(m_vigemClient, m_vigemTarget);
-    if (!VIGEM_SUCCESS(err)) {
-        if (m_logCallback) m_logCallback(L"ERROR: Could not plugin virtual Xbox 360 controller.");
-        vigem_target_free(m_vigemTarget);
-        m_vigemTarget = nullptr;
-        vigem_disconnect(m_vigemClient);
-        vigem_free(m_vigemClient);
-        m_vigemClient = nullptr;
-        return false;
-    }
-
+    m_targetPlugged = false;
     return true;
 }
 
 void Remapper::UninitViGEm() {
     if (m_vigemTarget) {
-        if (m_vigemClient) {
+        if (m_vigemClient && m_targetPlugged) {
             vigem_target_remove(m_vigemClient, m_vigemTarget);
+            m_targetPlugged = false;
         }
         vigem_target_free(m_vigemTarget);
         m_vigemTarget = nullptr;
@@ -141,11 +163,22 @@ void Remapper::WorkerLoop(HWND hwnd) {
     while (m_running.load()) {
         if (m_statusCallback) m_statusCallback(RemapperStatus::Searching, L"");
 
+        std::vector<DeviceChoice> rawDevices;
+        directInput->EnumDevices(DI8DEVCLASS_GAMECTRL, EnumDevicesCallback, &rawDevices, DIEDFL_ATTACHEDONLY);
+
         std::vector<DeviceChoice> devices;
-        directInput->EnumDevices(DI8DEVCLASS_GAMECTRL, EnumDevicesCallback, &devices, DIEDFL_ATTACHEDONLY);
+        for (const auto& dev : rawDevices) {
+            if (!dev.isVirtual) {
+                devices.push_back(dev);
+            }
+        }
 
         if (devices.empty()) {
-            // Sleep and retry auto-reconnect
+            if (m_targetPlugged && m_vigemClient && m_vigemTarget) {
+                vigem_target_remove(m_vigemClient, m_vigemTarget);
+                m_targetPlugged = false;
+            }
+            if (m_statusCallback) m_statusCallback(RemapperStatus::Searching, L"");
             for (int i = 0; i < 20 && m_running.load(); ++i) {
                 Sleep(100);
             }
@@ -160,8 +193,6 @@ void Remapper::WorkerLoop(HWND hwnd) {
                 break;
             }
         }
-
-        if (m_logCallback) m_logCallback(L"Target Device Found: " + chosen.name);
 
         LPDIRECTINPUTDEVICE8W joystick = nullptr;
         hr = directInput->CreateDevice(chosen.guid, &joystick, NULL);
@@ -178,10 +209,23 @@ void Remapper::WorkerLoop(HWND hwnd) {
         }
 
         joystick->SetCooperativeLevel(hwnd, DISCL_BACKGROUND | DISCL_NONEXCLUSIVE);
-        joystick->Acquire();
+        hr = joystick->Acquire();
+        if (FAILED(hr)) {
+            joystick->Release();
+            Sleep(500);
+            continue;
+        }
 
-        if (m_logCallback) m_logCallback(loc.Get(StringId::LogMapperReady));
-        if (m_statusCallback) m_statusCallback(RemapperStatus::Connected, chosen.name);
+        // Plug in virtual target on-demand once physical controller is acquired
+        if (!m_targetPlugged && m_vigemClient && m_vigemTarget) {
+            VIGEM_ERROR plugErr = vigem_target_add(m_vigemClient, m_vigemTarget);
+            if (VIGEM_SUCCESS(plugErr)) {
+                m_targetPlugged = true;
+            }
+        }
+
+        if (m_logCallback) m_logCallback(chosen.displayName + L" connected.");
+        if (m_statusCallback) m_statusCallback(RemapperStatus::Connected, chosen.displayName);
 
         // State cache for dirty checking
         XUSB_REPORT prevReport = {};
@@ -198,6 +242,10 @@ void Remapper::WorkerLoop(HWND hwnd) {
                 if (FAILED(hr)) {
                     if (m_logCallback) m_logCallback(loc.Get(StringId::LogMapperDisconnected));
                     if (m_statusCallback) m_statusCallback(RemapperStatus::Disconnected, L"");
+                    if (m_targetPlugged && m_vigemClient && m_vigemTarget) {
+                        vigem_target_remove(m_vigemClient, m_vigemTarget);
+                        m_targetPlugged = false;
+                    }
                     break;
                 }
             }
@@ -269,6 +317,11 @@ void Remapper::WorkerLoop(HWND hwnd) {
             }
 
             Sleep(5);
+        }
+
+        if (m_targetPlugged && m_vigemClient && m_vigemTarget) {
+            vigem_target_remove(m_vigemClient, m_vigemTarget);
+            m_targetPlugged = false;
         }
 
         joystick->Unacquire();

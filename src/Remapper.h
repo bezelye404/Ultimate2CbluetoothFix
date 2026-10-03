@@ -57,6 +57,7 @@ private:
 
     PVIGEM_CLIENT m_vigemClient{nullptr};
     PVIGEM_TARGET m_vigemTarget{nullptr};
+    bool m_targetPlugged{false};
 };
 
 } // namespace Ultimate2CFixer
