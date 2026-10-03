@@ -46,6 +46,7 @@ private:
     static SHORT NormalizeAxis(LONG v);
     static SHORT ApplyDeadzone(SHORT v, int dz);
     static SHORT NegateAxis(SHORT v);
+    static BYTE CalculateTrigger(LONG axisVal, LONG idleVal, bool btnPressed);
 
     std::atomic<bool> m_running{false};
     std::atomic<int> m_deadzone{4000};
@@ -58,6 +59,11 @@ private:
     PVIGEM_CLIENT m_vigemClient{nullptr};
     PVIGEM_TARGET m_vigemTarget{nullptr};
     bool m_targetPlugged{false};
+
+    LONG m_idleSlider0{0};
+    LONG m_idleSlider1{0};
+    LONG m_idleRx{0};
+    LONG m_idleRy{0};
 };
 
 } // namespace Ultimate2CFixer

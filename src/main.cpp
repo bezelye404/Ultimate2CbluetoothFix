@@ -532,12 +532,11 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     SetTextColor(memDC, UI::ColorTextPrimary);
     TextOutW(memDC, S(20), S(18), loc.Get(StringId::AppTitle).c_str(), (int)loc.Get(StringId::AppTitle).length());
 
-    int gap = S(12);
     int topCardTop = S(56);
     int topCardBottom = S(152);
 
     // MARK: Card 1 - Controller Status Card
-    RECT cardStatus = { S(20), topCardTop, S(260), topCardBottom };
+    RECT cardStatus = { S(20), topCardTop, S(240), topCardBottom };
     DrawCard(memDC, cardStatus);
 
     SelectObject(memDC, g_hFontSmall);
@@ -572,16 +571,16 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     TextOutW(memDC, cardStatus.left + S(30), cardStatus.top + S(64), statusText.c_str(), (int)statusText.length());
 
     // MARK: Card 2 - Live Input Telemetry Card
-    RECT cardTelemetry = { cardStatus.right + gap, topCardTop, cardStatus.right + gap + S(240), topCardBottom };
+    RECT cardTelemetry = { S(252), topCardTop, S(468), topCardBottom };
     DrawCard(memDC, cardTelemetry);
 
     SelectObject(memDC, g_hFontSmall);
     SetTextColor(memDC, UI::ColorTextMuted);
-    TextOutW(memDC, cardTelemetry.left + S(16), cardTelemetry.top + S(14), loc.Get(StringId::LiveInputTitle).c_str(), (int)loc.Get(StringId::LiveInputTitle).length());
+    TextOutW(memDC, cardTelemetry.left + S(14), cardTelemetry.top + S(14), loc.Get(StringId::LiveInputTitle).c_str(), (int)loc.Get(StringId::LiveInputTitle).length());
 
     // Mode Badge Pill
     std::wstring badgeText = g_nintendoMode ? L"NINTENDO" : L"XBOX";
-    RECT badgeRc = { cardTelemetry.right - S(82), cardTelemetry.top + S(12), cardTelemetry.right - S(16), cardTelemetry.top + S(28) };
+    RECT badgeRc = { cardTelemetry.right - S(74), cardTelemetry.top + S(12), cardTelemetry.right - S(14), cardTelemetry.top + S(26) };
     HBRUSH hBadgeBg = CreateSolidBrush(RGB(32, 32, 40));
     HPEN hBadgePen = CreatePen(PS_SOLID, 1, UI::ColorCardBorder);
     HBRUSH hOldBr = (HBRUSH)SelectObject(memDC, hBadgeBg);
@@ -596,11 +595,11 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     DrawTextW(memDC, badgeText.c_str(), (int)badgeText.length(), &badgeRc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
     // Left Stick & Right Stick Boxes
-    int visX = cardTelemetry.left + S(16);
+    int visX = cardTelemetry.left + S(14);
     int visY = cardTelemetry.top + S(42);
 
     RECT lsBox = { visX, visY, visX + S(34), visY + S(34) };
-    RECT rsBox = { visX + S(40), visY, visX + S(74), visY + S(34) };
+    RECT rsBox = { visX + S(38), visY, visX + S(72), visY + S(34) };
     HBRUSH hStickBg = CreateSolidBrush(RGB(24, 24, 30));
     HPEN hStickPen = CreatePen(PS_SOLID, 1, UI::ColorCardBorder);
     hOldBr = (HBRUSH)SelectObject(memDC, hStickBg);
@@ -643,7 +642,7 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     DeleteObject(hNullP);
 
     // Live Dynamic ABXY Diamond (Real-time Nintendo vs Xbox layout)
-    int diaX = visX + S(88);
+    int diaX = visX + S(80);
     struct BtnDef { const wchar_t* lbl; USHORT m; int x; int y; };
     BtnDef bArr[4];
     if (g_nintendoMode) {
@@ -678,10 +677,10 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
         DrawTextW(memDC, b.lbl, 1, &brc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
     }
 
-    // LT / RT Analog Trigger Meters
-    int trigX = cardTelemetry.right - S(38);
+    // LT / RT Analog Trigger Meters (Smooth Real-time Fill)
+    int trigX = cardTelemetry.right - S(32);
     RECT ltRc = { trigX, visY + S(2), trigX + S(9), visY + S(32) };
-    RECT rtRc = { trigX + S(15), visY + S(2), trigX + S(24), visY + S(32) };
+    RECT rtRc = { trigX + S(13), visY + S(2), trigX + S(22), visY + S(32) };
     HBRUSH htbg = CreateSolidBrush(RGB(24, 24, 30));
     FillRect(memDC, &ltRc, htbg);
     FillRect(memDC, &rtRc, htbg);
@@ -702,22 +701,22 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
         DeleteObject(hf);
     }
 
-    // MARK: Card 3 - Battery Card
-    RECT cardBattery = { cardTelemetry.right + gap, topCardTop, clientRc.right - S(20), topCardBottom };
+    // MARK: Card 3 - Battery Card (Width 220px, Zero Clipping, Clean Breathing Room)
+    RECT cardBattery = { S(480), topCardTop, clientRc.right - S(20), topCardBottom };
     DrawCard(memDC, cardBattery);
 
     SelectObject(memDC, g_hFontSmall);
     SetTextColor(memDC, UI::ColorTextMuted);
-    TextOutW(memDC, cardBattery.left + S(14), cardBattery.top + S(14), loc.Get(StringId::BatteryTitle).c_str(), (int)loc.Get(StringId::BatteryTitle).length());
+    TextOutW(memDC, cardBattery.left + S(16), cardBattery.top + S(14), loc.Get(StringId::BatteryTitle).c_str(), (int)loc.Get(StringId::BatteryTitle).length());
 
     std::wstring pctStr = (g_batteryLevel >= 0) ? (std::to_wstring(g_batteryLevel) + L"%") : L"--%";
     SelectObject(memDC, g_hFontTitle);
     SetTextColor(memDC, UI::ColorTextPrimary);
-    RECT pctRc = { cardBattery.left + S(14), cardBattery.top + S(12), cardBattery.right - S(14), cardBattery.top + S(32) };
+    RECT pctRc = { cardBattery.left + S(16), cardBattery.top + S(10), cardBattery.right - S(16), cardBattery.top + S(36) };
     DrawTextW(memDC, pctStr.c_str(), (int)pctStr.length(), &pctRc, DT_RIGHT | DT_SINGLELINE);
 
-    // Battery Bar
-    RECT trackRc = { cardBattery.left + S(14), cardBattery.top + S(46), cardBattery.right - S(14), cardBattery.top + S(52) };
+    // Battery Bar (Height 8px, clean and solid)
+    RECT trackRc = { cardBattery.left + S(16), cardBattery.top + S(46), cardBattery.right - S(16), cardBattery.top + S(54) };
     HBRUSH hTrackBr = CreateSolidBrush(UI::ColorCardBorder);
     FillRect(memDC, &trackRc, hTrackBr);
     DeleteObject(hTrackBr);
@@ -732,11 +731,28 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
         DeleteObject(hFillBr);
     }
 
+    // Clean, uncrowded status description
     SelectObject(memDC, g_hFontSmall);
-    SetTextColor(memDC, UI::ColorTextMuted);
-    std::wstring bDevName = (g_batteryLevel >= 0 && !g_batteryDevice.empty()) ? g_batteryDevice : loc.Get(StringId::NoDevice);
-    RECT bDevRc = { cardBattery.left + S(14), cardBattery.top + S(64), cardBattery.right - S(14), cardBattery.top + S(84) };
-    DrawTextW(memDC, bDevName.c_str(), (int)bDevName.length(), &bDevRc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+    std::wstring bStatusStr;
+    COLORREF bStatusCol = UI::ColorTextMuted;
+    if (g_batteryLevel >= 0) {
+        if (g_batteryLevel <= 20) {
+            bStatusStr = loc.IsEnglish() ? L"Low Battery - Please Recharge" : L"D\x00FC\x015F\x00FCk Pil - L\x00FCtfen \x015Farj Edin";
+            bStatusCol = UI::ColorStatusRed;
+        } else if (g_batteryLevel <= 50) {
+            bStatusStr = loc.IsEnglish() ? L"Wireless - Moderate Level" : L"Kablosuz - Orta Seviye";
+            bStatusCol = UI::ColorTextSecondary;
+        } else {
+            bStatusStr = loc.IsEnglish() ? L"Wireless - Healthy Level" : L"Kablosuz - \x0130yi Seviye";
+            bStatusCol = UI::ColorTextSecondary;
+        }
+    } else {
+        bStatusStr = loc.Get(StringId::NoDevice);
+        bStatusCol = UI::ColorTextMuted;
+    }
+    SetTextColor(memDC, bStatusCol);
+    RECT bDevRc = { cardBattery.left + S(16), cardBattery.top + S(64), cardBattery.right - S(16), cardBattery.top + S(84) };
+    DrawTextW(memDC, bStatusStr.c_str(), (int)bStatusStr.length(), &bDevRc, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
     // MARK: Terminal Card
     RECT cardTerminal = { S(20), S(212), clientRc.right - S(20), clientRc.bottom - S(20) };
@@ -955,8 +971,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
         case WM_UPDATE_INPUT: {
             if (!g_showSettings) {
-                int gap = S(12);
-                RECT rcTelemetry = { S(260) + gap, S(56), S(260) + gap + S(240), S(152) };
+                RECT rcTelemetry = { S(252), S(56), S(468), S(152) };
                 InvalidateRect(hwnd, &rcTelemetry, FALSE);
             }
             return 0;

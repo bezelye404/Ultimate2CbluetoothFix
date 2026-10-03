@@ -234,6 +234,12 @@ void Remapper::WorkerLoop(HWND hwnd) {
             continue;
         }
 
+        // Cache idle resting positions of potential trigger axes
+        m_idleSlider0 = testState.rglSlider[0];
+        m_idleSlider1 = testState.rglSlider[1];
+        m_idleRx = testState.lRx;
+        m_idleRy = testState.lRy;
+
         // Plug in virtual target on-demand once physical controller is verified alive
         if (!m_targetPlugged && m_vigemClient && m_vigemTarget) {
             VIGEM_ERROR plugErr = vigem_target_add(m_vigemClient, m_vigemTarget);
@@ -279,8 +285,14 @@ void Remapper::WorkerLoop(HWND hwnd) {
             SHORT rx = ApplyDeadzone(NormalizeAxis(state.lZ), curDz);
             SHORT ry = NegateAxis(ApplyDeadzone(NormalizeAxis(state.lRz), curDz));
 
-            BYTE lt = state.rgbButtons[8] ? 255 : 0;
-            BYTE rt = state.rgbButtons[9] ? 255 : 0;
+            // Hybrid Analog & Digital Trigger Evaluation
+            BYTE lt1 = CalculateTrigger(state.rglSlider[0], m_idleSlider0, state.rgbButtons[8] != 0);
+            BYTE lt2 = CalculateTrigger(state.lRx, m_idleRx, state.rgbButtons[8] != 0);
+            BYTE lt = (std::max)(lt1, lt2);
+
+            BYTE rt1 = CalculateTrigger(state.rglSlider[1], m_idleSlider1, state.rgbButtons[9] != 0);
+            BYTE rt2 = CalculateTrigger(state.lRy, m_idleRy, state.rgbButtons[9] != 0);
+            BYTE rt = (std::max)(rt1, rt2);
 
             bool nintendoMode = m_nintendoMode.load();
             USHORT btnA = static_cast<USHORT>(nintendoMode ? XUSB_GAMEPAD_B : XUSB_GAMEPAD_A);
@@ -381,6 +393,22 @@ SHORT Remapper::ApplyDeadzone(SHORT v, int dz) {
 SHORT Remapper::NegateAxis(SHORT v) {
     if (v == -32768) return 32767;
     return -v;
+}
+
+BYTE Remapper::CalculateTrigger(LONG axisVal, LONG idleVal, bool btnPressed) {
+    LONG diff = (axisVal >= idleVal) ? (axisVal - idleVal) : (idleVal - axisVal);
+    if (diff < 1500) {
+        return btnPressed ? 255 : 0;
+    }
+    LONG maxSpan = (idleVal <= 32768) ? (65535 - idleVal) : idleVal;
+    if (maxSpan < 1000) maxSpan = 65535;
+    LONG scaled = (diff * 255) / maxSpan;
+    if (scaled > 255) scaled = 255;
+    if (scaled < 0) scaled = 0;
+    if (btnPressed) {
+        return 255;
+    }
+    return static_cast<BYTE>(scaled);
 }
 
 } // namespace Ultimate2CFixer
