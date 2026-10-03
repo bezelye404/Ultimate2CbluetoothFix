@@ -1,86 +1,85 @@
-
+# Build
+build/
 bin/
 obj/
-publish/
 out/
-build/
-release/
-debug/
+publish/
+dist/
 x64/
 x86/
+Release/
+Debug/
 
+# MSVC
+*.obj
+*.ilk
 *.pdb
-*.dbg
-*.dmp
+*.tlog
+*.idb
+*.lastbuildstate
+*.res
+*.pch
+*.ipch
 
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
 
+# IDE
 .vs/
 .vscode/
 .idea/
 *.user
+*.useros
+*.userprefs
 *.suo
 *.sln.docstates
-*.rsuser
-*.userprefs
-.project
-.settings/
+*.VC.db
+*.VC.opendb
+CMakeSettings.json
+CMakeUserPresets.json
 
+# Environment & Secrets
+.env
+.env.*
+*.env
+*.key
+*.pem
+*.cert
+*.cer
+*.crt
+*.pfx
+*.p12
+*.token
+*.credentials
+secrets.*
 
+# Crash Dumps & Logs
 *.log
-*.txt.log
-crash.log
-error.log
+*.dmp
+*.dump
+*.crash
+*.stackdump
 
-
-*.cache
-*.tmp
-*.temp
-*~
-.cache/
-__pycache__/
-
-
+# OS
 Thumbs.db
 ehthumbs.db
 .DS_Store
 Desktop.ini
 $RECYCLE.BIN/
-*.lnk
+System Volume Information/
 
+# Temporary Files
+*.tmp
+*.temp
 *.bak
-*.backup
 *.old
 *.orig
+*~
 
-packages/
-*.nupkg
-.nuget/
-
-*.local
-*.env
-.env
-appsettings.*.json
-secrets.json
-launchSettings.json
-
-
-TestResults/
-*.trx
-
-
-coverage/
-*.coverage
-*.coveragexml
-
-
-*.zip
-*.7z
-*.rar
-*.tar.gz
-
-
-*.exe
-*.dll
-*.so
-*.dylib
+# Agent Files
 AGENTS.md
+.agents/
+.gemini/

@@ -53,11 +53,11 @@ std::wstring Localization::Get(StringId id) const {
             case StringId::Idle: return L"Idle";
             case StringId::WaitingReconnect: return L"Waiting for controller...";
             case StringId::LogAppReady: return L"Application ready.";
-            case StringId::LogServicesStarting: return L"Starting remapper and battery services...";
+            case StringId::LogServicesStarting: return L"Starting controller and battery services...";
             case StringId::LogServicesStopping: return L"Stopping services...";
-            case StringId::LogMapperStart: return L"DirectInput -> Virtual Xbox 360 remapper started.";
-            case StringId::LogMapperReady: return L"Virtual Xbox 360 controller connected and ready.";
-            case StringId::LogMapperDisconnected: return L"Controller disconnected. Entering auto-reconnect scan...";
+            case StringId::LogMapperStart: return L"Controller service started.";
+            case StringId::LogMapperReady: return L"Controller connected and ready.";
+            case StringId::LogMapperDisconnected: return L"Controller disconnected. Searching...";
             case StringId::LogBatteryActive: return L"Battery monitor active.";
             case StringId::LogBatteryError: return L"Battery monitor scan warning.";
             default: return L"";
@@ -114,9 +114,9 @@ std::wstring Localization::Get(StringId id) const {
             case StringId::LogAppReady: return L"Uygulama haz\x0131r.";
             case StringId::LogServicesStarting: return L"Servisler ba\x015Flat\x0131l\x0131yor...";
             case StringId::LogServicesStopping: return L"Servisler durduruluyor...";
-            case StringId::LogMapperStart: return L"DirectInput -> Sanal Xbox 360 remapper ba\x015Flat\x0131ld\x0131.";
-            case StringId::LogMapperReady: return L"Sanal Xbox 360 kontrolc\x00FCs\x00FC haz\x0131r.";
-            case StringId::LogMapperDisconnected: return L"Ba\x011Flant\x0131 koptu. Otomatik yeniden ba\x011Flanma moduna ge\x00E7ildi...";
+            case StringId::LogMapperStart: return L"Kontrolc\x00FC servisi ba\x015Flat\x0131ld\x0131.";
+            case StringId::LogMapperReady: return L"Kontrolc\x00FC ba\x011Flan\x0131ld\x0131 ve haz\x0131r.";
+            case StringId::LogMapperDisconnected: return L"Ba\x011Flant\x0131 koptu. Yeniden ba\x011Flan\x0131l\x0131yor...";
             case StringId::LogBatteryActive: return L"Pil monit\x00F6r\x00FC aktif.";
             case StringId::LogBatteryError: return L"Pil tarama uyar\x0131s\x0131.";
             default: return L"";
