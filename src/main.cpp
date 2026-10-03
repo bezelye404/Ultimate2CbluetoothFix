@@ -395,6 +395,7 @@ void MinimizeToTray() {
 }
 
 void RestoreFromTray() {
+    ShowWindow(g_hWnd, SW_SHOW);
     ShowWindow(g_hWnd, SW_RESTORE);
     SetForegroundWindow(g_hWnd);
 }
@@ -945,9 +946,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
 
         case WM_TRAYICON: {
-            if (lParam == WM_LBUTTONDBLCLK || lParam == WM_LBUTTONUP) {
+            UINT event = LOWORD(lParam);
+            if (event == WM_LBUTTONUP || event == WM_LBUTTONDBLCLK || event == NIN_SELECT) {
                 RestoreFromTray();
-            } else if (lParam == WM_RBUTTONUP) {
+            } else if (event == WM_RBUTTONUP || event == WM_CONTEXTMENU) {
                 ShowTrayMenu();
             }
             return 0;
