@@ -1,7 +1,7 @@
 # Build
 build/
-bin/
-obj/
+build-*/
+cmake-build-*/
 out/
 publish/
 dist/
@@ -9,9 +9,30 @@ x64/
 x86/
 Release/
 Debug/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+CTestTestfile.cmake
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+_deps/
+Testing/
+*_autogen/
 
-# MSVC
+# Compiled
+*.o
 *.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
 *.ilk
 *.pdb
 *.tlog
@@ -20,17 +41,62 @@ Debug/
 *.res
 *.pch
 *.ipch
+*.gch
+*.slo
+*.lo
+*.la
+*.lai
+*.mod
+*.smod
+*.exp
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
 
-# Binaries
-*.exe
-*.dll
-*.so
-*.dylib
+# Qt
+moc_*.cpp
+moc_*.h
+ui_*.h
+qrc_*.cpp
+*.qm
+*.autosave
+CMakeLists.txt.user*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Tests & Measurements
+linux/tools/*.sh
+*.gcda
+*.gcno
+*.gcov
+*.profraw
+*.profdata
+*.trace
+perf.data*
+callgrind.out.*
+massif.out.*
+heaptrack.*
+
+# Screenshots & Captures
+u2c-shots/
+screenshots/
+*-capture.txt
+*.pcap
+*.pcapng
 
 # IDE
 .vs/
 .vscode/
 .idea/
+.cache/
+.clangd/
+.ccls-cache/
 *.user
 *.useros
 *.userprefs
@@ -38,6 +104,8 @@ Debug/
 *.sln.docstates
 *.VC.db
 *.VC.opendb
+*.swp
+*.swo
 CMakeSettings.json
 CMakeUserPresets.json
 
@@ -55,13 +123,29 @@ CMakeUserPresets.json
 *.token
 *.credentials
 secrets.*
+id_rsa*
+id_ed25519*
+*.gpg
+*.kdbx
 
-# Crash Dumps & Logs
+# Personal & Local
+settings.conf
+*.local
+*.local.*
+local/
+.local/
+.config/
+.ssh/
+
+# Logs & Dumps
 *.log
 *.dmp
 *.dump
 *.crash
 *.stackdump
+core.[0-9]*
+vgcore.*
+hs_err_pid*
 
 # OS
 Thumbs.db
@@ -70,8 +154,11 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 System Volume Information/
+.directory
+.Trash-*/
+.fuse_hidden*
 
-# Temporary Files
+# Temporary
 *.tmp
 *.temp
 *.bak
@@ -81,5 +168,14 @@ System Volume Information/
 
 # Agent Files
 AGENTS.md
+CLAUDE.md
 .agents/
+.claude/
 .gemini/
+.cursor/
+.aider*
+/agent-rules-bundle
+
+# Research & Notes
+spikes/
+docs/

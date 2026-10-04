@@ -1,0 +1,25 @@
+cmake_minimum_required(VERSION 3.20)
+project(u2c_core LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+# Pure C++20 library: no OS calls, no Qt. -ffp-contract=off keeps the float curve math identical on every machine.
+add_library(u2c_core STATIC src/axes.cpp src/triggers.cpp src/buttons.cpp src/pad.cpp src/settings.cpp src/translations.cpp)
+target_include_directories(u2c_core PUBLIC include)
+target_compile_options(u2c_core PRIVATE -Wall -Wextra -Wpedantic -ffp-contract=off)
+
+enable_testing()
+add_executable(u2c_core_tests tests/test_main.cpp tests/test_settings.cpp tests/test_translations.cpp tests/test_rate_limiter.cpp)
+target_link_libraries(u2c_core_tests PRIVATE u2c_core)
+target_compile_options(u2c_core_tests PRIVATE -Wall -Wextra -Wpedantic -ffp-contract=off)
+add_test(NAME core COMMAND u2c_core_tests)
+set_tests_properties(core PROPERTIES ENVIRONMENT "U2C_VECTOR_DIR=${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors;U2C_RESOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/resources")
+
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_FOUND)
+  add_test(NAME translations_parity COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_translations.py)
+endif()
