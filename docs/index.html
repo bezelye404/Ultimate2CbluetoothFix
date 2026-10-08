@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ultimate2CFixer: use the 8BitDo Ultimate 2C over Bluetooth on Windows</title>
+  <meta name="description" content="Ultimate2CFixer is a free, open-source Windows utility that lets games see the 8BitDo Ultimate 2C as an Xbox (XInput) controller over Bluetooth. Native C++, under 400 KB.">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+  <link rel="canonical" href="https://bezelye404.github.io/Ultimate2CbluetoothFix/">
+  <link rel="alternate" hreflang="en" href="https://bezelye404.github.io/Ultimate2CbluetoothFix/">
+  <link rel="alternate" hreflang="tr" href="https://bezelye404.github.io/Ultimate2CbluetoothFix/tr/">
+  <link rel="alternate" hreflang="x-default" href="https://bezelye404.github.io/Ultimate2CbluetoothFix/">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#eff1ee" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#151918" media="(prefers-color-scheme: dark)">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preload" href="fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/dm-sans.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="style.css">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Ultimate2CFixer">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="tr_TR">
+  <meta property="og:title" content="Ultimate2CFixer: the 8BitDo Ultimate 2C as an Xbox controller over Bluetooth">
+  <meta property="og:description" content="A small, free Windows utility that turns the controller's Bluetooth DirectInput into a virtual Xbox 360 gamepad.">
+  <meta property="og:url" content="https://bezelye404.github.io/Ultimate2CbluetoothFix/">
+  <meta property="og:image" content="https://bezelye404.github.io/Ultimate2CbluetoothFix/og-image.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Ultimate2CFixer: a flat drawing of a game controller">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Ultimate2CFixer: the 8BitDo Ultimate 2C as an Xbox controller over Bluetooth">
+  <meta name="twitter:description" content="A small, free Windows utility that turns the controller's Bluetooth DirectInput into a virtual Xbox 360 gamepad.">
+  <meta name="twitter:image" content="https://bezelye404.github.io/Ultimate2CbluetoothFix/og-image.png">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://bezelye404.github.io/Ultimate2CbluetoothFix/#app",
+        "name": "Ultimate2CFixer",
+        "alternateName": "Ultimate2CbluetoothFix",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Windows 10, Windows 11 (64-bit)",
+        "description": "A free, open-source Windows utility that exposes the 8BitDo Ultimate 2C, connected over Bluetooth, as a virtual Xbox 360 (XInput) controller.",
+        "url": "https://bezelye404.github.io/Ultimate2CbluetoothFix/",
+        "downloadUrl": "https://github.com/bezelye404/Ultimate2CbluetoothFix/releases/latest",
+        "codeRepository": "https://github.com/bezelye404/Ultimate2CbluetoothFix",
+        "license": "https://opensource.org/licenses/MIT",
+        "isAccessibleForFree": true,
+        "author": {
+          "@id": "https://bezelye404.github.io/#person"
+        },
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "inLanguage": [
+          "en",
+          "tr"
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Why does the controller need a fix over Bluetooth?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "In Bluetooth mode, Windows sees the Ultimate 2C as a DirectInput device, with the right stick on the lZ and lRz axes. Many games only support Xbox (XInput) controllers, so they do not see it. Ultimate2CFixer reads the DirectInput state and passes it on through a virtual Xbox 360 controller."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What is ViGEmBus, and do I have to install it?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "ViGEmBus is an open-source driver that lets programs create virtual gamepads, and Ultimate2CFixer needs it. If it is missing, the app offers to download and install it."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Which versions of Windows work?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Windows 10 and 11, 64-bit."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does it work with other controllers?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "It was written for the 8BitDo Ultimate 2C in Bluetooth mode, and the axis mapping matches that controller. Other controllers are not covered."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Where are my settings stored?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "In the registry, under HKCU\\Software\\Ultimate2CFixer\\Settings, for your Windows user only."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What does the hair trigger option do?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "It treats any trigger pull beyond the deadzone as a full press, so a light touch registers as 255, the maximum."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can it start with Windows and stay out of the way?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. There is a start with Windows option, and the app can minimize to the system tray when you close the window."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Which languages does the interface have?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "English and Turkish."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is it free?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. It is released under the MIT license and the source code is on GitHub."
+            }
+          }
+        ]
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "bezelye404",
+            "item": "https://bezelye404.github.io/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Ultimate2CFixer",
+            "item": "https://bezelye404.github.io/Ultimate2CbluetoothFix/"
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="site">
+    <div class="wrap">
+      <a class="brand" href="#top"><span class="mark" aria-hidden="true"></span> Ultimate2CFixer</a>
+      <nav aria-label="Main">
+        <ul>
+          <li><a href="#how">How it works</a></li>
+          <li class="hide-small"><a href="#features">Features</a></li>
+          <li class="hide-small"><a href="#install">Install</a></li>
+          <li class="hide-small"><a href="#faq">FAQ</a></li>
+          <li><a class="pill" href="https://github.com/bezelye404/Ultimate2CbluetoothFix">GitHub</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="wrap">
+        <div class="hero-text">
+          <p class="eyebrow">Free and open source · Windows 10 and 11</p>
+          <h1>Ultimate2CFixer</h1>
+          <p class="sub">The 8BitDo Ultimate 2C, over Bluetooth, as an Xbox controller.</p>
+          <p class="lead">In Bluetooth mode, Windows sees the 8BitDo Ultimate 2C as a DirectInput device, and many games only look for Xbox (XInput) controllers. Ultimate2CFixer reads the controller and hands its input to Windows as a virtual Xbox 360 gamepad.</p>
+          <div class="actions">
+            <a class="btn" href="https://github.com/bezelye404/Ultimate2CbluetoothFix/releases/latest"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/></svg>Download for Windows</a>
+            <a class="btn secondary" href="https://github.com/bezelye404/Ultimate2CbluetoothFix"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 19c-4 1.2-4-2-6-2.5M15 21v-3.2a2.8 2.8 0 0 0-.8-2.2c2.7-.3 5.5-1.3 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6 0C6.5 3.9 5.5 4.2 5.5 4.2a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4.1 10.6c0 4.6 2.8 5.7 5.5 6A2.8 2.8 0 0 0 8.8 18.8V21"/></svg>View on GitHub</a>
+          </div>
+          <p class="meta">MIT license · Windows 10 and 11, 64-bit · one executable, under 400 KB</p>
+        </div>
+        <div class="hero-art"><svg class="pad" viewBox="0 0 400 260" role="img" aria-label="A flat drawing of a game controller with two sticks, four face buttons and a directional pad">
+  <g class="triggers"><rect class="lt" x="104" y="26" width="56" height="16" rx="8"/><rect class="rt" x="240" y="26" width="56" height="16" rx="8"/></g>
+  <g class="bumpers"><rect class="lb" x="92" y="50" width="76" height="14" rx="7"/><rect class="rb" x="232" y="50" width="76" height="14" rx="7"/></g>
+  <path class="body" d="M92 66 H308 C330 66 342 78 348 100 L376 196 C384 226 366 244 342 240 C322 237 312 222 304 202 L296 184 H104 L96 202 C88 222 78 237 58 240 C34 244 16 226 24 196 L52 100 C58 78 70 66 92 66 Z"/>
+  <g class="stick ls"><circle class="well" cx="122" cy="108" r="26"/><circle class="knob" cx="122" cy="108" r="15"/></g>
+  <g class="stick rs"><circle class="well" cx="246" cy="160" r="26"/><circle class="knob" cx="246" cy="160" r="15"/></g>
+  <g class="dpad"><rect x="148" y="146" width="12" height="40" rx="3"/><rect x="134" y="160" width="40" height="12" rx="3"/></g>
+  <g class="face">
+    <circle class="key y" cx="290" cy="82" r="11"/><circle class="key b" cx="316" cy="108" r="11"/>
+    <circle class="key a" cx="290" cy="134" r="11"/><circle class="key x" cx="264" cy="108" r="11"/>
+  </g>
+  <g class="center"><circle cx="184" cy="108" r="5"/><circle cx="216" cy="108" r="5"/></g>
+</svg></div>
+      </div>
+    </section>
+
+    <section id="how">
+      <div class="wrap">
+        <h2>How it works</h2>
+        <p class="intro">Three steps, and a small driver doing the translation in the background.</p>
+        <ol class="steps">
+          <li><span class="num">1</span><div><h3>Pair the controller</h3><p>Connect the 8BitDo Ultimate 2C in Bluetooth mode from Windows' Bluetooth settings.</p></div></li>
+          <li><span class="num">2</span><div><h3>Start the service</h3><p>Open Ultimate2CFixer.exe and click Start Service. If the ViGEmBus driver is missing, the app offers to install it.</p></div></li>
+          <li><span class="num">3</span><div><h3>Play</h3><p>Games now see a virtual Xbox 360 controller that follows your Ultimate 2C.</p></div></li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="features">
+      <div class="wrap">
+        <h2>What it does</h2>
+        <p class="intro">A small utility with a few settings, so it can be tuned without getting in the way.</p>
+        <div class="grid">
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>
+            <h3>DirectInput to XInput</h3>
+            <p>Reads the controller's DirectInput state, including the right stick on the lZ and lRz axes, and feeds it to a virtual Xbox 360 gamepad through ViGEmBus.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+            <h3>Polling rate</h3>
+            <p>Choose 125, 250, 500 or 1000 Hz, which is an update every 8, 4, 2 or 1 ms.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19C9 19 9 5 12 12s3 7 8 7"/><path d="M4 19h16" opacity=".5"/></svg>
+            <h3>Stick response curves</h3>
+            <p>Linear (1:1), Smooth Aim (a cubic S-curve) or Aggressive (square root), plus a deadzone of 0, 8, 12 or 20 percent.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h6a4 4 0 0 1 4 4v10H7z"/><path d="M7 10h10"/></svg>
+            <h3>Hair trigger</h3>
+            <p>An optional setting that treats any trigger pull beyond the deadzone as a full press.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg>
+            <h3>Live input view</h3>
+            <p>Shows the sticks, the A, B, X and Y buttons, the bumpers and the analog depth of both triggers, so you can see what the controller reports.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="8" width="16" height="9" rx="2.5"/><path d="M21 11v3M7 12.5h6"/></svg>
+            <h3>Battery level</h3>
+            <p>Reads the battery percentage over Bluetooth Low Energy, with an optional low battery alert.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M3.5 14h5l1.5 2.5h4L15.5 14h5"/></svg>
+            <h3>Tray and small footprint</h3>
+            <p>Can stay in the system tray and start with Windows. The release notes list under 6 MB of memory in use and under 2 MB in the tray.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2" fill="var(--surface)"/><circle cx="15" cy="12" r="2" fill="var(--surface)"/><circle cx="8" cy="17" r="2" fill="var(--surface)"/></svg>
+            <h3>Layout and language</h3>
+            <p>A Nintendo layout option swaps A with B and X with Y. The interface is in English or Turkish. Settings are remembered between runs.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="mapping">
+      <div class="wrap">
+        <h2>Axis mapping</h2>
+        <p class="intro">How the 8BitDo Ultimate 2C reports its controls to DirectInput in Bluetooth mode. The right stick is on lZ and lRz, not lRx and lRy.</p>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th scope="col">DirectInput field</th><th scope="col">Control</th></tr></thead>
+            <tbody>
+              <tr><td><code>state.lX</code></td><td>Left stick (horizontal)</td></tr>
+              <tr><td><code>state.lY</code></td><td>Left stick (vertical)</td></tr>
+              <tr><td><code>state.lZ</code></td><td>Right stick (horizontal)</td></tr>
+              <tr><td><code>state.lRz</code></td><td>Right stick (vertical)</td></tr>
+              <tr><td><code>state.rglSlider[0]</code></td><td>Left trigger (LT), analog depth</td></tr>
+              <tr><td><code>state.rglSlider[1]</code></td><td>Right trigger (RT), analog depth</td></tr>
+              <tr><td><code>state.rgbButtons[6]</code></td><td>Left bumper (LB)</td></tr>
+              <tr><td><code>state.rgbButtons[7]</code></td><td>Right bumper (RB)</td></tr>
+              <tr><td><code>state.rgbButtons[8]</code></td><td>Left trigger (LT), digital click</td></tr>
+              <tr><td><code>state.rgbButtons[9]</code></td><td>Right trigger (RT), digital click</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="install">
+      <div class="wrap">
+        <h2>Install</h2>
+        <p class="intro">You need Windows 10 or 11 (64-bit) and the ViGEmBus driver.</p>
+        <div class="install-grid">
+          <div class="install-card">
+            <h3><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/></svg>Download</h3>
+            <p>Get Ultimate2CFixer.exe from the releases page. It is a single file, with nothing to unpack.</p>
+            <a class="btn" href="https://github.com/bezelye404/Ultimate2CbluetoothFix/releases/latest">Open the releases page</a>
+            <p class="small">Pair the controller in Windows' Bluetooth settings, open the app and click Start Service.</p>
+          </div>
+          <div class="install-card">
+            <h3><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>ViGEmBus driver</h3>
+            <p>ViGEmBus is an open-source driver that creates virtual gamepads. If it is not installed yet, Ultimate2CFixer downloads its installer from the ViGEmBus releases on GitHub and runs it.</p>
+            <p class="small"><a href="https://github.com/nefarius/ViGEmBus">github.com/nefarius/ViGEmBus</a></p>
+          </div>
+        </div>
+        <div class="build">
+          <h3>Build from source</h3>
+          <p>You need Visual Studio 2022 with the C++ desktop workload and CMake 3.20 or newer.</p>
+<pre><code>git clone https://github.com/bezelye404/Ultimate2CbluetoothFix.git
+cd Ultimate2CbluetoothFix
+cmake -B build -S .
+cmake --build build --config Release</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="touches">
+      <div class="wrap">
+        <h2>What it touches</h2>
+        <p class="intro">Everything the app changes on your PC, in one place.</p>
+        <ul class="touches">
+          <li><h3>A virtual controller</h3><p>While the service runs, Windows has an extra Xbox 360 controller, created through ViGEmBus.</p></li>
+          <li><h3>The registry</h3><p>Your settings live in HKCU\Software\Ultimate2CFixer\Settings. If you turn on start with Windows, a startup entry is added for your user.</p></li>
+          <li><h3>The network</h3><p>The only thing it fetches from the internet is the ViGEmBus installer, and only when the driver is missing. Battery level comes over Bluetooth, not the network.</p></li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="faq">
+      <div class="wrap">
+        <h2>Frequently asked questions</h2>
+        <details>
+          <summary>Why does the controller need a fix over Bluetooth?</summary>
+          <p>In Bluetooth mode, Windows sees the Ultimate 2C as a DirectInput device, with the right stick on the lZ and lRz axes. Many games only support Xbox (XInput) controllers, so they do not see it. Ultimate2CFixer reads the DirectInput state and passes it on through a virtual Xbox 360 controller.</p>
+        </details>
+        <details>
+          <summary>What is ViGEmBus, and do I have to install it?</summary>
+          <p>ViGEmBus is an open-source driver that lets programs create virtual gamepads, and Ultimate2CFixer needs it. If it is missing, the app offers to download and install it.</p>
+        </details>
+        <details>
+          <summary>Which versions of Windows work?</summary>
+          <p>Windows 10 and 11, 64-bit.</p>
+        </details>
+        <details>
+          <summary>Does it work with other controllers?</summary>
+          <p>It was written for the 8BitDo Ultimate 2C in Bluetooth mode, and the axis mapping matches that controller. Other controllers are not covered.</p>
+        </details>
+        <details>
+          <summary>Where are my settings stored?</summary>
+          <p>In the registry, under HKCU\Software\Ultimate2CFixer\Settings, for your Windows user only.</p>
+        </details>
+        <details>
+          <summary>What does the hair trigger option do?</summary>
+          <p>It treats any trigger pull beyond the deadzone as a full press, so a light touch registers as 255, the maximum.</p>
+        </details>
+        <details>
+          <summary>Can it start with Windows and stay out of the way?</summary>
+          <p>Yes. There is a start with Windows option, and the app can minimize to the system tray when you close the window.</p>
+        </details>
+        <details>
+          <summary>Which languages does the interface have?</summary>
+          <p>English and Turkish.</p>
+        </details>
+        <details>
+          <summary>Is it free?</summary>
+          <p>Yes. It is released under the MIT license and the source code is on GitHub.</p>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site">
+    <div class="wrap">
+      <ul>
+        <li><a href="https://github.com/bezelye404/Ultimate2CbluetoothFix">Source code</a></li>
+        <li><a href="https://github.com/bezelye404/Ultimate2CbluetoothFix/releases">Releases</a></li>
+        <li><a href="https://github.com/bezelye404/Ultimate2CbluetoothFix/issues">Report an issue</a></li>
+        <li><a href="https://github.com/bezelye404/Ultimate2CbluetoothFix/blob/main/LICENSE">MIT license</a></li>
+      </ul>
+      <p>A project by <a href="https://bezelye404.github.io/">bezelye404</a>. This site has no trackers and loads nothing from other servers. English · <a href="tr/" hreflang="tr" lang="tr">Türkçe</a></p>
+    </div>
+  </footer>
+</body>
+</html>

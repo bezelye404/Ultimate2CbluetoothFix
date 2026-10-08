@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ultimate2CFixer: 8BitDo Ultimate 2C'yi Windows'ta Bluetooth üzerinden kullan</title>
+  <meta name="description" content="Ultimate2CFixer, oyunların 8BitDo Ultimate 2C'yi Bluetooth üzerinden Xbox (XInput) kontrolcüsü olarak görmesini sağlayan ücretsiz ve açık kaynaklı bir Windows aracıdır. Yerel C++, 400 KB'tan küçük.">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+  <link rel="canonical" href="https://bezelye404.github.io/Ultimate2CbluetoothFix/tr/">
+  <link rel="alternate" hreflang="en" href="https://bezelye404.github.io/Ultimate2CbluetoothFix/">
+  <link rel="alternate" hreflang="tr" href="https://bezelye404.github.io/Ultimate2CbluetoothFix/tr/">
+  <link rel="alternate" hreflang="x-default" href="https://bezelye404.github.io/Ultimate2CbluetoothFix/">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#eff1ee" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#151918" media="(prefers-color-scheme: dark)">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+  <link rel="preload" href="../fonts/fraunces.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../fonts/dm-sans.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../style.css">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Ultimate2CFixer">
+  <meta property="og:locale" content="tr_TR">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta property="og:title" content="Ultimate2CFixer: 8BitDo Ultimate 2C, Bluetooth'ta Xbox kontrolcüsü olarak">
+  <meta property="og:description" content="Kontrolcünün Bluetooth DirectInput girdisini sanal bir Xbox 360 gamepad'ine çeviren küçük, ücretsiz bir Windows aracı.">
+  <meta property="og:url" content="https://bezelye404.github.io/Ultimate2CbluetoothFix/tr/">
+  <meta property="og:image" content="https://bezelye404.github.io/Ultimate2CbluetoothFix/og-image.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Ultimate2CFixer: düz çizilmiş bir oyun kontrolcüsü">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Ultimate2CFixer: 8BitDo Ultimate 2C, Bluetooth'ta Xbox kontrolcüsü olarak">
+  <meta name="twitter:description" content="Kontrolcünün Bluetooth DirectInput girdisini sanal bir Xbox 360 gamepad'ine çeviren küçük, ücretsiz bir Windows aracı.">
+  <meta name="twitter:image" content="https://bezelye404.github.io/Ultimate2CbluetoothFix/og-image.png">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://bezelye404.github.io/Ultimate2CbluetoothFix/#app",
+        "name": "Ultimate2CFixer",
+        "alternateName": "Ultimate2CbluetoothFix",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Windows 10, Windows 11 (64-bit)",
+        "description": "8BitDo Ultimate 2C'yi Bluetooth üzerinden sanal bir Xbox 360 (XInput) kontrolcüsü olarak sunan ücretsiz, açık kaynaklı bir Windows aracı.",
+        "url": "https://bezelye404.github.io/Ultimate2CbluetoothFix/tr/",
+        "downloadUrl": "https://github.com/bezelye404/Ultimate2CbluetoothFix/releases/latest",
+        "codeRepository": "https://github.com/bezelye404/Ultimate2CbluetoothFix",
+        "license": "https://opensource.org/licenses/MIT",
+        "isAccessibleForFree": true,
+        "author": {
+          "@id": "https://bezelye404.github.io/#person"
+        },
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "inLanguage": [
+          "en",
+          "tr"
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Kontrolcü Bluetooth'ta neden bir düzeltmeye ihtiyaç duyuyor?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Bluetooth modunda Windows, Ultimate 2C'yi sağ analogu lZ ve lRz eksenlerinde olan bir DirectInput aygıtı olarak görür. Birçok oyun yalnızca Xbox (XInput) kontrolcülerini desteklediği için onu görmez. Ultimate2CFixer DirectInput durumunu okuyup sanal bir Xbox 360 kontrolcüsü üzerinden iletir."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "ViGEmBus nedir, kurmam gerekir mi?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "ViGEmBus, programların sanal gamepad oluşturmasını sağlayan açık kaynaklı bir sürücüdür ve Ultimate2CFixer buna ihtiyaç duyar. Kurulu değilse uygulama indirip kurmayı önerir."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Hangi Windows sürümleri çalışır?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Windows 10 ve 11, 64 bit."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Başka kontrolcülerle çalışır mı?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Bluetooth modundaki 8BitDo Ultimate 2C için yazıldı ve eksen eşlemesi o kontrolcüye göre. Diğer kontrolcüler kapsam dışı."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Ayarlarım nerede saklanıyor?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Kayıt defterinde, yalnızca Windows kullanıcın için HKCU\\Software\\Ultimate2CFixer\\Settings altında."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Hair trigger seçeneği ne yapar?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Ölü bölgeyi aşan her tetik çekişini tam basış sayar; hafif bir dokunuş en yüksek değer olan 255 olarak kaydolur."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Windows ile başlayıp arka planda durabilir mi?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Evet. Windows ile başlatma seçeneği var ve pencereyi kapatınca uygulama sistem tepsisine küçülebilir."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Arayüz hangi dillerde?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "İngilizce ve Türkçe."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Ücretsiz mi?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Evet. MIT lisansıyla yayınlanıyor, kaynak kodu GitHub'da."
+            }
+          }
+        ]
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "bezelye404",
+            "item": "https://bezelye404.github.io/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Ultimate2CFixer",
+            "item": "https://bezelye404.github.io/Ultimate2CbluetoothFix/"
+          },
+          {
+            "@type": "ListItem",
+            "position": 3,
+            "name": "Türkçe",
+            "item": "https://bezelye404.github.io/Ultimate2CbluetoothFix/tr/"
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">İçeriğe geç</a>
+
+  <header class="site">
+    <div class="wrap">
+      <a class="brand" href="#top"><span class="mark" aria-hidden="true"></span> Ultimate2CFixer</a>
+      <nav aria-label="Ana menü">
+        <ul>
+          <li><a href="#nasil">Nasıl çalışır</a></li>
+          <li class="hide-small"><a href="#ozellikler">Özellikler</a></li>
+          <li class="hide-small"><a href="#kurulum">Kurulum</a></li>
+          <li class="hide-small"><a href="#sss">SSS</a></li>
+          <li><a class="pill" href="https://github.com/bezelye404/Ultimate2CbluetoothFix">GitHub</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="wrap">
+        <div class="hero-text">
+          <p class="eyebrow">Ücretsiz ve açık kaynak · Windows 10 ve 11</p>
+          <h1>Ultimate2CFixer</h1>
+          <p class="sub">8BitDo Ultimate 2C, Bluetooth'ta, Xbox kontrolcüsü olarak.</p>
+          <p class="lead">Bluetooth modunda Windows, 8BitDo Ultimate 2C'yi bir DirectInput aygıtı olarak görür; birçok oyun ise yalnızca Xbox (XInput) kontrolcüleri arar. Ultimate2CFixer kontrolcüyü okur ve girdisini Windows'a sanal bir Xbox 360 gamepad'i olarak iletir.</p>
+          <div class="actions">
+            <a class="btn" href="https://github.com/bezelye404/Ultimate2CbluetoothFix/releases/latest"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/></svg>Windows için indir</a>
+            <a class="btn secondary" href="https://github.com/bezelye404/Ultimate2CbluetoothFix"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 19c-4 1.2-4-2-6-2.5M15 21v-3.2a2.8 2.8 0 0 0-.8-2.2c2.7-.3 5.5-1.3 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6 0C6.5 3.9 5.5 4.2 5.5 4.2a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 4.1 10.6c0 4.6 2.8 5.7 5.5 6A2.8 2.8 0 0 0 8.8 18.8V21"/></svg>GitHub'da görüntüle</a>
+          </div>
+          <p class="meta">MIT lisansı · Windows 10 ve 11, 64 bit · tek çalıştırılabilir dosya, 400 KB'tan küçük</p>
+        </div>
+        <div class="hero-art"><svg class="pad" viewBox="0 0 400 260" role="img" aria-label="İki analog, dört işlem tuşu ve yön tuşları olan düz çizilmiş bir oyun kontrolcüsü">
+  <g class="triggers"><rect class="lt" x="104" y="26" width="56" height="16" rx="8"/><rect class="rt" x="240" y="26" width="56" height="16" rx="8"/></g>
+  <g class="bumpers"><rect class="lb" x="92" y="50" width="76" height="14" rx="7"/><rect class="rb" x="232" y="50" width="76" height="14" rx="7"/></g>
+  <path class="body" d="M92 66 H308 C330 66 342 78 348 100 L376 196 C384 226 366 244 342 240 C322 237 312 222 304 202 L296 184 H104 L96 202 C88 222 78 237 58 240 C34 244 16 226 24 196 L52 100 C58 78 70 66 92 66 Z"/>
+  <g class="stick ls"><circle class="well" cx="122" cy="108" r="26"/><circle class="knob" cx="122" cy="108" r="15"/></g>
+  <g class="stick rs"><circle class="well" cx="246" cy="160" r="26"/><circle class="knob" cx="246" cy="160" r="15"/></g>
+  <g class="dpad"><rect x="148" y="146" width="12" height="40" rx="3"/><rect x="134" y="160" width="40" height="12" rx="3"/></g>
+  <g class="face">
+    <circle class="key y" cx="290" cy="82" r="11"/><circle class="key b" cx="316" cy="108" r="11"/>
+    <circle class="key a" cx="290" cy="134" r="11"/><circle class="key x" cx="264" cy="108" r="11"/>
+  </g>
+  <g class="center"><circle cx="184" cy="108" r="5"/><circle cx="216" cy="108" r="5"/></g>
+</svg></div>
+      </div>
+    </section>
+
+    <section id="nasil">
+      <div class="wrap">
+        <h2>Nasıl çalışır</h2>
+        <p class="intro">Üç adım; çeviriyi arka planda küçük bir sürücü yapar.</p>
+        <ol class="steps">
+          <li><span class="num">1</span><div><h3>Kontrolcüyü eşleştir</h3><p>8BitDo Ultimate 2C'yi Bluetooth modunda, Windows'un Bluetooth ayarlarından bağla.</p></div></li>
+          <li><span class="num">2</span><div><h3>Hizmeti başlat</h3><p>Ultimate2CFixer.exe'yi aç ve Start Service düğmesine bas. ViGEmBus sürücüsü yoksa uygulama kurmayı önerir.</p></div></li>
+          <li><span class="num">3</span><div><h3>Oyna</h3><p>Oyunlar artık Ultimate 2C'ni izleyen sanal bir Xbox 360 kontrolcüsü görür.</p></div></li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="ozellikler">
+      <div class="wrap">
+        <h2>Neler yapar</h2>
+        <p class="intro">Birkaç ayarı olan küçük bir araç: ayarlanabilir ama yolunuza çıkmaz.</p>
+        <div class="grid">
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>
+            <h3>DirectInput'tan XInput'a</h3>
+            <p>Sağ analogun lZ ve lRz eksenlerinde olduğu DirectInput durumunu okur ve ViGEmBus üzerinden sanal bir Xbox 360 gamepad'ine aktarır.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+            <h3>Örnekleme hızı</h3>
+            <p>125, 250, 500 ya da 1000 Hz seç; yani 8, 4, 2 ya da 1 ms'de bir güncelleme.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19C9 19 9 5 12 12s3 7 8 7"/><path d="M4 19h16" opacity=".5"/></svg>
+            <h3>Analog tepki eğrileri</h3>
+            <p>Doğrusal (1:1), Smooth Aim (kübik S eğrisi) ya da Aggressive (karekök); ayrıca yüzde 0, 8, 12 veya 20 ölü bölge.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h6a4 4 0 0 1 4 4v10H7z"/><path d="M7 10h10"/></svg>
+            <h3>Hair trigger</h3>
+            <p>Ölü bölgeyi aşan her tetik çekişini tam basış sayan isteğe bağlı bir ayar.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg>
+            <h3>Canlı girdi görünümü</h3>
+            <p>Analogları, A, B, X ve Y tuşlarını, bumper'ları ve iki tetiğin analog derinliğini gösterir; kontrolcünün ne bildirdiğini görürsün.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="8" width="16" height="9" rx="2.5"/><path d="M21 11v3M7 12.5h6"/></svg>
+            <h3>Pil seviyesi</h3>
+            <p>Pil yüzdesini Bluetooth Low Energy üzerinden okur; isteğe bağlı düşük pil uyarısı var.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M3.5 14h5l1.5 2.5h4L15.5 14h5"/></svg>
+            <h3>Tepsi ve küçük boyut</h3>
+            <p>Sistem tepsisinde durabilir ve Windows ile başlayabilir. Sürüm notları, kullanımda 6 MB'tan az, tepsideyken 2 MB'tan az bellek belirtiyor.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2" fill="var(--surface)"/><circle cx="15" cy="12" r="2" fill="var(--surface)"/><circle cx="8" cy="17" r="2" fill="var(--surface)"/></svg>
+            <h3>Yerleşim ve dil</h3>
+            <p>Nintendo yerleşimi seçeneği A ile B'yi, X ile Y'yi değiştirir. Arayüz İngilizce ya da Türkçe. Ayarlar çalıştırmalar arasında hatırlanır.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="mapping">
+      <div class="wrap">
+        <h2>Eksen eşlemesi</h2>
+        <p class="intro">8BitDo Ultimate 2C'nin Bluetooth modunda kontrollerini DirectInput'a nasıl bildirdiği. Sağ analog lRx ve lRy'de değil, lZ ve lRz'de.</p>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th scope="col">DirectInput alanı</th><th scope="col">Kontrol</th></tr></thead>
+            <tbody>
+              <tr><td><code>state.lX</code></td><td>Sol analog (yatay)</td></tr>
+              <tr><td><code>state.lY</code></td><td>Sol analog (dikey)</td></tr>
+              <tr><td><code>state.lZ</code></td><td>Sağ analog (yatay)</td></tr>
+              <tr><td><code>state.lRz</code></td><td>Sağ analog (dikey)</td></tr>
+              <tr><td><code>state.rglSlider[0]</code></td><td>Sol tetik (LT), analog derinlik</td></tr>
+              <tr><td><code>state.rglSlider[1]</code></td><td>Sağ tetik (RT), analog derinlik</td></tr>
+              <tr><td><code>state.rgbButtons[6]</code></td><td>Sol bumper (LB)</td></tr>
+              <tr><td><code>state.rgbButtons[7]</code></td><td>Sağ bumper (RB)</td></tr>
+              <tr><td><code>state.rgbButtons[8]</code></td><td>Sol tetik (LT), dijital tık</td></tr>
+              <tr><td><code>state.rgbButtons[9]</code></td><td>Sağ tetik (RT), dijital tık</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="kurulum">
+      <div class="wrap">
+        <h2>Kurulum</h2>
+        <p class="intro">Windows 10 ya da 11 (64 bit) ve ViGEmBus sürücüsü gerekir.</p>
+        <div class="install-grid">
+          <div class="install-card">
+            <h3><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/></svg>İndir</h3>
+            <p>Ultimate2CFixer.exe'yi sürümler sayfasından al. Tek dosya, açılacak bir şey yok.</p>
+            <a class="btn" href="https://github.com/bezelye404/Ultimate2CbluetoothFix/releases/latest">Sürümler sayfasını aç</a>
+            <p class="small">Kontrolcüyü Windows'un Bluetooth ayarlarından eşleştir, uygulamayı aç ve Start Service'e bas.</p>
+          </div>
+          <div class="install-card">
+            <h3><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>ViGEmBus sürücüsü</h3>
+            <p>ViGEmBus, sanal gamepad oluşturan açık kaynaklı bir sürücüdür. Kurulu değilse Ultimate2CFixer yükleyicisini GitHub'daki ViGEmBus sürümlerinden indirir ve çalıştırır.</p>
+            <p class="small"><a href="https://github.com/nefarius/ViGEmBus">github.com/nefarius/ViGEmBus</a></p>
+          </div>
+        </div>
+        <div class="build">
+          <h3>Kaynaktan derleme</h3>
+          <p>C++ masaüstü iş yüküyle Visual Studio 2022 ve CMake 3.20 veya üzeri gerekir.</p>
+<pre><code>git clone https://github.com/bezelye404/Ultimate2CbluetoothFix.git
+cd Ultimate2CbluetoothFix
+cmake -B build -S .
+cmake --build build --config Release</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="touches">
+      <div class="wrap">
+        <h2>Nelere dokunur</h2>
+        <p class="intro">Uygulamanın bilgisayarında değiştirdiği her şey, tek yerde.</p>
+        <ul class="touches">
+          <li><h3>Sanal bir kontrolcü</h3><p>Hizmet çalışırken Windows'ta ViGEmBus üzerinden oluşturulmuş fazladan bir Xbox 360 kontrolcüsü bulunur.</p></li>
+          <li><h3>Kayıt defteri</h3><p>Ayarların HKCU\Software\Ultimate2CFixer\Settings altında durur. Windows ile başlatmayı açarsan kullanıcın için bir başlangıç girdisi eklenir.</p></li>
+          <li><h3>Ağ</h3><p>İnternetten çektiği tek şey ViGEmBus yükleyicisidir, o da yalnızca sürücü yoksa. Pil seviyesi ağdan değil Bluetooth'tan gelir.</p></li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="sss">
+      <div class="wrap">
+        <h2>Sık sorulan sorular</h2>
+        <details>
+          <summary>Kontrolcü Bluetooth'ta neden bir düzeltmeye ihtiyaç duyuyor?</summary>
+          <p>Bluetooth modunda Windows, Ultimate 2C'yi sağ analogu lZ ve lRz eksenlerinde olan bir DirectInput aygıtı olarak görür. Birçok oyun yalnızca Xbox (XInput) kontrolcülerini desteklediği için onu görmez. Ultimate2CFixer DirectInput durumunu okuyup sanal bir Xbox 360 kontrolcüsü üzerinden iletir.</p>
+        </details>
+        <details>
+          <summary>ViGEmBus nedir, kurmam gerekir mi?</summary>
+          <p>ViGEmBus, programların sanal gamepad oluşturmasını sağlayan açık kaynaklı bir sürücüdür ve Ultimate2CFixer buna ihtiyaç duyar. Kurulu değilse uygulama indirip kurmayı önerir.</p>
+        </details>
+        <details>
+          <summary>Hangi Windows sürümleri çalışır?</summary>
+          <p>Windows 10 ve 11, 64 bit.</p>
+        </details>
+        <details>
+          <summary>Başka kontrolcülerle çalışır mı?</summary>
+          <p>Bluetooth modundaki 8BitDo Ultimate 2C için yazıldı ve eksen eşlemesi o kontrolcüye göre. Diğer kontrolcüler kapsam dışı.</p>
+        </details>
+        <details>
+          <summary>Ayarlarım nerede saklanıyor?</summary>
+          <p>Kayıt defterinde, yalnızca Windows kullanıcın için HKCU\Software\Ultimate2CFixer\Settings altında.</p>
+        </details>
+        <details>
+          <summary>Hair trigger seçeneği ne yapar?</summary>
+          <p>Ölü bölgeyi aşan her tetik çekişini tam basış sayar; hafif bir dokunuş en yüksek değer olan 255 olarak kaydolur.</p>
+        </details>
+        <details>
+          <summary>Windows ile başlayıp arka planda durabilir mi?</summary>
+          <p>Evet. Windows ile başlatma seçeneği var ve pencereyi kapatınca uygulama sistem tepsisine küçülebilir.</p>
+        </details>
+        <details>
+          <summary>Arayüz hangi dillerde?</summary>
+          <p>İngilizce ve Türkçe.</p>
+        </details>
+        <details>
+          <summary>Ücretsiz mi?</summary>
+          <p>Evet. MIT lisansıyla yayınlanıyor, kaynak kodu GitHub'da.</p>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site">
+    <div class="wrap">
+      <ul>
+        <li><a href="https://github.com/bezelye404/Ultimate2CbluetoothFix">Kaynak kod</a></li>
+        <li><a href="https://github.com/bezelye404/Ultimate2CbluetoothFix/releases">Sürümler</a></li>
+        <li><a href="https://github.com/bezelye404/Ultimate2CbluetoothFix/issues">Sorun bildir</a></li>
+        <li><a href="https://github.com/bezelye404/Ultimate2CbluetoothFix/blob/main/LICENSE">MIT lisansı</a></li>
+      </ul>
+      <p> <a href="https://bezelye404.github.io/">bezelye404</a> projesi. Bu sitede izleyici yok ve başka sunuculardan hiçbir şey yüklenmez. Türkçe · <a href="../" hreflang="en" lang="en">English</a></p>
+    </div>
+  </footer>
+</body>
+</html>
