@@ -310,6 +310,10 @@ bool DeviceHider::IsPresent(DWORD vid, DWORD pid) {
     return !FindHidInstanceIds(vid, pid, false).empty();
 }
 
+std::vector<std::wstring> DeviceHider::PresentInstanceIds(DWORD vid, DWORD pid) {
+    return FindHidInstanceIds(vid, pid, false);
+}
+
 void DeviceHider::SaveLastController(DWORD vid, DWORD pid) {
     HKEY key;
     if (RegCreateKeyExW(HKEY_CURRENT_USER, kLastControllerKey, 0, nullptr, 0, KEY_WRITE, nullptr, &key, nullptr) != ERROR_SUCCESS) return;

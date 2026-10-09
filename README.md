@@ -36,6 +36,7 @@ Because most modern Windows games expect an XInput device, Ultimate2CFixer reads
 * **Original Controller Hidden:** While the application is open, games and Steam only see the virtual gamepad, never the physical controller as well (no double inputs). This uses the [HidHide](https://github.com/nefarius/HidHide) driver, which the application offers to download and install, and it is always on. The controller is hidden before it connects, stays hidden when the service is stopped and started, and is put back within half a second if another program removes the hiding. Closing the application gives the controller back.
 * **Battery Status:** Reads battery percentage via Windows WinRT Bluetooth Low Energy (BLE) GATT service.
 * **System Tray & Resource Trimming:** Flushes physical working set memory when minimized to the system tray.
+* **Closing:** The X button closes the application; the `_` button hides it to the system tray (the settings can make X do that too). Optionally the application can disconnect the controller when it closes, so browsers and games that were already using it see it disappear and arrive again. Windows asks for permission for this, only when the application is closed (not when the service is stopped).
 * **Settings Persistence:** Saves user preferences to the Windows Registry (`HKCU\Software\Ultimate2CFixer\Settings`).
 * **Localization:** English, Turkish and Spanish interface. The language button cycles through them and the choice is remembered.
 

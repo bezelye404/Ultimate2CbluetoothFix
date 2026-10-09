@@ -4,6 +4,7 @@
 //   InputProbe vigem          plug a virtual pad, feed trigger values 0..255 and read them back through XInput
 //   InputProbe pad [secs]     sample the controller the way the app reads it (trigger depth, sticks, clicks)
 //   InputProbe xinput [secs]  watch what games receive: every XInput pad (with the app running, the virtual one)
+//   InputProbe btnode         show which Bluetooth node the disconnect would disable and the exact command (dry run, changes nothing)
 //   InputProbe rawinput       list the game controllers Raw Input reports (what browsers and many games read)
 //   InputProbe wgi            list the controllers Windows.Gaming.Input reports (what browsers and UWP games read)
 //   InputProbe dinput [secs]  show the DirectInput objects of the 8BitDo and, when secs > 0, sample it
@@ -28,6 +29,8 @@ extern "C" {
 #include <winrt/Windows.Gaming.Input.h>
 #include "ViGEm/Client.h"
 #include "PadFormat.h"
+#include "ControllerDisconnect.h"
+#include "DeviceHider.h"
 #include <cstdio>
 #include <cstdarg>
 #include <string>
@@ -500,6 +503,17 @@ void ShowWgi() {
     Out(L"Windows.Gaming.Input gamepads: %u\n", pads.Size());
 }
 
+// MARK: - Dry run of "disconnect the controller when the app closes"
+void ShowBluetoothNode() {
+    const DWORD vid = 0x2DC8, pid = 0x301B;
+    Out(L"Connected HID entries of the controller:\n");
+    for (const auto& id : Ultimate2CFixer::DeviceHider::PresentInstanceIds(vid, pid)) Out(L"  %s\n", id.c_str());
+    std::wstring node = Ultimate2CFixer::FindConnectedBluetoothNode(vid, pid);
+    if (node.empty()) { Out(L"No Bluetooth LE node found: nothing would be disconnected.\n"); return; }
+    Out(L"Bluetooth node that would be disabled and enabled again:\n  %s\n", node.c_str());
+    Out(L"cmd.exe would run (elevated, after the permission prompt):\n  %s\n", Ultimate2CFixer::BuildReconnectCommand(node).c_str());
+}
+
 } // namespace
 
 int wmain(int argc, wchar_t** argv) {
@@ -510,9 +524,10 @@ int wmain(int argc, wchar_t** argv) {
     else if (mode == L"vigem") TestVigem();
     else if (mode == L"pad") SamplePad(argc > 2 ? _wtoi(argv[2]) : 0);
     else if (mode == L"xinput") WatchXInput(argc > 2 ? _wtoi(argv[2]) : 3);
+    else if (mode == L"btnode") ShowBluetoothNode();
     else if (mode == L"rawinput") ShowRawInput();
     else if (mode == L"wgi") ShowWgi();
     else if (mode == L"dinput") ShowDirectInput(argc > 2 ? _wtoi(argv[2]) : 0);
-    else Out(L"usage: InputProbe hidhide | hid | vigem | pad [seconds] | xinput [seconds] | rawinput | wgi | dinput [seconds]\n");
+    else Out(L"usage: InputProbe hidhide | hid | vigem | pad [seconds] | xinput [seconds] | btnode | rawinput | wgi | dinput [seconds]\n");
     return 0;
 }

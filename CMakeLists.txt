@@ -27,6 +27,7 @@ set(SOURCES
     src/DriverInstaller.cpp
     src/DeviceHider.cpp
     src/ControllerHiding.cpp
+    src/ControllerDisconnect.cpp
     src/vigem/ViGEmClient.cpp
     src/resource.rc
 )
@@ -57,6 +58,6 @@ if(WIN32)
     add_executable(LayoutCheck EXCLUDE_FROM_ALL tools/LayoutCheck.cpp src/Localization.cpp)
 
     # Read-only diagnostic for controller inputs and the HidHide state (see the header of the file).
-    add_executable(InputProbe EXCLUDE_FROM_ALL tools/InputProbe.cpp src/PadFormat.cpp src/vigem/ViGEmClient.cpp)
+    add_executable(InputProbe EXCLUDE_FROM_ALL tools/InputProbe.cpp src/PadFormat.cpp src/DeviceHider.cpp src/ControllerDisconnect.cpp src/vigem/ViGEmClient.cpp)
     target_link_libraries(InputProbe PRIVATE dinput8 dxguid setupapi hid xinput windowsapp)
 endif()

@@ -88,7 +88,8 @@ void CheckLanguage(Language language, const wchar_t* name) {
 
     // Settings view
     for (StringId id : { StringId::StartWithWindows, StringId::MinimizeOnClose, StringId::AutoStartService,
-                         StringId::LowBatteryNotification, StringId::NintendoMode, StringId::HairTrigger }) {
+                         StringId::LowBatteryNotification, StringId::NintendoMode, StringId::HairTrigger,
+                         StringId::DisconnectOnExit }) {
         Check(name, L"Settings checkbox", g_fontBody, T(id), 650 - 20);
     }
     Check(name, L"Back button", g_fontBody, T(StringId::SettingsBack), 150 - kButtonPad);

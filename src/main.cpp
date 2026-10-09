@@ -31,6 +31,7 @@
 #include "DriverInstaller.h"
 #include "DeviceHider.h"
 #include "ControllerHiding.h"
+#include "ControllerDisconnect.h"
 
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "shell32.lib")
@@ -101,6 +102,7 @@ constexpr int IDC_CHK_NINTENDO_MODE = 114;
 constexpr int IDC_CHK_HAIR_TRIGGER  = 115;
 constexpr int IDC_BTN_POLLING_RATE  = 116;
 constexpr int IDC_BTN_CURVE         = 117;
+constexpr int IDC_CHK_DISCONNECT    = 118;
 
 constexpr int IDM_TRAY_OPEN         = 201;
 constexpr int IDM_TRAY_EXIT         = 202;
@@ -122,13 +124,16 @@ HWND g_hChkAutoStart                = nullptr;
 HWND g_hChkLowBattery               = nullptr;
 HWND g_hChkNintendoMode             = nullptr;
 HWND g_hChkHairTrigger              = nullptr;
+HWND g_hChkDisconnect               = nullptr;
 HWND g_hBtnDeadzone                 = nullptr;
 HWND g_hBtnPollingRate              = nullptr;
 HWND g_hBtnCurve                    = nullptr;
 HWND g_hBtnSettingsBack             = nullptr;
 
 bool g_showSettings                 = false;
-bool g_minimizeOnClose              = true;
+bool g_minimizeOnClose              = false;   // the X button closes the application; the _ button hides it to the tray
+bool g_disconnectOnExit             = false;
+bool g_sessionEnding                = false;
 bool g_startWithWindows             = false;
 bool g_autoStartService             = true;
 bool g_lowBatteryAlert              = true;
@@ -257,8 +262,19 @@ void LoadUserSettings() {
     HKEY hKey;
     if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Ultimate2CFixer\\Settings", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
         DWORD val = 0, size = sizeof(val);
-        if (RegQueryValueExW(hKey, L"MinimizeOnClose", NULL, NULL, (LPBYTE)&val, &size) == ERROR_SUCCESS) {
+        // Settings written before version 2 stored the old default (minimize to tray on close) even when the user
+        // never chose it, so that stored value is not trusted: the X button closes the application by default.
+        DWORD settingsVersion = 0;
+        if (RegQueryValueExW(hKey, L"SettingsVersion", NULL, NULL, (LPBYTE)&settingsVersion, &size) != ERROR_SUCCESS) {
+            settingsVersion = 0;
+        }
+        size = sizeof(val);
+        if (settingsVersion >= 2 && RegQueryValueExW(hKey, L"MinimizeOnClose", NULL, NULL, (LPBYTE)&val, &size) == ERROR_SUCCESS) {
             g_minimizeOnClose = (val != 0);
+        }
+        size = sizeof(val);
+        if (RegQueryValueExW(hKey, L"DisconnectOnExit", NULL, NULL, (LPBYTE)&val, &size) == ERROR_SUCCESS) {
+            g_disconnectOnExit = (val != 0);
         }
         size = sizeof(val);
         if (RegQueryValueExW(hKey, L"AutoStart", NULL, NULL, (LPBYTE)&val, &size) == ERROR_SUCCESS) {
@@ -302,8 +318,12 @@ void LoadUserSettings() {
 void SaveUserSettings() {
     HKEY hKey;
     if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\Ultimate2CFixer\\Settings", 0, NULL, 0, KEY_WRITE, NULL, &hKey, NULL) == ERROR_SUCCESS) {
-        DWORD val = g_minimizeOnClose ? 1 : 0;
+        DWORD val = 2;
+        RegSetValueExW(hKey, L"SettingsVersion", 0, REG_DWORD, (const BYTE*)&val, sizeof(val));
+        val = g_minimizeOnClose ? 1 : 0;
         RegSetValueExW(hKey, L"MinimizeOnClose", 0, REG_DWORD, (const BYTE*)&val, sizeof(val));
+        val = g_disconnectOnExit ? 1 : 0;
+        RegSetValueExW(hKey, L"DisconnectOnExit", 0, REG_DWORD, (const BYTE*)&val, sizeof(val));
         val = g_autoStartService ? 1 : 0;
         RegSetValueExW(hKey, L"AutoStart", 0, REG_DWORD, (const BYTE*)&val, sizeof(val));
         val = g_lowBatteryAlert ? 1 : 0;
@@ -373,6 +393,7 @@ void SwitchView(bool showSettings) {
     ShowWindow(g_hChkLowBattery, showSet);
     ShowWindow(g_hChkNintendoMode, showSet);
     ShowWindow(g_hChkHairTrigger, showSet);
+    ShowWindow(g_hChkDisconnect, showSet);
     ShowWindow(g_hBtnDeadzone, showSet);
     ShowWindow(g_hBtnPollingRate, showSet);
     ShowWindow(g_hBtnCurve, showSet);
@@ -418,6 +439,7 @@ void UpdateUIStrings() {
     SetWindowTextW(g_hChkLowBattery, loc.Get(StringId::LowBatteryNotification).c_str());
     SetWindowTextW(g_hChkNintendoMode, loc.Get(StringId::NintendoMode).c_str());
     SetWindowTextW(g_hChkHairTrigger, loc.Get(StringId::HairTrigger).c_str());
+    SetWindowTextW(g_hChkDisconnect, loc.Get(StringId::DisconnectOnExit).c_str());
     SetWindowTextW(g_hBtnSettingsBack, loc.Get(StringId::SettingsBack).c_str());
     UpdateDeadzoneButtonText();
     UpdatePollingRateButtonText();
@@ -1079,23 +1101,30 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             SendMessageW(g_hChkHairTrigger, BM_SETCHECK, g_hairTrigger ? BST_CHECKED : BST_UNCHECKED, 0);
             SetWindowTheme(g_hChkHairTrigger, L"DarkMode_Explorer", NULL);
 
+            g_hChkDisconnect = CreateWindowW(L"BUTTON", loc.Get(StringId::DisconnectOnExit).c_str(),
+                WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
+                S(44), S(286), S(650), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_DISCONNECT, GetModuleHandleW(NULL), NULL);
+            SendMessageW(g_hChkDisconnect, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
+            SendMessageW(g_hChkDisconnect, BM_SETCHECK, g_disconnectOnExit ? BST_CHECKED : BST_UNCHECKED, 0);
+            SetWindowTheme(g_hChkDisconnect, L"DarkMode_Explorer", NULL);
+
             // Row 1 Buttons: Deadzone & Polling Rate
             g_hBtnDeadzone = CreateWindowW(L"BUTTON", L"",
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(44), S(296), S(340), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_DEADZONE, GetModuleHandleW(NULL), NULL);
+                S(44), S(326), S(340), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_DEADZONE, GetModuleHandleW(NULL), NULL);
 
             g_hBtnPollingRate = CreateWindowW(L"BUTTON", L"",
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(400), S(296), S(340), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_POLLING_RATE, GetModuleHandleW(NULL), NULL);
+                S(400), S(326), S(340), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_POLLING_RATE, GetModuleHandleW(NULL), NULL);
 
             // Row 2 Buttons: Stick Curve & Back
             g_hBtnCurve = CreateWindowW(L"BUTTON", L"",
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(44), S(344), S(340), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_CURVE, GetModuleHandleW(NULL), NULL);
+                S(44), S(374), S(340), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_CURVE, GetModuleHandleW(NULL), NULL);
 
             g_hBtnSettingsBack = CreateWindowW(L"BUTTON", loc.Get(StringId::SettingsBack).c_str(),
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(400), S(344), S(150), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_SETTINGS_BACK, GetModuleHandleW(NULL), NULL);
+                S(400), S(374), S(150), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_SETTINGS_BACK, GetModuleHandleW(NULL), NULL);
 
             UpdateDeadzoneButtonText();
             UpdatePollingRateButtonText();
@@ -1183,6 +1212,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 case IDC_CHK_HAIR_TRIGGER:
                     g_hairTrigger = (SendMessageW(g_hChkHairTrigger, BM_GETCHECK, 0, 0) == BST_CHECKED);
                     if (g_remapper) g_remapper->SetHairTrigger(g_hairTrigger);
+                    SaveUserSettings();
+                    break;
+                case IDC_CHK_DISCONNECT:
+                    g_disconnectOnExit = (SendMessageW(g_hChkDisconnect, BM_GETCHECK, 0, 0) == BST_CHECKED);
                     SaveUserSettings();
                     break;
                 case IDC_BTN_DEADZONE:
@@ -1376,7 +1409,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         case WM_CTLCOLOREDIT: {
             HDC hdcCtrl = (HDC)wParam;
             HWND hwndCtrl = (HWND)lParam;
-            if (hwndCtrl == g_hChkMinimizeClose || hwndCtrl == g_hChkStartWindows || hwndCtrl == g_hChkAutoStart || hwndCtrl == g_hChkLowBattery || hwndCtrl == g_hChkNintendoMode || hwndCtrl == g_hChkHairTrigger) {
+            if (hwndCtrl == g_hChkMinimizeClose || hwndCtrl == g_hChkStartWindows || hwndCtrl == g_hChkAutoStart || hwndCtrl == g_hChkLowBattery || hwndCtrl == g_hChkNintendoMode || hwndCtrl == g_hChkHairTrigger || hwndCtrl == g_hChkDisconnect) {
                 SetTextColor(hdcCtrl, UI::ColorTextSecondary);
                 SetBkColor(hdcCtrl, UI::ColorCardBg);
                 return (LRESULT)g_hBrCardBg;
@@ -1396,6 +1429,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             if (wParam) {
                 // Windows is shutting down or the user is logging off and will end this process right after
                 // this message: give the real controller back to other programs first.
+                g_sessionEnding = true;   // no permission prompt while Windows shuts down
                 StopServices();
                 g_hiding.reset();
             }
@@ -1439,7 +1473,16 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         case WM_DESTROY: {
             KillTimer(hwnd, 1);
             StopServices();
-            g_hiding.reset();   // gives the real controller back
+            {
+                const DWORD controllerVid = g_hiding ? g_hiding->Vid() : 0;
+                const DWORD controllerPid = g_hiding ? g_hiding->Pid() : 0;
+                g_hiding.reset();   // gives the real controller back
+                // Optional: drop the Bluetooth connection so every program that was using the controller sees it
+                // disappear and arrive again. Needs permission (UAC), so only when the user closes the application.
+                if (g_disconnectOnExit && !g_sessionEnding) {
+                    DisconnectController(controllerVid, controllerPid);
+                }
+            }
             if (g_trayCreated) {
                 Shell_NotifyIconW(NIM_DELETE, &g_nid);
             }

@@ -6,6 +6,8 @@
 #include <windows.h>
 #include <atomic>
 #include <mutex>
+#include <string>
+#include <vector>
 
 namespace Ultimate2CFixer {
 
@@ -41,6 +43,8 @@ public:
 
     // True when a controller with this USB id is currently connected.
     static bool IsPresent(DWORD vid, DWORD pid);
+    // The HID instance ids of the controller entries that are connected right now.
+    static std::vector<std::wstring> PresentInstanceIds(DWORD vid, DWORD pid);
 
     // The controller seen last, so its entries can be hidden before it connects again.
     static void SaveLastController(DWORD vid, DWORD pid);
