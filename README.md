@@ -33,7 +33,7 @@ Because most modern Windows games expect an XInput device, Ultimate2CFixer reads
 * **Optional Hair Trigger:** User-configurable toggle that maps any trigger pull beyond the deadzone directly to full activation (255).
 * **Single Instance:** Starting a second copy brings the first window forward instead of running twice.
 * **Live Input Telemetry:** Visual indicators for analog sticks, ABXY layout, LB/RB bumpers, and LT/RT analog triggers.
-* **Original Controller Hidden:** While the application is open, games and Steam only see the virtual gamepad, never the physical controller as well (no double inputs). This uses the [HidHide](https://github.com/nefarius/HidHide) driver, which the application offers to download and install, and it is always on. The controller is hidden before it connects, stays hidden when the service is stopped and started, and is put back within half a second if another program removes the hiding. Closing the application gives the controller back. A program that already had the controller open before it was hidden keeps it; if games still see two controllers, turn the controller off and on again.
+* **Original Controller Hidden:** While the application is open, games and Steam only see the virtual gamepad, never the physical controller as well (no double inputs). This uses the [HidHide](https://github.com/nefarius/HidHide) driver, which the application offers to download and install, and it is always on. The controller is hidden before it connects, stays hidden when the service is stopped and started, and is put back within half a second if another program removes the hiding. Closing the application gives the controller back.
 * **Battery Status:** Reads battery percentage via Windows WinRT Bluetooth Low Energy (BLE) GATT service.
 * **System Tray & Resource Trimming:** Flushes physical working set memory when minimized to the system tray.
 * **Settings Persistence:** Saves user preferences to the Windows Registry (`HKCU\Software\Ultimate2CFixer\Settings`).
@@ -52,6 +52,11 @@ Because most modern Windows games expect an XInput device, Ultimate2CFixer reads
 1. Download `Ultimate2CFixer.exe` from the [Releases](https://github.com/bezelye404/Ultimate2CbluetoothFix/releases) page.
 2. Pair the 8BitDo Ultimate 2C controller via Windows Bluetooth settings.
 3. Open `Ultimate2CFixer.exe` and click **Start Service**.
+
+---
+
+> [!NOTE]
+> A program that was already using the controller when it got hidden (a browser tab, Steam) keeps it, and neither hiding nor un-hiding tells such a program that anything changed. If you open the application while the controller is already on, turn the controller off and on once (the application reminds you), and reload the browser page. Starting the application with Windows, before the controller connects, avoids this completely.
 
 ---
 

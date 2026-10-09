@@ -66,8 +66,7 @@ private:
     void WorkerLoop(HWND hwnd);
     bool InitViGEm();
     void UninitViGEm();
-    void NoteConnectFailure();
-    void RevertHiding(StringId reason);
+    void CheckHidingLockout(bool controllerFound);
 
     static SHORT NormalizeAxis(LONG v);
     static SHORT ApplyDeadzone(SHORT v, int dz);
@@ -101,8 +100,7 @@ private:
 
     // Worker-thread only state for the check that hiding did not lock this application out.
     ControllerHiding* m_hiding{nullptr};
-    bool m_hideJustApplied{false};   // Hidden, but the device is not yet confirmed readable.
-    int m_hideFailCount{0};
+    int m_hideFailCount{0};   // consecutive scans where the controller is connected but DirectInput cannot see it
 };
 
 } // namespace Ultimate2CFixer

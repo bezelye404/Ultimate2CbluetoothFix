@@ -2,7 +2,7 @@
 
 namespace Ultimate2CFixer {
 
-ControllerHiding::ControllerHiding(LogFn log) : m_log(std::move(log)) {}
+ControllerHiding::ControllerHiding(LogFn log, NoticeFn notice) : m_log(std::move(log)), m_notice(std::move(notice)) {}
 
 ControllerHiding::~ControllerHiding() {
     Stop();
@@ -20,8 +20,12 @@ void ControllerHiding::Start() {
     if (DeviceHider::LoadLastController(vid, pid)) {
         m_vid = vid;
         m_pid = pid;
+    } else if (DeviceHider::RecoverStale()) {
+        // Leftover hiding of a session that ended unexpectedly, and no controller to hide again: give it back.
+        // (With a known controller the leftover is taken over by Hide() instead, without any gap.)
+        Log(StringId::LogHideRecovered);
     }
-    m_suspended = false;
+    m_suspendedUntil = 0;
     m_lastReport = -1;
     m_thread = std::thread(&ControllerHiding::Loop, this);
 }
@@ -40,11 +44,12 @@ void ControllerHiding::SetController(DWORD vid, DWORD pid) {
 }
 
 void ControllerHiding::HideNow() {
-    if (!m_suspended.load()) Apply(false);
+    if (!IsSuspended()) Apply(false);
 }
 
-void ControllerHiding::Suspend(StringId reason) {
-    m_suspended = true;
+void ControllerHiding::Suspend(StringId reason, DWORD durationMs) {
+    m_suspendedUntil = GetTickCount64() + durationMs;
+    m_lastReport = -1;
     m_hider.Restore();
     Log(reason);
 }
@@ -53,8 +58,26 @@ void ControllerHiding::Apply(bool quietWhenNotFound) {
     const DWORD vid = m_vid.load();
     if (vid == 0) return;
 
-    HideResult result = m_hider.Hide(vid, m_pid.load());
+    const DWORD pid = m_pid.load();
+    const bool connected = DeviceHider::IsPresent(vid, pid);   // checked before hiding, which changes nothing about it
+    HideResult result = m_hider.Hide(vid, pid);
+    if (result == HideResult::StillHidden) return;
+    if (result == HideResult::Repaired) {
+        Log(StringId::LogHideRepaired);
+        return;
+    }
     if (result == HideResult::DeviceNotFound && quietWhenNotFound) return;
+
+    // Hiding something that is connected and may already be in use: programs holding it will not notice.
+    if (result == HideResult::Hidden && connected) {
+        const ULONGLONG now = GetTickCount64();
+        const ULONGLONG last = m_lastNoticeTick.load();
+        if (last == 0 || now - last > 10 * 60 * 1000) {
+            m_lastNoticeTick = now;
+            Log(StringId::LogHideNeedsReconnect);
+            if (m_notice) m_notice(StringId::LogHideNeedsReconnect);
+        }
+    }
 
     int code = static_cast<int>(result);
     if (m_lastReport.exchange(code) == code) return;   // report every outcome once
@@ -62,6 +85,9 @@ void ControllerHiding::Apply(bool quietWhenNotFound) {
     StringId msg = StringId::LogHideFailed;
     switch (result) {
         case HideResult::Hidden:           msg = StringId::LogHideActive; break;
+        case HideResult::Adopted:          msg = StringId::LogHideActive; break;
+        case HideResult::StillHidden:
+        case HideResult::Repaired:         return;   // handled above
         case HideResult::AlreadyHidden:    msg = StringId::LogHideAlready; break;
         case HideResult::NotInstalled:     msg = StringId::LogHideMissing; break;
         case HideResult::DeviceNotFound:   msg = StringId::LogHideNoDevice; break;
@@ -73,7 +99,7 @@ void ControllerHiding::Apply(bool quietWhenNotFound) {
 
 void ControllerHiding::Loop() {
     while (m_running.load()) {
-        if (!m_suspended.load() && m_vid.load() != 0) {
+        if (!IsSuspended() && m_vid.load() != 0) {
             if (m_hider.IsHidden()) {
                 if (m_hider.Maintain()) Log(StringId::LogHideRepaired);
             } else {

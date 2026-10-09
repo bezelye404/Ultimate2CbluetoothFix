@@ -173,7 +173,6 @@ bool Remapper::Start(HWND hwnd, LogCallback logCb, StatusCallback statusCb, Inpu
     m_statusCallback = std::move(statusCb);
     m_inputCallback = std::move(inputCb);
 
-    m_hideJustApplied = false;
     m_hideFailCount = 0;
 
     if (!InitViGEm()) {
@@ -240,15 +239,7 @@ void Remapper::WorkerLoop(HWND hwnd) {
         }
 
         if (!targetDevice) {
-            // Hiding must never lock this app out: when the controller is connected but DirectInput cannot see
-            // it, the hiding is the likely cause (NoteConnectFailure then undoes it after a few tries).
-            const DWORD vid = m_hiding ? m_hiding->Vid() : 0;
-            if (m_hiding && m_hiding->IsHidden() && vid != 0 && DeviceHider::IsPresent(vid, m_hiding->Pid())) {
-                m_hideJustApplied = true;
-                NoteConnectFailure();
-            } else {
-                m_hideFailCount = 0;
-            }
+            CheckHidingLockout(false);
             if (m_targetPlugged && m_vigemClient && m_vigemTarget) {
                 vigem_target_remove(m_vigemClient, m_vigemTarget);
                 m_targetPlugged = false;
@@ -261,18 +252,16 @@ void Remapper::WorkerLoop(HWND hwnd) {
         }
 
         DeviceChoice chosen = *targetDevice;
+        CheckHidingLockout(true);
 
         if (m_hiding) {
             m_hiding->SetController(chosen.vid, chosen.pid);
             m_hiding->HideNow();
         }
-        // From here on a failure to open the controller is blamed on the hiding (see NoteConnectFailure).
-        m_hideJustApplied = (m_hiding != nullptr && m_hiding->IsHidden());
 
         LPDIRECTINPUTDEVICE8W joystick = nullptr;
         hr = directInput->CreateDevice(chosen.guid, &joystick, NULL);
         if (FAILED(hr) || !joystick) {
-            NoteConnectFailure();
             Sleep(1000);
             continue;
         }
@@ -283,7 +272,6 @@ void Remapper::WorkerLoop(HWND hwnd) {
         hr = usageFormat ? S_OK : joystick->SetDataFormat(&c_dfDIJoystick2);
         if (FAILED(hr)) {
             joystick->Release();
-            NoteConnectFailure();
             Sleep(1000);
             continue;
         }
@@ -292,7 +280,6 @@ void Remapper::WorkerLoop(HWND hwnd) {
         hr = joystick->Acquire();
         if (FAILED(hr)) {
             joystick->Release();
-            NoteConnectFailure();
             Sleep(500);
             continue;
         }
@@ -304,14 +291,9 @@ void Remapper::WorkerLoop(HWND hwnd) {
         if (FAILED(hr)) {
             joystick->Unacquire();
             joystick->Release();
-            NoteConnectFailure();
             Sleep(500);
             continue;
         }
-
-        // The controller is readable, so hiding did not lock this application out.
-        m_hideJustApplied = false;
-        m_hideFailCount = 0;
 
         // Before the first real report arrives DirectInput answers with neutral placeholders (32767 on every
         // axis, triggers included). Let a few reports come in so the resting positions below are real.
@@ -525,19 +507,24 @@ void Remapper::WorkerLoop(HWND hwnd) {
     }
 }
 
-// If the controller cannot be opened shortly after hiding it, undo the hiding so the
-// user is never left without a working controller.
-void Remapper::NoteConnectFailure() {
-    if (!m_hideJustApplied) return;
-    if (++m_hideFailCount >= 3) {
-        RevertHiding(StringId::LogHideSuspended);
+// Hiding must never lock this application out. The only case where the hiding can be the cause is a controller
+// that is connected (Windows lists it) while DirectInput does not offer it: this application is whitelisted, so
+// that means the whitelist is not working. A controller that DirectInput does offer but that fails to open has
+// some other problem (still starting up, in use), which must not switch the hiding off.
+void Remapper::CheckHidingLockout(bool controllerFound) {
+    if (controllerFound || !m_hiding) {
+        m_hideFailCount = 0;
+        return;
     }
-}
-
-void Remapper::RevertHiding(StringId reason) {
-    if (m_hiding) m_hiding->Suspend(reason);
-    m_hideJustApplied = false;
-    m_hideFailCount = 0;
+    const DWORD vid = m_hiding->Vid();
+    if (m_hiding->IsHidden() && vid != 0 && DeviceHider::IsPresent(vid, m_hiding->Pid())) {
+        if (++m_hideFailCount >= 6) {   // about 9 seconds of scans
+            m_hideFailCount = 0;
+            m_hiding->Suspend(StringId::LogHideSuspended);
+        }
+    } else {
+        m_hideFailCount = 0;
+    }
 }
 
 SHORT Remapper::NormalizeAxis(LONG v) {

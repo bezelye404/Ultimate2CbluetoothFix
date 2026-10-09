@@ -72,6 +72,8 @@ enum class StringId {
     LogHideSuspended,
     LogHideRecovered,
     LogHideRepaired,
+    LogHideNeedsReconnect,
+    HideInstallBalloon,
     LogHideInstalling,
     LogHideInstalled,
     LogHideInstallFailed,

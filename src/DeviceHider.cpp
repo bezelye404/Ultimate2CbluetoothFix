@@ -333,8 +333,8 @@ bool DeviceHider::LoadLastController(DWORD& vid, DWORD& pid) {
 HideResult DeviceHider::Hide(DWORD vid, DWORD pid) {
     std::lock_guard<std::mutex> lock(m_lock);
     if (m_hidden.load()) {
-        MaintainLocked();   // also picks up a new instance of the same controller
-        return HideResult::Hidden;
+        // Also picks up a new instance of the same controller.
+        return MaintainLocked() ? HideResult::Repaired : HideResult::StillHidden;
     }
 
     HandleGuard dev(OpenHidHide());
@@ -357,35 +357,50 @@ HideResult DeviceHider::Hide(DWORD vid, DWORD pid) {
         return HideResult::Failed;
     }
 
+    // A record from an earlier session that ended unexpectedly means entries of ours may still be in place.
+    // Take them over instead of giving them back and hiding again: that gap would let programs grab the controller.
     OwnedEntries owned;
-    for (const auto& id : ids) {
-        if (!Contains(black, id)) owned.blacklist.push_back(id);
+    const bool hadRecord = LoadOwned(owned);
+    if (!hadRecord) {
+        owned = OwnedEntries{};
+        owned.activeChanged = !active;
+        owned.baseline = black;
+        owned.hasBaseline = true;
     }
-    if (!Contains(white, ntPath)) owned.whitelist = ntPath;
-    owned.activeChanged = !active;
-    owned.baseline = black;
-    owned.hasBaseline = true;
 
-    if (owned.blacklist.empty() && owned.whitelist.empty() && !owned.activeChanged) {
+    StrList addBlack;
+    for (const auto& id : ids) {
+        if (!Contains(black, id)) addBlack.push_back(id);
+    }
+    const bool addWhite = !Contains(white, ntPath);
+    const bool turnOn = !active;
+
+    for (const auto& id : addBlack) {
+        const bool existedBefore = owned.hasBaseline && Contains(owned.baseline, id);
+        if (!existedBefore && !Contains(owned.blacklist, id)) owned.blacklist.push_back(id);
+    }
+    if (addWhite && owned.whitelist.empty()) owned.whitelist = ntPath;
+
+    if (addBlack.empty() && !addWhite && !turnOn) {
         m_vid = vid;
         m_pid = pid;
         m_hidden = true;
-        return HideResult::AlreadyHidden;
+        return hadRecord ? HideResult::Adopted : HideResult::AlreadyHidden;
     }
 
     // Record first, so a crash between the steps below can still be cleaned up.
     if (!SaveOwned(owned)) return HideResult::Failed;
 
     bool ok = true;
-    if (!owned.whitelist.empty()) {
-        white.push_back(owned.whitelist);
+    if (addWhite) {
+        white.push_back(ntPath);
         ok &= IoSetList(dev.h, kIoctlSetWhitelist, white);
     }
-    if (ok && !owned.blacklist.empty()) {
-        black.insert(black.end(), owned.blacklist.begin(), owned.blacklist.end());
+    if (ok && !addBlack.empty()) {
+        black.insert(black.end(), addBlack.begin(), addBlack.end());
         ok &= IoSetList(dev.h, kIoctlSetBlacklist, black);
     }
-    if (ok && owned.activeChanged) {
+    if (ok && turnOn) {
         ok &= IoSetBool(dev.h, kIoctlSetActive, TRUE);
     }
 

@@ -81,6 +81,8 @@ constexpr int WM_UPDATE_INPUT           = WM_USER + 5;
 constexpr int WM_DRIVER_INSTALL_DONE     = WM_USER + 6;
 constexpr int WM_DRIVER_INSTALL_PROGRESS = WM_USER + 7;
 constexpr int WM_HIDING_INSTALL_DONE    = WM_USER + 8;
+constexpr int WM_HIDING_NOTICE          = WM_USER + 9;
+constexpr int WM_HIDING_STARTUP_CHECK   = WM_USER + 10;
 
 constexpr int IDC_BTN_START         = 101;
 constexpr int IDC_BTN_STOP          = 102;
@@ -134,6 +136,7 @@ bool g_nintendoMode                 = false;
 bool g_hairTrigger                  = false;
 bool g_hidingInstalling             = false;
 bool g_hidingOffered                = false;
+bool g_pendingHidHideOffer          = false;   // the tray notification about the missing driver is waiting for a click
 bool g_driverInstalled              = false;
 bool g_driverInstalling             = false;
 int g_deadzoneLevel                 = 2; // 0=0%, 1=8%, 2=12%, 3=20%
@@ -589,6 +592,16 @@ void SetupTray(HWND hwnd) {
         g_nid.uVersion = NOTIFYICON_VERSION_4;
         Shell_NotifyIconW(NIM_SETVERSION, &g_nid);
     }
+}
+
+void ShowTrayBalloon(const std::wstring& text) {
+    if (!g_trayCreated) return;
+    g_nid.uFlags |= NIF_INFO;
+    wcsncpy_s(g_nid.szInfoTitle, Localization::Instance().Get(StringId::AppTitle).c_str(), _TRUNCATE);
+    wcsncpy_s(g_nid.szInfo, text.c_str(), _TRUNCATE);
+    g_nid.dwInfoFlags = NIIF_INFO;
+    Shell_NotifyIconW(NIM_MODIFY, &g_nid);
+    g_nid.uFlags &= ~NIF_INFO;
 }
 
 void MinimizeToTray() {
@@ -1106,17 +1119,18 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
             UpdateUIStrings();
             AppendLogMessage(loc.Get(StringId::LogAppReady));
-            if (DeviceHider::RecoverStale()) {
-                AppendLogMessage(loc.Get(StringId::LogHideRecovered));
-            }
-
             // The real controller stays hidden from other programs for as long as this window is open, whether
             // or not the service is running (see ControllerHiding).
-            g_hiding = std::make_unique<ControllerHiding>([](const std::wstring& msg) {
-                auto* pMsg = new std::wstring(msg);
-                PostMessageW(g_hWnd, WM_UPDATE_LOG, (WPARAM)pMsg, 0);
-            });
+            g_hiding = std::make_unique<ControllerHiding>(
+                [](const std::wstring& msg) {
+                    auto* pMsg = new std::wstring(msg);
+                    PostMessageW(g_hWnd, WM_UPDATE_LOG, (WPARAM)pMsg, 0);
+                },
+                [](StringId notice) {
+                    PostMessageW(g_hWnd, WM_HIDING_NOTICE, (WPARAM)notice, 0);
+                });
             g_hiding->Start();
+            PostMessageW(hwnd, WM_HIDING_STARTUP_CHECK, 0, 0);   // handled once the window is shown or hidden
             if (isFirstRun && g_driverInstalled) {
                 AppendLogMessage(loc.Get(StringId::DriverReadyFirstRun));
             } else if (!g_driverInstalled) {
@@ -1215,6 +1229,22 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
             return 0;
         }
+
+        case WM_HIDING_NOTICE:
+            ShowTrayBalloon(Localization::Instance().Get(static_cast<StringId>(wParam)));
+            return 0;
+
+        case WM_HIDING_STARTUP_CHECK:
+            // Hiding is not optional, so a missing HidHide driver must not go unnoticed (also on an automatic start).
+            if (!DeviceHider::IsAvailable()) {
+                if (IsWindowVisible(hwnd)) {
+                    OfferHidingDriverInstall(false);
+                } else {
+                    g_pendingHidHideOffer = true;
+                    ShowTrayBalloon(Localization::Instance().Get(StringId::HideInstallBalloon));
+                }
+            }
+            return 0;
 
         case WM_TIMER: {
             if (wParam == 1 && !g_showSettings && g_currentStatus == RemapperStatus::Connected &&
@@ -1382,6 +1412,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
         case WM_TRAYICON: {
             UINT event = LOWORD(lParam);
+            if (event == NIN_BALLOONUSERCLICK && g_pendingHidHideOffer) {
+                g_pendingHidHideOffer = false;
+                OfferHidingDriverInstall(true);
+                return 0;
+            }
             if (event == WM_LBUTTONUP || event == WM_LBUTTONDBLCLK || event == NIN_SELECT) {
                 RestoreFromTray();
             } else if (event == WM_RBUTTONUP || event == WM_CONTEXTMENU) {

@@ -22,11 +22,18 @@ namespace Ultimate2CFixer {
 //
 // A watchdog thread hides the remembered controller before it connects, and puts the hiding back within half
 // a second when another program removes it or switches HidHide off. The controller is given back in Stop().
+//
+// What this cannot do: a program that already had the controller open (a browser tab, Steam) keeps it, and
+// hiding or un-hiding produces no "device arrived" event for such programs. Only restarting the device
+// (administrator) or switching the controller off and on does. So when the hiding is applied while the
+// controller is connected, the user is told to switch the controller off and on once.
 class ControllerHiding {
 public:
     using LogFn = std::function<void(const std::wstring&)>;
+    // Asks the window to tell the user something (a tray notification) about this message.
+    using NoticeFn = std::function<void(StringId)>;
 
-    explicit ControllerHiding(LogFn log);
+    explicit ControllerHiding(LogFn log, NoticeFn notice = nullptr);
     ~ControllerHiding();
 
     void Start();
@@ -42,8 +49,10 @@ public:
 
     bool IsHidden() const { return m_hider.IsHidden(); }
 
-    // The controller could not be read while hidden: give it back for the rest of this session.
-    void Suspend(StringId reason);
+    // The controller is connected but DirectInput cannot see it while hidden: give it back for a while
+    // (the hiding resumes by itself afterwards).
+    void Suspend(StringId reason, DWORD durationMs = 60000);
+    bool IsSuspended() const { return GetTickCount64() < m_suspendedUntil.load(); }
 
 private:
     void Apply(bool quietWhenNotFound);
@@ -51,10 +60,12 @@ private:
     void Log(StringId id);
 
     LogFn m_log;
+    NoticeFn m_notice;
     DeviceHider m_hider;
     std::thread m_thread;
     std::atomic<bool> m_running{false};
-    std::atomic<bool> m_suspended{false};
+    std::atomic<ULONGLONG> m_suspendedUntil{0};
+    std::atomic<ULONGLONG> m_lastNoticeTick{0};
     std::atomic<DWORD> m_vid{0};
     std::atomic<DWORD> m_pid{0};
     std::atomic<int> m_lastReport{-1};

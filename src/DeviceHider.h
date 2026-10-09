@@ -11,6 +11,9 @@ namespace Ultimate2CFixer {
 
 enum class HideResult {
     Hidden,           // Entries were added and hiding is now active.
+    Adopted,          // Entries of ours from an earlier session were still in place; nothing had to change.
+    StillHidden,      // Already hidden by this instance; nothing to do.
+    Repaired,         // Already hidden by this instance, but something had been undone and was put back.
     AlreadyHidden,    // The user's own setup already hides the device; nothing was changed.
     NotInstalled,     // The hiding driver is not present.
     DeviceNotFound,   // The physical controller could not be located.
