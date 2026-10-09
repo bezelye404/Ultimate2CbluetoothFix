@@ -26,6 +26,7 @@ set(SOURCES
     src/Localization.cpp
     src/DriverInstaller.cpp
     src/DeviceHider.cpp
+    src/ControllerHiding.cpp
     src/vigem/ViGEmClient.cpp
     src/resource.rc
 )

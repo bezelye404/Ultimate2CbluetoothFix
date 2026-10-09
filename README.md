@@ -33,7 +33,7 @@ Because most modern Windows games expect an XInput device, Ultimate2CFixer reads
 * **Optional Hair Trigger:** User-configurable toggle that maps any trigger pull beyond the deadzone directly to full activation (255).
 * **Single Instance:** Starting a second copy brings the first window forward instead of running twice.
 * **Live Input Telemetry:** Visual indicators for analog sticks, ABXY layout, LB/RB bumpers, and LT/RT analog triggers.
-* **Hide Original Controller:** Prevents games and Steam from seeing both the physical controller and the virtual one (double inputs). Enabled by default; uses the optional [HidHide](https://github.com/nefarius/HidHide) driver, which the application offers to download and install. The hiding is applied before the controller connects, is put back within a second if another program removes it, and follows the setting immediately. Only the entries added by Ultimate2CFixer are removed again when the service stops. A program that already had the controller open before it was hidden keeps it; if games still see two controllers, turn the controller off and on again.
+* **Original Controller Hidden:** While the application is open, games and Steam only see the virtual gamepad, never the physical controller as well (no double inputs). This uses the [HidHide](https://github.com/nefarius/HidHide) driver, which the application offers to download and install, and it is always on. The controller is hidden before it connects, stays hidden when the service is stopped and started, and is put back within half a second if another program removes the hiding. Closing the application gives the controller back. A program that already had the controller open before it was hidden keeps it; if games still see two controllers, turn the controller off and on again.
 * **Battery Status:** Reads battery percentage via Windows WinRT Bluetooth Low Energy (BLE) GATT service.
 * **System Tray & Resource Trimming:** Flushes physical working set memory when minimized to the system tray.
 * **Settings Persistence:** Saves user preferences to the Windows Registry (`HKCU\Software\Ultimate2CFixer\Settings`).
@@ -46,7 +46,7 @@ Because most modern Windows games expect an XInput device, Ultimate2CFixer reads
 ### 1. Requirements
 * Windows 10 / 11 (64-bit)
 * [ViGEmBus](https://github.com/nefarius/ViGEmBus) driver (the application prompts to install this if not detected)
-* Optional: [HidHide](https://github.com/nefarius/HidHide) driver to hide the original controller from games (the application offers to install it)
+* [HidHide](https://github.com/nefarius/HidHide) driver to hide the original controller from games (the application offers to install it)
 
 ### 2. Quick Start
 1. Download `Ultimate2CFixer.exe` from the [Releases](https://github.com/bezelye404/Ultimate2CbluetoothFix/releases) page.

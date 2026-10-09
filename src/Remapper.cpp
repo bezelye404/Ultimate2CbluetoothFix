@@ -173,20 +173,8 @@ bool Remapper::Start(HWND hwnd, LogCallback logCb, StatusCallback statusCb, Inpu
     m_statusCallback = std::move(statusCb);
     m_inputCallback = std::move(inputCb);
 
-    m_lastHideReport = -1;
-    m_hidingSuspended = false;
     m_hideJustApplied = false;
     m_hideFailCount = 0;
-
-    // The controller seen in an earlier session can be hidden before it connects this time.
-    DWORD lastVid = 0, lastPid = 0;
-    if (DeviceHider::LoadLastController(lastVid, lastPid)) {
-        m_knownVid = lastVid;
-        m_knownPid = lastPid;
-    } else {
-        m_knownVid = 0;
-        m_knownPid = 0;
-    }
 
     if (!InitViGEm()) {
         return false;
@@ -194,7 +182,6 @@ bool Remapper::Start(HWND hwnd, LogCallback logCb, StatusCallback statusCb, Inpu
 
     m_running.store(true);
     m_workerThread = std::thread(&Remapper::WorkerLoop, this, hwnd);
-    m_hideThread = std::thread(&Remapper::HideWatchdogLoop, this);
     return true;
 }
 
@@ -205,15 +192,8 @@ void Remapper::Stop() {
     if (m_workerThread.joinable()) {
         m_workerThread.join();
     }
-    if (m_hideThread.joinable()) {
-        m_hideThread.join();
-    }
 
     UninitViGEm();
-
-    if (m_hider.Restore() && m_logCallback) {
-        m_logCallback(Localization::Instance().Get(StringId::LogHideRestored));
-    }
 
     if (m_inputCallback) {
         XUSB_REPORT zeroReport = {};
@@ -262,12 +242,12 @@ void Remapper::WorkerLoop(HWND hwnd) {
         if (!targetDevice) {
             // Hiding must never lock this app out: when the controller is connected but DirectInput cannot see
             // it, the hiding is the likely cause (NoteConnectFailure then undoes it after a few tries).
-            const DWORD vid = m_knownVid.load();
-            if (m_hider.IsHidden() && vid != 0 && DeviceHider::IsPresent(vid, m_knownPid.load())) {
-                m_hideJustApplied.store(true);
+            const DWORD vid = m_hiding ? m_hiding->Vid() : 0;
+            if (m_hiding && m_hiding->IsHidden() && vid != 0 && DeviceHider::IsPresent(vid, m_hiding->Pid())) {
+                m_hideJustApplied = true;
                 NoteConnectFailure();
             } else {
-                m_hideFailCount.store(0);
+                m_hideFailCount = 0;
             }
             if (m_targetPlugged && m_vigemClient && m_vigemTarget) {
                 vigem_target_remove(m_vigemClient, m_vigemTarget);
@@ -282,17 +262,12 @@ void Remapper::WorkerLoop(HWND hwnd) {
 
         DeviceChoice chosen = *targetDevice;
 
-        if (chosen.vid != m_knownVid.load() || chosen.pid != m_knownPid.load()) {
-            m_knownVid.store(chosen.vid);
-            m_knownPid.store(chosen.pid);
-            DeviceHider::SaveLastController(chosen.vid, chosen.pid);
-        }
-
-        if (m_hideReal.load() && !m_hidingSuspended.load()) {
-            ApplyDeviceHiding(chosen.vid, chosen.pid, false);
+        if (m_hiding) {
+            m_hiding->SetController(chosen.vid, chosen.pid);
+            m_hiding->HideNow();
         }
         // From here on a failure to open the controller is blamed on the hiding (see NoteConnectFailure).
-        m_hideJustApplied.store(m_hider.IsHidden());
+        m_hideJustApplied = (m_hiding != nullptr && m_hiding->IsHidden());
 
         LPDIRECTINPUTDEVICE8W joystick = nullptr;
         hr = directInput->CreateDevice(chosen.guid, &joystick, NULL);
@@ -550,57 +525,6 @@ void Remapper::WorkerLoop(HWND hwnd) {
     }
 }
 
-// MARK: - Physical controller hiding
-void Remapper::ApplyDeviceHiding(DWORD vid, DWORD pid, bool quietWhenNotFound) {
-    HideResult result = m_hider.Hide(vid, pid);
-    if (result == HideResult::DeviceNotFound && quietWhenNotFound) return;
-
-    int code = static_cast<int>(result);
-    if (m_lastHideReport.exchange(code) == code) return;   // report every outcome once
-
-    StringId msg = StringId::LogHideFailed;
-    switch (result) {
-        case HideResult::Hidden:           msg = StringId::LogHideActive; break;
-        case HideResult::AlreadyHidden:    msg = StringId::LogHideAlready; break;
-        case HideResult::NotInstalled:     msg = StringId::LogHideMissing; break;
-        case HideResult::DeviceNotFound:   msg = StringId::LogHideNoDevice; break;
-        case HideResult::UnsupportedSetup: msg = StringId::LogHideCustomSetup; break;
-        case HideResult::Failed:           msg = StringId::LogHideFailed; break;
-    }
-    if (m_logCallback) m_logCallback(Localization::Instance().Get(msg));
-}
-
-// Runs next to the worker (never inside its polling loop). It keeps the hiding in step with reality:
-//  - hides the remembered controller before it connects, so no program can grab it first,
-//  - puts the hiding back when another program (or the user) removed it or switched HidHide off,
-//  - follows the "hide original controller" setting while the service is running.
-void Remapper::HideWatchdogLoop() {
-    auto& loc = Localization::Instance();
-    while (m_running.load()) {
-        const DWORD vid = m_knownVid.load();
-        const bool wanted = m_hideReal.load();
-
-        if (wanted && !m_hidingSuspended.load() && vid != 0) {
-            if (m_hider.IsHidden()) {
-                if (m_hider.Maintain() && m_logCallback) {
-                    m_logCallback(loc.Get(StringId::LogHideRepaired));
-                }
-            } else {
-                ApplyDeviceHiding(vid, m_knownPid.load(), true);
-            }
-        } else if (!wanted && m_hider.IsHidden()) {
-            if (m_hider.Restore() && m_logCallback) {
-                m_logCallback(loc.Get(StringId::LogHideRestored));
-            }
-            m_lastHideReport = -1;
-        }
-
-        for (int i = 0; i < 5 && m_running.load(); ++i) {
-            Sleep(100);
-        }
-    }
-}
-
 // If the controller cannot be opened shortly after hiding it, undo the hiding so the
 // user is never left without a working controller.
 void Remapper::NoteConnectFailure() {
@@ -611,11 +535,9 @@ void Remapper::NoteConnectFailure() {
 }
 
 void Remapper::RevertHiding(StringId reason) {
-    m_hider.Restore();
-    m_hidingSuspended = true;
+    if (m_hiding) m_hiding->Suspend(reason);
     m_hideJustApplied = false;
     m_hideFailCount = 0;
-    if (m_logCallback) m_logCallback(Localization::Instance().Get(reason));
 }
 
 SHORT Remapper::NormalizeAxis(LONG v) {

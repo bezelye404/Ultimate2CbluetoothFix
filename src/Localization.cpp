@@ -64,7 +64,6 @@ std::wstring GetEnglish(StringId id) {
         case StringId::LogMapperDisconnected: return L"Controller disconnected. Searching...";
         case StringId::LogBatteryActive: return L"Battery monitor active.";
         case StringId::LogBatteryError: return L"Battery monitor scan warning.";
-        case StringId::HideRealController: return L"Hide the real controller from other programs";
         case StringId::HideInstallTitle: return L"Install hiding driver";
         case StringId::HideInstallPrompt: return L"Hiding the original controller needs the free HidHide driver (about 8 MB, downloaded from its official release page). Download and install it now?";
         case StringId::LogHideActive: return L"Original controller hidden from games.";
@@ -152,7 +151,6 @@ std::wstring GetTurkish(StringId id) {
         case StringId::LogMapperDisconnected: return L"Bağlantı koptu. Yeniden bağlanılıyor...";
         case StringId::LogBatteryActive: return L"Pil monitörü aktif.";
         case StringId::LogBatteryError: return L"Pil tarama uyarısı.";
-        case StringId::HideRealController: return L"Gerçek kontrolcüyü diğer programlardan gizle";
         case StringId::HideInstallTitle: return L"Gizleme sürücüsünü kur";
         case StringId::HideInstallPrompt: return L"Orijinal kontrolcüyü gizlemek için ücretsiz HidHide sürücüsü gerekiyor (yaklaşık 8 MB, resmi yayın sayfasından indirilir). Şimdi indirilip kurulsun mu?";
         case StringId::LogHideActive: return L"Orijinal kontrolcü oyunlardan gizlendi.";
@@ -240,7 +238,6 @@ std::wstring GetSpanish(StringId id) {
         case StringId::LogMapperDisconnected: return L"Control desconectado. Buscando...";
         case StringId::LogBatteryActive: return L"Monitor de batería activo.";
         case StringId::LogBatteryError: return L"Aviso en el análisis de la batería.";
-        case StringId::HideRealController: return L"Ocultar el control real a otros programas";
         case StringId::HideInstallTitle: return L"Instalar controlador de ocultación";
         case StringId::HideInstallPrompt: return L"Para ocultar el control real se necesita el controlador gratuito HidHide (unos 8 MB, descargado desde su página oficial de versiones). ¿Descargarlo e instalarlo ahora?";
         case StringId::LogHideActive: return L"Control real oculto para los juegos.";

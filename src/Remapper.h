@@ -11,6 +11,7 @@
 #include "Localization.h"
 #include "../include/ViGEm/Client.h"
 #include "DeviceHider.h"
+#include "ControllerHiding.h"
 
 namespace Ultimate2CFixer {
 
@@ -49,8 +50,8 @@ public:
     void SetResponseCurve(int curve) { m_responseCurve.store(curve); }
     int GetResponseCurve() const { return m_responseCurve.load(); }
 
-    void SetHideRealDevice(bool enable) { m_hideReal.store(enable); }
-    bool GetHideRealDevice() const { return m_hideReal.load(); }
+    // The hiding of the physical controller belongs to the application (it must outlive service restarts).
+    void SetHiding(ControllerHiding* hiding) { m_hiding = hiding; }
 
     // Measured rate of controller updates (reports that changed the output), not the loop speed.
     int GetLiveHz() const { return m_liveHz.load(); }
@@ -65,8 +66,6 @@ private:
     void WorkerLoop(HWND hwnd);
     bool InitViGEm();
     void UninitViGEm();
-    void ApplyDeviceHiding(DWORD vid, DWORD pid, bool quietWhenNotFound);
-    void HideWatchdogLoop();
     void NoteConnectFailure();
     void RevertHiding(StringId reason);
 
@@ -82,7 +81,6 @@ private:
     std::atomic<bool> m_hairTrigger{false};
     std::atomic<int> m_pollingRateHz{250};
     std::atomic<int> m_responseCurve{0};
-    std::atomic<bool> m_hideReal{true};
     std::atomic<int> m_liveHz{250};
     std::atomic<float> m_liveMs{4.0f};
     std::atomic<ULONGLONG> m_lastInputTick{0};
@@ -101,16 +99,10 @@ private:
     LONG m_idleRx{0};
     LONG m_idleRy{0};
 
-    // Worker-thread only state for hiding the physical controller.
-    // Hiding is shared between the worker thread and the hiding watchdog thread.
-    DeviceHider m_hider;
-    std::thread m_hideThread;
-    std::atomic<DWORD> m_knownVid{0};         // USB id of the controller (remembered from earlier sessions too)
-    std::atomic<DWORD> m_knownPid{0};
-    std::atomic<int> m_lastHideReport{-1};
-    std::atomic<bool> m_hidingSuspended{false};   // Hiding proved unsafe this session; stay visible.
-    std::atomic<bool> m_hideJustApplied{false};   // Hidden, but the device is not yet confirmed readable.
-    std::atomic<int> m_hideFailCount{0};
+    // Worker-thread only state for the check that hiding did not lock this application out.
+    ControllerHiding* m_hiding{nullptr};
+    bool m_hideJustApplied{false};   // Hidden, but the device is not yet confirmed readable.
+    int m_hideFailCount{0};
 };
 
 } // namespace Ultimate2CFixer

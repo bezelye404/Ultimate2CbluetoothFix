@@ -30,6 +30,7 @@
 #include "BatteryMonitor.h"
 #include "DriverInstaller.h"
 #include "DeviceHider.h"
+#include "ControllerHiding.h"
 
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "shell32.lib")
@@ -98,7 +99,6 @@ constexpr int IDC_CHK_NINTENDO_MODE = 114;
 constexpr int IDC_CHK_HAIR_TRIGGER  = 115;
 constexpr int IDC_BTN_POLLING_RATE  = 116;
 constexpr int IDC_BTN_CURVE         = 117;
-constexpr int IDC_CHK_HIDE_REAL     = 118;
 
 constexpr int IDM_TRAY_OPEN         = 201;
 constexpr int IDM_TRAY_EXIT         = 202;
@@ -120,7 +120,6 @@ HWND g_hChkAutoStart                = nullptr;
 HWND g_hChkLowBattery               = nullptr;
 HWND g_hChkNintendoMode             = nullptr;
 HWND g_hChkHairTrigger              = nullptr;
-HWND g_hChkHideReal                 = nullptr;
 HWND g_hBtnDeadzone                 = nullptr;
 HWND g_hBtnPollingRate              = nullptr;
 HWND g_hBtnCurve                    = nullptr;
@@ -133,7 +132,6 @@ bool g_autoStartService             = true;
 bool g_lowBatteryAlert              = true;
 bool g_nintendoMode                 = false;
 bool g_hairTrigger                  = false;
-bool g_hideReal                     = true;
 bool g_hidingInstalling             = false;
 bool g_hidingOffered                = false;
 bool g_driverInstalled              = false;
@@ -174,6 +172,7 @@ bool g_trayCreated                  = false;
 UINT g_uTaskbarRestartMsg           = 0;
 
 std::unique_ptr<Remapper> g_remapper;
+std::unique_ptr<ControllerHiding> g_hiding;   // lives as long as the window
 std::unique_ptr<BatteryMonitor> g_batteryMonitor;
 
 std::deque<std::wstring> g_logLines;
@@ -275,10 +274,6 @@ void LoadUserSettings() {
             g_hairTrigger = (val != 0);
         }
         size = sizeof(val);
-        if (RegQueryValueExW(hKey, L"HideRealController", NULL, NULL, (LPBYTE)&val, &size) == ERROR_SUCCESS) {
-            g_hideReal = (val != 0);
-        }
-        size = sizeof(val);
         if (RegQueryValueExW(hKey, L"Deadzone", NULL, NULL, (LPBYTE)&val, &size) == ERROR_SUCCESS) {
             if (val <= 3) g_deadzoneLevel = static_cast<int>(val);
         }
@@ -314,8 +309,6 @@ void SaveUserSettings() {
         RegSetValueExW(hKey, L"NintendoMode", 0, REG_DWORD, (const BYTE*)&val, sizeof(val));
         val = g_hairTrigger ? 1 : 0;
         RegSetValueExW(hKey, L"HairTrigger", 0, REG_DWORD, (const BYTE*)&val, sizeof(val));
-        val = g_hideReal ? 1 : 0;
-        RegSetValueExW(hKey, L"HideRealController", 0, REG_DWORD, (const BYTE*)&val, sizeof(val));
         val = static_cast<DWORD>(g_deadzoneLevel);
         RegSetValueExW(hKey, L"Deadzone", 0, REG_DWORD, (const BYTE*)&val, sizeof(val));
         val = static_cast<DWORD>(g_pollingRateIndex);
@@ -377,7 +370,6 @@ void SwitchView(bool showSettings) {
     ShowWindow(g_hChkLowBattery, showSet);
     ShowWindow(g_hChkNintendoMode, showSet);
     ShowWindow(g_hChkHairTrigger, showSet);
-    ShowWindow(g_hChkHideReal, showSet);
     ShowWindow(g_hBtnDeadzone, showSet);
     ShowWindow(g_hBtnPollingRate, showSet);
     ShowWindow(g_hBtnCurve, showSet);
@@ -423,7 +415,6 @@ void UpdateUIStrings() {
     SetWindowTextW(g_hChkLowBattery, loc.Get(StringId::LowBatteryNotification).c_str());
     SetWindowTextW(g_hChkNintendoMode, loc.Get(StringId::NintendoMode).c_str());
     SetWindowTextW(g_hChkHairTrigger, loc.Get(StringId::HairTrigger).c_str());
-    SetWindowTextW(g_hChkHideReal, loc.Get(StringId::HideRealController).c_str());
     SetWindowTextW(g_hBtnSettingsBack, loc.Get(StringId::SettingsBack).c_str());
     UpdateDeadzoneButtonText();
     UpdatePollingRateButtonText();
@@ -452,7 +443,7 @@ void TriggerDriverInstall() {
 
 // Offers the optional hiding driver when hiding is wanted but the driver is missing.
 void OfferHidingDriverInstall(bool force) {
-    if (!g_hideReal || g_hidingInstalling || DeviceHider::IsAvailable()) return;
+    if (g_hidingInstalling || DeviceHider::IsAvailable()) return;
     if (!force && g_hidingOffered) return;
     g_hidingOffered = true;
 
@@ -491,7 +482,7 @@ void StartServices() {
     g_remapper->SetHairTrigger(g_hairTrigger);
     g_remapper->SetPollingRate(kPollingRates[g_pollingRateIndex]);
     g_remapper->SetResponseCurve(g_responseCurve);
-    g_remapper->SetHideRealDevice(g_hideReal);
+    g_remapper->SetHiding(g_hiding.get());
     const bool started = g_remapper->Start(
         g_hWnd,
         [](const std::wstring& msg) {
@@ -1075,30 +1066,23 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             SendMessageW(g_hChkHairTrigger, BM_SETCHECK, g_hairTrigger ? BST_CHECKED : BST_UNCHECKED, 0);
             SetWindowTheme(g_hChkHairTrigger, L"DarkMode_Explorer", NULL);
 
-            g_hChkHideReal = CreateWindowW(L"BUTTON", loc.Get(StringId::HideRealController).c_str(),
-                WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
-                S(44), S(286), S(650), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_HIDE_REAL, GetModuleHandleW(NULL), NULL);
-            SendMessageW(g_hChkHideReal, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
-            SendMessageW(g_hChkHideReal, BM_SETCHECK, g_hideReal ? BST_CHECKED : BST_UNCHECKED, 0);
-            SetWindowTheme(g_hChkHideReal, L"DarkMode_Explorer", NULL);
-
             // Row 1 Buttons: Deadzone & Polling Rate
             g_hBtnDeadzone = CreateWindowW(L"BUTTON", L"",
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(44), S(326), S(340), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_DEADZONE, GetModuleHandleW(NULL), NULL);
+                S(44), S(296), S(340), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_DEADZONE, GetModuleHandleW(NULL), NULL);
 
             g_hBtnPollingRate = CreateWindowW(L"BUTTON", L"",
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(400), S(326), S(340), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_POLLING_RATE, GetModuleHandleW(NULL), NULL);
+                S(400), S(296), S(340), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_POLLING_RATE, GetModuleHandleW(NULL), NULL);
 
             // Row 2 Buttons: Stick Curve & Back
             g_hBtnCurve = CreateWindowW(L"BUTTON", L"",
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(44), S(374), S(340), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_CURVE, GetModuleHandleW(NULL), NULL);
+                S(44), S(344), S(340), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_CURVE, GetModuleHandleW(NULL), NULL);
 
             g_hBtnSettingsBack = CreateWindowW(L"BUTTON", loc.Get(StringId::SettingsBack).c_str(),
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(400), S(374), S(150), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_SETTINGS_BACK, GetModuleHandleW(NULL), NULL);
+                S(400), S(344), S(150), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_SETTINGS_BACK, GetModuleHandleW(NULL), NULL);
 
             UpdateDeadzoneButtonText();
             UpdatePollingRateButtonText();
@@ -1125,6 +1109,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             if (DeviceHider::RecoverStale()) {
                 AppendLogMessage(loc.Get(StringId::LogHideRecovered));
             }
+
+            // The real controller stays hidden from other programs for as long as this window is open, whether
+            // or not the service is running (see ControllerHiding).
+            g_hiding = std::make_unique<ControllerHiding>([](const std::wstring& msg) {
+                auto* pMsg = new std::wstring(msg);
+                PostMessageW(g_hWnd, WM_UPDATE_LOG, (WPARAM)pMsg, 0);
+            });
+            g_hiding->Start();
             if (isFirstRun && g_driverInstalled) {
                 AppendLogMessage(loc.Get(StringId::DriverReadyFirstRun));
             } else if (!g_driverInstalled) {
@@ -1178,14 +1170,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     g_hairTrigger = (SendMessageW(g_hChkHairTrigger, BM_GETCHECK, 0, 0) == BST_CHECKED);
                     if (g_remapper) g_remapper->SetHairTrigger(g_hairTrigger);
                     SaveUserSettings();
-                    break;
-                case IDC_CHK_HIDE_REAL:
-                    g_hideReal = (SendMessageW(g_hChkHideReal, BM_GETCHECK, 0, 0) == BST_CHECKED);
-                    if (g_remapper) g_remapper->SetHideRealDevice(g_hideReal);
-                    SaveUserSettings();
-                    if (g_hideReal) {
-                        OfferHidingDriverInstall(true);
-                    }
                     break;
                 case IDC_BTN_DEADZONE:
                     g_deadzoneLevel = (g_deadzoneLevel + 1) % 4;
@@ -1341,11 +1325,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             switch (static_cast<HidHideInstallResult>(wParam)) {
                 case HidHideInstallResult::Installed:
                     AppendLogMessage(loc.Get(StringId::LogHideInstalled));
-                    if (g_remapper && g_remapper->IsRunning()) {
-                        StopServices();
-                        StartServices();
-                    }
-                    break;
+                    break;   // the hiding starts by itself within half a second
                 case HidHideInstallResult::NeedsRestart:
                     AppendLogMessage(loc.Get(StringId::LogHideInstallRestart));
                     break;
@@ -1366,7 +1346,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         case WM_CTLCOLOREDIT: {
             HDC hdcCtrl = (HDC)wParam;
             HWND hwndCtrl = (HWND)lParam;
-            if (hwndCtrl == g_hChkMinimizeClose || hwndCtrl == g_hChkStartWindows || hwndCtrl == g_hChkAutoStart || hwndCtrl == g_hChkLowBattery || hwndCtrl == g_hChkNintendoMode || hwndCtrl == g_hChkHairTrigger || hwndCtrl == g_hChkHideReal) {
+            if (hwndCtrl == g_hChkMinimizeClose || hwndCtrl == g_hChkStartWindows || hwndCtrl == g_hChkAutoStart || hwndCtrl == g_hChkLowBattery || hwndCtrl == g_hChkNintendoMode || hwndCtrl == g_hChkHairTrigger) {
                 SetTextColor(hdcCtrl, UI::ColorTextSecondary);
                 SetBkColor(hdcCtrl, UI::ColorCardBg);
                 return (LRESULT)g_hBrCardBg;
@@ -1387,6 +1367,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 // Windows is shutting down or the user is logging off and will end this process right after
                 // this message: give the real controller back to other programs first.
                 StopServices();
+                g_hiding.reset();
             }
             return 0;
 
@@ -1423,6 +1404,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         case WM_DESTROY: {
             KillTimer(hwnd, 1);
             StopServices();
+            g_hiding.reset();   // gives the real controller back
             if (g_trayCreated) {
                 Shell_NotifyIconW(NIM_DELETE, &g_nid);
             }

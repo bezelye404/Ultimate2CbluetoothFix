@@ -60,7 +60,6 @@ enum class StringId {
     LogMapperDisconnected,
     LogBatteryActive,
     LogBatteryError,
-    HideRealController,
     HideInstallTitle,
     HideInstallPrompt,
     LogHideActive,
