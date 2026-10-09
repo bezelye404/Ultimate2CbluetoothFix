@@ -67,7 +67,7 @@ private:
     static SHORT ApplyDeadzone(SHORT v, int dz);
     static SHORT ApplyResponseCurve(SHORT v, int curveType);
     static SHORT NegateAxis(SHORT v);
-    static BYTE CalculateTrigger(LONG axisVal, LONG idleVal, bool btnPressed, bool hairTrigger);
+    static BYTE CalculateTrigger(LONG axisVal, LONG idleVal, bool hairTrigger);
 
     std::atomic<bool> m_running{false};
     std::atomic<int> m_deadzone{4000};

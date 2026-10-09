@@ -48,3 +48,9 @@ target_link_libraries(Ultimate2CFixer PRIVATE
 if(MSVC)
     target_link_libraries(Ultimate2CFixer PRIVATE windowsapp)
 endif()
+
+# Optional developer check: every text must fit its control in all languages.
+# Build with: cmake --build build --config Release --target LayoutCheck
+if(WIN32)
+    add_executable(LayoutCheck EXCLUDE_FROM_ALL tools/LayoutCheck.cpp src/Localization.cpp)
+endif()

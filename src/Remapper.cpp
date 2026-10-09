@@ -34,6 +34,13 @@ namespace {
         return str;
     }
 
+    BOOL CALLBACK CountSlidersCallback(LPCDIDEVICEOBJECTINSTANCEW obj, LPVOID pvRef) {
+        if (IsEqualGUID(obj->guidType, GUID_Slider)) {
+            ++*reinterpret_cast<int*>(pvRef);
+        }
+        return DIENUM_CONTINUE;
+    }
+
     BOOL CALLBACK EnumDevicesCallback(LPCDIDEVICEINSTANCEW lpddi, LPVOID pvRef) {
         auto* list = reinterpret_cast<std::vector<DeviceChoice>*>(pvRef);
 
@@ -266,6 +273,12 @@ void Remapper::WorkerLoop(HWND hwnd) {
         m_idleRx = testState.lRx;
         m_idleRy = testState.lRy;
 
+        // The analog trigger depth lives on the two slider axes. Only when they are missing does the
+        // digital click have to stand in for the trigger (same rule as the Linux version).
+        int sliderCount = 0;
+        joystick->EnumObjects(CountSlidersCallback, &sliderCount, DIDFT_AXIS);
+        const bool analogTriggers = (sliderCount >= 2);
+
         // Plug in virtual target on-demand once physical controller is verified alive
         if (!m_targetPlugged && m_vigemClient && m_vigemTarget) {
             VIGEM_ERROR plugErr = vigem_target_add(m_vigemClient, m_vigemTarget);
@@ -322,13 +335,17 @@ void Remapper::WorkerLoop(HWND hwnd) {
 
             // Triggers: Hybrid Analog (Sliders / Rx / Ry) & Digital (LT=Button 8, RT=Button 9)
             bool hair = m_hairTrigger.load();
-            BYTE lt1 = CalculateTrigger(state.rglSlider[0], m_idleSlider0, state.rgbButtons[8] != 0, hair);
-            BYTE lt2 = CalculateTrigger(state.lRx, m_idleRx, state.rgbButtons[8] != 0, hair);
-            BYTE lt = (std::max)(lt1, lt2);
-
-            BYTE rt1 = CalculateTrigger(state.rglSlider[1], m_idleSlider1, state.rgbButtons[9] != 0, hair);
-            BYTE rt2 = CalculateTrigger(state.lRy, m_idleRy, state.rgbButtons[9] != 0, hair);
-            BYTE rt = (std::max)(rt1, rt2);
+            BYTE lt, rt;
+            if (analogTriggers) {
+                // The click fires early in the pull and must not force the full value.
+                lt = (std::max)(CalculateTrigger(state.rglSlider[0], m_idleSlider0, hair),
+                                CalculateTrigger(state.lRx, m_idleRx, hair));
+                rt = (std::max)(CalculateTrigger(state.rglSlider[1], m_idleSlider1, hair),
+                                CalculateTrigger(state.lRy, m_idleRy, hair));
+            } else {
+                lt = (state.rgbButtons[8] != 0) ? 255 : 0;
+                rt = (state.rgbButtons[9] != 0) ? 255 : 0;
+            }
 
             bool nintendoMode = m_nintendoMode.load();
             USHORT btnA = static_cast<USHORT>(nintendoMode ? XUSB_GAMEPAD_B : XUSB_GAMEPAD_A);
@@ -510,10 +527,7 @@ SHORT Remapper::ApplyResponseCurve(SHORT v, int curveType) {
     return static_cast<SHORT>(res);
 }
 
-BYTE Remapper::CalculateTrigger(LONG axisVal, LONG idleVal, bool btnPressed, bool hairTrigger) {
-    if (btnPressed) {
-        return 255;
-    }
+BYTE Remapper::CalculateTrigger(LONG axisVal, LONG idleVal, bool hairTrigger) {
     LONG diff = (axisVal >= idleVal) ? (axisVal - idleVal) : (idleVal - axisVal);
     if (diff < 1500) {
         return 0;

@@ -81,7 +81,8 @@ enum class StringId {
     LogHideInstallRestart,
     BatteryLowStatus,
     BatteryModerateStatus,
-    BatteryHealthyStatus
+    BatteryHealthyStatus,
+    DriverDownloadingShort
 };
 
 enum class Language {
