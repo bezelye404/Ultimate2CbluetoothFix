@@ -403,7 +403,7 @@ void UpdateUIStrings() {
     }
     SetWindowTextW(g_hBtnStop, loc.Get(StringId::StopBtn).c_str());
     SetWindowTextW(g_hBtnClearLogs, loc.Get(StringId::ClearBtn).c_str());
-    SetWindowTextW(g_hBtnLang, loc.Code());
+    SetWindowTextW(g_hBtnLang, loc.NextCode());
     SetWindowTextW(g_hChkStartWindows, loc.Get(StringId::StartWithWindows).c_str());
     SetWindowTextW(g_hChkMinimizeClose, loc.Get(StringId::MinimizeOnClose).c_str());
     SetWindowTextW(g_hChkAutoStart, loc.Get(StringId::AutoStartService).c_str());
@@ -979,7 +979,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 rc.right - S(64), S(16), S(38), S(26), hwnd, (HMENU)(INT_PTR)IDC_BTN_TRAY, GetModuleHandleW(NULL), NULL);
 
             g_hBtnClearLogs = CreateWindowW(L"BUTTON", L"Clear", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_OWNERDRAW,
-                rc.right - S(88), S(218), S(54), S(22), hwnd, (HMENU)(INT_PTR)IDC_BTN_CLEAR_LOGS, GetModuleHandleW(NULL), NULL);
+                rc.right - S(98), S(218), S(64), S(22), hwnd, (HMENU)(INT_PTR)IDC_BTN_CLEAR_LOGS, GetModuleHandleW(NULL), NULL);
 
             // MARK: Terminal Logs
             int editTop = S(248);
@@ -1045,20 +1045,20 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             // Row 1 Buttons: Deadzone & Polling Rate
             g_hBtnDeadzone = CreateWindowW(L"BUTTON", L"",
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(44), S(336), S(340), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_DEADZONE, GetModuleHandleW(NULL), NULL);
+                S(44), S(326), S(340), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_DEADZONE, GetModuleHandleW(NULL), NULL);
 
             g_hBtnPollingRate = CreateWindowW(L"BUTTON", L"",
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(400), S(336), S(340), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_POLLING_RATE, GetModuleHandleW(NULL), NULL);
+                S(400), S(326), S(340), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_POLLING_RATE, GetModuleHandleW(NULL), NULL);
 
             // Row 2 Buttons: Stick Curve & Back
             g_hBtnCurve = CreateWindowW(L"BUTTON", L"",
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(44), S(384), S(340), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_CURVE, GetModuleHandleW(NULL), NULL);
+                S(44), S(374), S(340), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_CURVE, GetModuleHandleW(NULL), NULL);
 
             g_hBtnSettingsBack = CreateWindowW(L"BUTTON", loc.Get(StringId::SettingsBack).c_str(),
                 WS_TABSTOP | WS_CHILD | BS_OWNERDRAW,
-                S(400), S(384), S(150), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_SETTINGS_BACK, GetModuleHandleW(NULL), NULL);
+                S(400), S(374), S(150), S(36), hwnd, (HMENU)(INT_PTR)IDC_BTN_SETTINGS_BACK, GetModuleHandleW(NULL), NULL);
 
             UpdateDeadzoneButtonText();
             UpdatePollingRateButtonText();
@@ -1264,7 +1264,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             int pct = (int)wParam;
             auto& loc = Localization::Instance();
             wchar_t buf[128];
-            swprintf_s(buf, loc.Get(StringId::DriverDownloading).c_str(), pct);
+            swprintf_s(buf, loc.Get(StringId::DriverDownloadingShort).c_str(), pct);
             SetWindowTextW(g_hBtnStart, buf);
             return 0;
         }
