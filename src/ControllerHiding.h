@@ -4,6 +4,7 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#include <cfgmgr32.h>
 #include <atomic>
 #include <functional>
 #include <string>
@@ -69,6 +70,8 @@ private:
     std::atomic<DWORD> m_vid{0};
     std::atomic<DWORD> m_pid{0};
     std::atomic<int> m_lastReport{-1};
+    std::atomic<unsigned> m_deviceChanges{0};   // bumped by Windows when a HID interface arrives or leaves
+    HCMNOTIFICATION m_notify = nullptr;
 };
 
 } // namespace Ultimate2CFixer

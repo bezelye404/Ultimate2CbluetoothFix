@@ -54,7 +54,9 @@ public:
 
     // Verifies that the hiding is still in place and puts back whatever another program
     // removed or switched off. Returns true when something had to be repaired.
-    bool Maintain();
+    // rescan=false skips the (costly) search for the controller's HID entries and reuses the last result;
+    // the caller asks for a rescan when Windows reported a device change and every few seconds as a fallback.
+    bool Maintain(bool rescan = true);
 
     // Returns true when entries added by this application were removed.
     bool Restore();
@@ -62,9 +64,11 @@ public:
     bool IsHidden() const { return m_hidden.load(); }
 
 private:
-    bool MaintainLocked();
+    bool MaintainLocked(bool rescan);
 
     std::mutex m_lock;
+    std::vector<std::wstring> m_ids;   // HID entries found by the last rescan
+    std::wstring m_ntPath;             // NT path of this exe (never changes while running)
     std::atomic<bool> m_hidden{false};
     DWORD m_vid{0};
     DWORD m_pid{0};

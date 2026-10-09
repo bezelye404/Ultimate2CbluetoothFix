@@ -1352,7 +1352,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
 
         case WM_UPDATE_STATUS: {
+            const RemapperStatus previous = g_currentStatus;
             g_currentStatus = static_cast<RemapperStatus>(wParam);
+            if (g_currentStatus == RemapperStatus::Connected && previous != RemapperStatus::Connected && g_batteryMonitor) {
+                g_batteryMonitor->ScanSoon();
+            }
             auto* pName = reinterpret_cast<std::wstring*>(lParam);
             if (pName) {
                 g_deviceName = *pName;

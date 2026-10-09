@@ -65,12 +65,15 @@ void BatteryMonitor::WorkerLoop() {
         Sleep(100);
     }
 
+    int misses = 0;
     while (m_running.load()) {
         bool connected = PollBattery();
 
-        // If connected, check every 60s; if searching/disconnected, check every 4s
-        int sleepTicks = connected ? 120 : 8; // 500ms intervals
-        for (int i = 0; i < sleepTicks && m_running.load(); ++i) {
+        // Connected: check every 60 s. Not connected: the scan is costly, so back off from 4 s to 20 s; a new
+        // connection wakes it up through ScanSoon().
+        misses = connected ? 0 : (std::min)(misses + 1, 3);
+        const int sleepTicks = connected ? 120 : (misses == 1 ? 8 : (misses == 2 ? 20 : 40));   // 500 ms steps
+        for (int i = 0; i < sleepTicks && m_running.load() && !m_scanSoon.exchange(false); ++i) {
             Sleep(500);
         }
     }

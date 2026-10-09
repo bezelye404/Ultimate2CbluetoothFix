@@ -27,12 +27,29 @@ void ControllerHiding::Start() {
     }
     m_suspendedUntil = 0;
     m_lastReport = -1;
+
+    // Windows tells us when a HID interface appears or disappears (a new identity of the controller), so the
+    // watchdog only has to search for the controller's entries then, not twice a second.
+    CM_NOTIFY_FILTER filter = {};
+    filter.cbSize = sizeof(filter);
+    filter.FilterType = CM_NOTIFY_FILTER_TYPE_DEVICEINTERFACE;
+    filter.u.DeviceInterface.ClassGuid = { 0x4D1E55B2, 0xF16F, 0x11CF, { 0x88, 0xCB, 0x00, 0x11, 0x11, 0x00, 0x00, 0x30 } };   // GUID_DEVINTERFACE_HID
+    auto onChange = [](HCMNOTIFICATION, PVOID ctx, CM_NOTIFY_ACTION, PCM_NOTIFY_EVENT_DATA, DWORD) -> DWORD {
+        static_cast<std::atomic<unsigned>*>(ctx)->fetch_add(1);
+        return ERROR_SUCCESS;
+    };
+    if (CM_Register_Notification(&filter, &m_deviceChanges, onChange, &m_notify) != CR_SUCCESS) m_notify = nullptr;
+
     m_thread = std::thread(&ControllerHiding::Loop, this);
 }
 
 void ControllerHiding::Stop() {
     if (!m_running.exchange(false)) return;
     if (m_thread.joinable()) m_thread.join();
+    if (m_notify) {
+        CM_Unregister_Notification(m_notify);
+        m_notify = nullptr;
+    }
     if (m_hider.Restore()) Log(StringId::LogHideRestored);
 }
 
@@ -98,10 +115,21 @@ void ControllerHiding::Apply(bool quietWhenNotFound) {
 }
 
 void ControllerHiding::Loop() {
+    unsigned seenChanges = m_deviceChanges.load();
+    ULONGLONG lastScan = 0;
     while (m_running.load()) {
         if (!IsSuspended() && m_vid.load() != 0) {
             if (m_hider.IsHidden()) {
-                if (m_hider.Maintain()) Log(StringId::LogHideRepaired);
+                // Cheap check every pass (three small driver reads); the search for the controller's entries only
+                // when Windows reported a device change, or every 10 s when no notification is available.
+                const unsigned changes = m_deviceChanges.load();
+                const ULONGLONG now = GetTickCount64();
+                const bool rescan = changes != seenChanges || now - lastScan >= (m_notify ? 30000u : 10000u);
+                if (rescan) {
+                    seenChanges = changes;
+                    lastScan = now;
+                }
+                if (m_hider.Maintain(rescan)) Log(StringId::LogHideRepaired);
             } else {
                 Apply(true);
             }

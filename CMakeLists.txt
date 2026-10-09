@@ -49,6 +49,7 @@ target_link_libraries(Ultimate2CFixer PRIVATE
     winmm
     wintrust
     crypt32
+    cfgmgr32
 )
 
 if(MSVC)
