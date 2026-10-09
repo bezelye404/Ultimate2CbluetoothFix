@@ -27,7 +27,7 @@ Because most modern Windows games expect an XInput device, Ultimate2CFixer reads
 ## ⚙️ Features
 
 * **DirectInput to XInput Translation:** Maps Left Stick (`lX`, `lY`), Right Stick (`lZ`, `lRz`), triggers, and buttons to a virtual Xbox 360 gamepad.
-* **Configurable Polling Rate:** Update intervals of 125 Hz (8 ms), 250 Hz (4 ms), 500 Hz (2 ms), and 1000 Hz (1 ms).
+* **Configurable Update Rate:** Maximum update rate (the app wakes only when the controller reports) of 125 Hz (8 ms), 250 Hz (4 ms), 500 Hz (2 ms), and 1000 Hz (1 ms).
 * **Stick Response Curves:** Linear (1:1), Smooth Aim (cubic S-curve), and Aggressive (square-root).
 * **Analog Triggers:** The analog pull depth (0-255) reaches the game. The trigger's digital click is only used as a fallback when the controller reports no analog trigger axes, so it never forces the full value. Behaves the same as the Linux version.
 * **Optional Hair Trigger:** User-configurable toggle that maps any trigger pull beyond the deadzone directly to full activation (255).
