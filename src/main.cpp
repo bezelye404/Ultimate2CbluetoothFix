@@ -16,6 +16,7 @@
 #endif
 #include <windows.h>
 #include <commctrl.h>
+#include <richedit.h>
 #include <shellapi.h>
 #include <uxtheme.h>
 #include <string>
@@ -183,7 +184,11 @@ std::unique_ptr<Remapper> g_remapper;
 std::unique_ptr<ControllerHiding> g_hiding;   // lives as long as the window
 std::unique_ptr<BatteryMonitor> g_batteryMonitor;
 
-std::deque<std::wstring> g_logLines;
+struct LogLine {
+    std::wstring text;
+    LogLevel level;
+};
+std::deque<LogLine> g_logLines;
 std::wstring g_deviceName;
 RemapperStatus g_currentStatus      = RemapperStatus::Stopped;
 int g_batteryLevel                  = -1;
@@ -206,25 +211,59 @@ void TrimWorkingSet() {
     SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
 }
 
-void AppendLogMessage(const std::wstring& msg) {
+COLORREF LogColor(LogLevel level) {
+    switch (level) {
+        case LogLevel::Good:     return UI::ColorStatusGreen;
+        case LogLevel::Bad:      return UI::ColorStatusRed;
+        case LogLevel::Critical: return UI::ColorStatusAmber;
+        default:                 return UI::ColorTextSecondary;
+    }
+}
+
+void AppendLogMessage(const std::wstring& msg, LogLevel level = LogLevel::Info) {
     SYSTEMTIME st;
     GetLocalTime(&st);
     wchar_t timeBuf[32];
     swprintf_s(timeBuf, L"[%02d:%02d:%02d] ", st.wHour, st.wMinute, st.wSecond);
 
-    g_logLines.push_back(std::wstring(timeBuf) + msg);
+    g_logLines.push_back({ std::wstring(timeBuf) + msg, level });
     while (g_logLines.size() > MAX_LOG_LINES) {
         g_logLines.pop_front();
     }
 
     std::wstring allLogs;
     for (const auto& line : g_logLines) {
-        allLogs += line + L"\r\n";
+        allLogs += line.text + L"\r\n";
     }
 
+    SendMessageW(g_hEditLogs, WM_SETREDRAW, FALSE, 0);
     SetWindowTextW(g_hEditLogs, allLogs.c_str());
-    SendMessageW(g_hEditLogs, EM_SETSEL, (WPARAM)allLogs.length(), (LPARAM)allLogs.length());
+
+    // Colour the important lines. The rich edit stores a line break as one character.
+    LONG start = 0;
+    for (const auto& line : g_logLines) {
+        const LONG length = static_cast<LONG>(line.text.length());
+        if (line.level != LogLevel::Info) {
+            CHARRANGE range = { start, start + length };
+            SendMessageW(g_hEditLogs, EM_EXSETSEL, 0, (LPARAM)&range);
+            CHARFORMAT2W format = {};
+            format.cbSize = sizeof(format);
+            format.dwMask = CFM_COLOR;
+            format.crTextColor = LogColor(line.level);
+            SendMessageW(g_hEditLogs, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&format);
+        }
+        start += length + 1;
+    }
+
+    const LONG endPos = GetWindowTextLengthW(g_hEditLogs);
+    SendMessageW(g_hEditLogs, EM_SETSEL, endPos, endPos);
+    SendMessageW(g_hEditLogs, WM_SETREDRAW, TRUE, 0);
     SendMessageW(g_hEditLogs, EM_SCROLLCARET, 0, 0);
+    InvalidateRect(g_hEditLogs, NULL, TRUE);
+}
+
+void AppendLogId(StringId id) {
+    AppendLogMessage(Localization::Instance().Get(id), LevelOf(id));
 }
 
 bool CheckStartWithWindows() {
@@ -452,8 +491,7 @@ void TriggerDriverInstall() {
     if (g_driverInstalling) return;
     g_driverInstalling = true;
     EnableWindow(g_hBtnStart, FALSE);
-    auto& loc = Localization::Instance();
-    AppendLogMessage(loc.Get(StringId::DriverInstalling));
+    AppendLogId(StringId::DriverInstalling);
     StartViGEmBusInstall(
         g_hWnd,
         [](int pct, const std::wstring&) {
@@ -478,7 +516,7 @@ void OfferHidingDriverInstall(bool force) {
     if (answer != IDYES) return;
 
     g_hidingInstalling = true;
-    AppendLogMessage(loc.Get(StringId::LogHideInstalling));
+    AppendLogId(StringId::LogHideInstalling);
     StartHidHideInstall(g_hWnd, [](HidHideInstallResult result) {
         PostMessageW(g_hWnd, WM_HIDING_INSTALL_DONE, (WPARAM)result, 0);
     });
@@ -495,7 +533,7 @@ void StartServices() {
     EnableWindow(g_hBtnStop, TRUE);
 
     auto& loc = Localization::Instance();
-    AppendLogMessage(loc.Get(StringId::LogServicesStarting));
+    AppendLogId(StringId::LogServicesStarting);
 
     g_currentStatus = RemapperStatus::Searching;
     g_deviceName = loc.Get(StringId::StatusSearching);
@@ -510,9 +548,9 @@ void StartServices() {
     g_remapper->SetHiding(g_hiding.get());
     const bool started = g_remapper->Start(
         g_hWnd,
-        [](const std::wstring& msg) {
+        [](const std::wstring& msg, LogLevel level) {
             auto* pMsg = new std::wstring(msg);
-            PostMessageW(g_hWnd, WM_UPDATE_LOG, (WPARAM)pMsg, 0);
+            PostMessageW(g_hWnd, WM_UPDATE_LOG, (WPARAM)pMsg, (LPARAM)level);
         },
         [](RemapperStatus status, const std::wstring& devName) {
             auto* pName = new std::wstring(devName);
@@ -542,9 +580,9 @@ void StartServices() {
 
     g_batteryMonitor = std::make_unique<BatteryMonitor>();
     g_batteryMonitor->Start(
-        [](const std::wstring& msg) {
+        [](const std::wstring& msg, LogLevel level) {
             auto* pMsg = new std::wstring(msg);
-            PostMessageW(g_hWnd, WM_UPDATE_LOG, (WPARAM)pMsg, 0);
+            PostMessageW(g_hWnd, WM_UPDATE_LOG, (WPARAM)pMsg, (LPARAM)level);
         },
         [](const std::wstring& devName, int level) {
             auto* pName = new std::wstring(devName);
@@ -567,7 +605,7 @@ void StopServices() {
     EnableWindow(g_hBtnStop, FALSE);
 
     auto& loc = Localization::Instance();
-    AppendLogMessage(loc.Get(StringId::LogServicesStopping));
+    AppendLogId(StringId::LogServicesStopping);
 
     g_currentStatus = RemapperStatus::Stopped;
     g_deviceName = loc.Get(StringId::NoDevice);
@@ -1051,11 +1089,19 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             int editTop = S(248);
             int editHeight = (rc.bottom - S(20)) - editTop - S(12);
             if (editHeight < S(140)) editHeight = S(140);
-            g_hEditLogs = CreateWindowExW(0, L"EDIT", L"",
+            g_hEditLogs = CreateWindowExW(0, MSFTEDIT_CLASS, L"",
                 WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
                 S(38), editTop, rc.right - S(76), editHeight, hwnd, (HMENU)(INT_PTR)IDC_EDIT_LOGS, GetModuleHandleW(NULL), NULL);
 
             SendMessageW(g_hEditLogs, WM_SETFONT, (WPARAM)g_hFontMono, TRUE);
+            SendMessageW(g_hEditLogs, EM_SETBKGNDCOLOR, 0, (LPARAM)UI::ColorCardBg);
+            {
+                CHARFORMAT2W normalText = {};
+                normalText.cbSize = sizeof(normalText);
+                normalText.dwMask = CFM_COLOR;
+                normalText.crTextColor = UI::ColorTextSecondary;
+                SendMessageW(g_hEditLogs, EM_SETCHARFORMAT, SCF_DEFAULT, (LPARAM)&normalText);
+            }
             SetWindowTheme(g_hEditLogs, L"DarkMode_Explorer", NULL);
 
             // MARK: Settings View Controls (Hidden by default)
@@ -1147,13 +1193,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
 
             UpdateUIStrings();
-            AppendLogMessage(loc.Get(StringId::LogAppReady));
+            AppendLogId(StringId::LogAppReady);
             // The real controller stays hidden from other programs for as long as this window is open, whether
             // or not the service is running (see ControllerHiding).
             g_hiding = std::make_unique<ControllerHiding>(
-                [](const std::wstring& msg) {
+                [](const std::wstring& msg, LogLevel level) {
                     auto* pMsg = new std::wstring(msg);
-                    PostMessageW(g_hWnd, WM_UPDATE_LOG, (WPARAM)pMsg, 0);
+                    PostMessageW(g_hWnd, WM_UPDATE_LOG, (WPARAM)pMsg, (LPARAM)level);
                 },
                 [](StringId notice) {
                     PostMessageW(g_hWnd, WM_HIDING_NOTICE, (WPARAM)notice, 0);
@@ -1161,9 +1207,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             g_hiding->Start();
             PostMessageW(hwnd, WM_HIDING_STARTUP_CHECK, 0, 0);   // handled once the window is shown or hidden
             if (isFirstRun && g_driverInstalled) {
-                AppendLogMessage(loc.Get(StringId::DriverReadyFirstRun));
+                AppendLogId(StringId::DriverReadyFirstRun);
             } else if (!g_driverInstalled) {
-                AppendLogMessage(loc.Get(StringId::DriverMissing));
+                AppendLogId(StringId::DriverMissing);
             }
             return 0;
         }
@@ -1299,7 +1345,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         case WM_UPDATE_LOG: {
             auto* pMsg = reinterpret_cast<std::wstring*>(wParam);
             if (pMsg) {
-                AppendLogMessage(*pMsg);
+                AppendLogMessage(*pMsg, static_cast<LogLevel>(lParam));
                 delete pMsg;
             }
             return 0;
@@ -1368,38 +1414,36 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             bool success = (wParam == 1);
             g_driverInstalling = false;
             g_driverInstalled = success;
-            auto& loc = Localization::Instance();
             EnableWindow(g_hBtnStart, TRUE);
             UpdateUIStrings();
             if (success) {
-                AppendLogMessage(loc.Get(StringId::DriverSuccess));
+                AppendLogId(StringId::DriverSuccess);
                 if (g_autoStartService) {
                     StartServices();
                 }
             } else {
-                AppendLogMessage(loc.Get(wParam == 2 ? StringId::LogHideInstallUnverified : StringId::DriverFailed));
+                AppendLogId(wParam == 2 ? StringId::LogHideInstallUnverified : StringId::DriverFailed);
             }
             return 0;
         }
 
         case WM_HIDING_INSTALL_DONE: {
             g_hidingInstalling = false;
-            auto& loc = Localization::Instance();
             switch (static_cast<HidHideInstallResult>(wParam)) {
                 case HidHideInstallResult::Installed:
-                    AppendLogMessage(loc.Get(StringId::LogHideInstalled));
+                    AppendLogId(StringId::LogHideInstalled);
                     break;   // the hiding starts by itself within half a second
                 case HidHideInstallResult::NeedsRestart:
-                    AppendLogMessage(loc.Get(StringId::LogHideInstallRestart));
+                    AppendLogId(StringId::LogHideInstallRestart);
                     break;
                 case HidHideInstallResult::DownloadFailed:
-                    AppendLogMessage(loc.Get(StringId::LogHideInstallFailed));
+                    AppendLogId(StringId::LogHideInstallFailed);
                     break;
                 case HidHideInstallResult::NotVerified:
-                    AppendLogMessage(loc.Get(StringId::LogHideInstallUnverified));
+                    AppendLogId(StringId::LogHideInstallUnverified);
                     break;
                 case HidHideInstallResult::Cancelled:
-                    AppendLogMessage(loc.Get(StringId::LogHideInstallCancelled));
+                    AppendLogId(StringId::LogHideInstallCancelled);
                     break;
             }
             return 0;
@@ -1516,6 +1560,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     InitDpiAwareness();
+    LoadLibraryW(L"Msftedit.dll");   // rich edit control of the console
     LoadUserSettings();
 
     g_startWithWindows = CheckStartWithWindows();

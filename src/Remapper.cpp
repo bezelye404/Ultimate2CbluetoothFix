@@ -120,7 +120,7 @@ Remapper::~Remapper() {
 
 bool Remapper::InitViGEm() {
     auto reportUnavailable = [this]() {
-        if (m_logCallback) m_logCallback(Localization::Instance().Get(StringId::LogViGEmUnavailable));
+        if (m_logCallback) m_logCallback(Localization::Instance().Get(StringId::LogViGEmUnavailable), LevelOf(StringId::LogViGEmUnavailable));
     };
 
     m_vigemClient = vigem_alloc();
@@ -206,12 +206,12 @@ void Remapper::Stop() {
 
 void Remapper::WorkerLoop(HWND hwnd) {
     auto& loc = Localization::Instance();
-    if (m_logCallback) m_logCallback(loc.Get(StringId::LogMapperStart));
+    if (m_logCallback) m_logCallback(loc.Get(StringId::LogMapperStart), LevelOf(StringId::LogMapperStart));
 
     IDirectInput8W* directInput = nullptr;
     HRESULT hr = DirectInput8Create(GetModuleHandle(NULL), DIRECTINPUT_VERSION, IID_IDirectInput8W, (VOID**)&directInput, NULL);
     if (FAILED(hr) || !directInput) {
-        if (m_logCallback) m_logCallback(loc.Get(StringId::LogInputSystemFailed));
+        if (m_logCallback) m_logCallback(loc.Get(StringId::LogInputSystemFailed), LevelOf(StringId::LogInputSystemFailed));
         if (m_statusCallback) m_statusCallback(RemapperStatus::Disconnected, L"");
         return;
     }
@@ -331,7 +331,7 @@ void Remapper::WorkerLoop(HWND hwnd) {
         if (m_logCallback) {
             wchar_t connectedMsg[256];
             swprintf_s(connectedMsg, loc.Get(StringId::LogControllerConnected).c_str(), chosen.displayName.c_str());
-            m_logCallback(connectedMsg);
+            m_logCallback(connectedMsg, LevelOf(StringId::LogControllerConnected));
         }
         m_lastInputTick.store(0);
         m_liveHz.store(0);
@@ -360,7 +360,7 @@ void Remapper::WorkerLoop(HWND hwnd) {
                     continue;
                 }
                 {
-                    if (m_logCallback) m_logCallback(loc.Get(StringId::LogMapperDisconnected));
+                    if (m_logCallback) m_logCallback(loc.Get(StringId::LogMapperDisconnected), LevelOf(StringId::LogMapperDisconnected));
                     if (m_statusCallback) m_statusCallback(RemapperStatus::Disconnected, L"");
                     if (m_targetPlugged && m_vigemClient && m_vigemTarget) {
                         vigem_target_remove(m_vigemClient, m_vigemTarget);

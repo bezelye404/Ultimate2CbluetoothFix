@@ -33,6 +33,7 @@ Because most modern Windows games expect an XInput device, Ultimate2CFixer reads
 * **Optional Hair Trigger:** User-configurable toggle that maps any trigger pull beyond the deadzone directly to full activation (255).
 * **Single Instance:** Starting a second copy brings the first window forward instead of running twice.
 * **Live Input Telemetry:** Visual indicators for analog sticks, ABXY layout, LB/RB bumpers, and LT/RT analog triggers.
+* **Readable Console:** Important lines of the console are coloured: green for something that worked, red for something that failed or went away, yellow for something that needs your attention.
 * **Original Controller Hidden:** While the application is open, games and Steam only see the virtual gamepad, never the physical controller as well (no double inputs). This uses the [HidHide](https://github.com/nefarius/HidHide) driver, which the application offers to download and install, and it is always on. The controller is hidden before it connects, stays hidden when the service is stopped and started, and is put back within half a second if another program removes the hiding. Closing the application gives the controller back.
 * **Battery Status:** Reads battery percentage via Windows WinRT Bluetooth Low Energy (BLE) GATT service.
 * **System Tray & Resource Trimming:** Flushes physical working set memory when minimized to the system tray.

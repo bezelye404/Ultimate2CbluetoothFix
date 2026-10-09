@@ -29,7 +29,7 @@ namespace Ultimate2CFixer {
 // controller is connected, the user is told to switch the controller off and on once.
 class ControllerHiding {
 public:
-    using LogFn = std::function<void(const std::wstring&)>;
+    using LogFn = std::function<void(const std::wstring&, LogLevel)>;
     // Asks the window to tell the user something (a tray notification) about this message.
     using NoticeFn = std::function<void(StringId)>;
 

@@ -2,13 +2,14 @@
 
 #include <string>
 #include <functional>
+#include "Localization.h"
 #include <thread>
 #include <atomic>
 
 namespace Ultimate2CFixer {
 
 using BatteryCallback = std::function<void(const std::wstring& devName, int level)>;
-using LogCallback = std::function<void(const std::wstring&)>;
+using LogCallback = std::function<void(const std::wstring&, LogLevel)>;
 
 class BatteryMonitor {
 public:

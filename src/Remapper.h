@@ -22,7 +22,7 @@ enum class RemapperStatus {
     Stopped
 };
 
-using LogCallback = std::function<void(const std::wstring&)>;
+using LogCallback = std::function<void(const std::wstring&, LogLevel)>;
 using StatusCallback = std::function<void(RemapperStatus, const std::wstring&)>;
 using InputCallback = std::function<void(const XUSB_REPORT&)>;
 

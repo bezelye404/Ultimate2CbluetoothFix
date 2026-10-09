@@ -9,7 +9,7 @@ ControllerHiding::~ControllerHiding() {
 }
 
 void ControllerHiding::Log(StringId id) {
-    if (m_log) m_log(Localization::Instance().Get(id));
+    if (m_log) m_log(Localization::Instance().Get(id), LevelOf(id));
 }
 
 void ControllerHiding::Start() {

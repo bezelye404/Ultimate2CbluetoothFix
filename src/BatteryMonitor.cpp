@@ -52,7 +52,7 @@ void BatteryMonitor::Stop() {
 
 void BatteryMonitor::WorkerLoop() {
     auto& loc = Localization::Instance();
-    if (m_logCallback) m_logCallback(loc.Get(StringId::LogBatteryActive));
+    if (m_logCallback) m_logCallback(loc.Get(StringId::LogBatteryActive), LevelOf(StringId::LogBatteryActive));
 
 #if HAS_WINRT_BLE
     try {
@@ -117,7 +117,7 @@ bool BatteryMonitor::PollBattery() {
                                 wchar_t levelMsg[256];
                                 swprintf_s(levelMsg, Localization::Instance().Get(StringId::LogBatteryLevel).c_str(),
                                            devName.c_str(), static_cast<int>(level));
-                                m_logCallback(levelMsg);
+                                m_logCallback(levelMsg, LevelOf(StringId::LogBatteryLevel));
                             }
                         }
                         return true;

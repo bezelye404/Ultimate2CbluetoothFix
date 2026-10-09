@@ -4,6 +4,7 @@
 //   InputProbe vigem          plug a virtual pad, feed trigger values 0..255 and read them back through XInput
 //   InputProbe pad [secs]     sample the controller the way the app reads it (trigger depth, sticks, clicks)
 //   InputProbe xinput [secs]  watch what games receive: every XInput pad (with the app running, the virtual one)
+//   InputProbe btstatus <12 hex digit address>   what Windows reports for the link of one Bluetooth LE device (read-only)
 //   InputProbe btnode         show which Bluetooth node the disconnect would disable and the exact command (dry run, changes nothing)
 //   InputProbe rawinput       list the game controllers Raw Input reports (what browsers and many games read)
 //   InputProbe wgi            list the controllers Windows.Gaming.Input reports (what browsers and UWP games read)
@@ -27,6 +28,8 @@ extern "C" {
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Gaming.Input.h>
+#include <winrt/Windows.Devices.Bluetooth.h>
+#include <winrt/Windows.Devices.Enumeration.h>
 #include "ViGEm/Client.h"
 #include "PadFormat.h"
 #include "ControllerDisconnect.h"
@@ -514,6 +517,18 @@ void ShowBluetoothNode() {
     Out(L"cmd.exe would run (elevated, after the permission prompt):\n  %s\n", Ultimate2CFixer::BuildReconnectCommand(node).c_str());
 }
 
+// MARK: - Link state of a Bluetooth LE device
+void ShowBluetoothLinkState(const wchar_t* hexAddress) {
+    using namespace winrt::Windows::Devices::Bluetooth;
+    winrt::init_apartment(winrt::apartment_type::multi_threaded);
+    uint64_t address = _wcstoui64(hexAddress, nullptr, 16);
+    auto device = BluetoothLEDevice::FromBluetoothAddressAsync(address).get();
+    if (!device) { Out(L"Windows has no Bluetooth LE device with address %012llX\n", address); return; }
+    Out(L"Name: %s\n", device.Name().c_str());
+    Out(L"Connection status: %s\n", device.ConnectionStatus() == BluetoothConnectionStatus::Connected ? L"Connected" : L"Disconnected");
+    Out(L"Paired: %s\n", device.DeviceInformation().Pairing().IsPaired() ? L"yes" : L"no");
+}
+
 } // namespace
 
 int wmain(int argc, wchar_t** argv) {
@@ -524,6 +539,7 @@ int wmain(int argc, wchar_t** argv) {
     else if (mode == L"vigem") TestVigem();
     else if (mode == L"pad") SamplePad(argc > 2 ? _wtoi(argv[2]) : 0);
     else if (mode == L"xinput") WatchXInput(argc > 2 ? _wtoi(argv[2]) : 3);
+    else if (mode == L"btstatus" && argc > 2) ShowBluetoothLinkState(argv[2]);
     else if (mode == L"btnode") ShowBluetoothNode();
     else if (mode == L"rawinput") ShowRawInput();
     else if (mode == L"wgi") ShowWgi();

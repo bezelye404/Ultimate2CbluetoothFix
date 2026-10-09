@@ -97,6 +97,17 @@ enum class Language {
     Spanish
 };
 
+// How a console line is shown: neutral, good (green), bad (red) or critical, needs the user's attention (yellow).
+enum class LogLevel {
+    Info,
+    Good,
+    Bad,
+    Critical
+};
+
+// The level a message is shown with.
+LogLevel LevelOf(StringId id);
+
 class Localization {
 public:
     static Localization& Instance() {

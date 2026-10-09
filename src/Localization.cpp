@@ -279,6 +279,44 @@ std::wstring GetSpanish(StringId id) {
 
 } // namespace
 
+LogLevel LevelOf(StringId id) {
+    switch (id) {
+        // Something worked.
+        case StringId::LogControllerConnected:
+        case StringId::LogMapperReady:
+        case StringId::LogHideActive:
+        case StringId::LogHideAlready:
+        case StringId::LogHideRestored:
+        case StringId::LogHideRecovered:
+        case StringId::LogHideInstalled:
+        case StringId::DriverSuccess:
+        case StringId::DriverReadyFirstRun:
+            return LogLevel::Good;
+        // Something failed or went away.
+        case StringId::LogViGEmUnavailable:
+        case StringId::LogInputSystemFailed:
+        case StringId::LogMapperDisconnected:
+        case StringId::LogHideFailed:
+        case StringId::LogHideNoDevice:
+        case StringId::LogHideInstallFailed:
+        case StringId::LogHideInstallUnverified:
+        case StringId::DriverFailed:
+            return LogLevel::Bad;
+        // Needs the user's attention or action.
+        case StringId::LogHideMissing:
+        case StringId::LogHideNeedsReconnect:
+        case StringId::LogHideSuspended:
+        case StringId::LogHideRepaired:
+        case StringId::LogHideCustomSetup:
+        case StringId::LogHideInstallRestart:
+        case StringId::LogBatteryError:
+        case StringId::DriverMissing:
+            return LogLevel::Critical;
+        default:
+            return LogLevel::Info;
+    }
+}
+
 const wchar_t* Localization::Code() const {
     switch (m_language) {
         case Language::Turkish: return L"TR";
