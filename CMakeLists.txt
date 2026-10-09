@@ -21,6 +21,7 @@ include_directories(
 set(SOURCES
     src/main.cpp
     src/Remapper.cpp
+    src/PadFormat.cpp
     src/BatteryMonitor.cpp
     src/Localization.cpp
     src/DriverInstaller.cpp
@@ -53,4 +54,8 @@ endif()
 # Build with: cmake --build build --config Release --target LayoutCheck
 if(WIN32)
     add_executable(LayoutCheck EXCLUDE_FROM_ALL tools/LayoutCheck.cpp src/Localization.cpp)
+
+    # Read-only diagnostic for controller inputs and the HidHide state (see the header of the file).
+    add_executable(InputProbe EXCLUDE_FROM_ALL tools/InputProbe.cpp src/PadFormat.cpp src/vigem/ViGEmClient.cpp)
+    target_link_libraries(InputProbe PRIVATE dinput8 dxguid setupapi hid xinput)
 endif()

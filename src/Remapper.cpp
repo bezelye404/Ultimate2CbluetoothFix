@@ -1,6 +1,7 @@
 #define DIRECTINPUT_VERSION 0x0800
 #include "Remapper.h"
 #include "Localization.h"
+#include "PadFormat.h"
 #include <dinput.h>
 #include <vector>
 #include <algorithm>
@@ -32,6 +33,38 @@ namespace {
     std::wstring ToLower(std::wstring str) {
         std::transform(str.begin(), str.end(), str.begin(), [](wchar_t c) { return (wchar_t)std::towlower(c); });
         return str;
+    }
+
+    // One reading of the controller, independent of the DirectInput data format in use.
+    struct PadSample {
+        LONG lX, lY, lZ, lRz;       // sticks
+        LONG lt, rt;                // analog trigger depth
+        LONG ltAlt, rtAlt;          // second analog source (only the legacy format has one)
+        DWORD pov;
+        BYTE buttons[16];
+    };
+
+    HRESULT ReadPad(LPDIRECTINPUTDEVICE8W dev, bool usageFormat, PadSample& out) {
+        if (usageFormat) {
+            PadRaw raw = {};
+            HRESULT hr = dev->GetDeviceState(sizeof(raw), &raw);
+            if (FAILED(hr)) return hr;
+            out.lX = raw.lX; out.lY = raw.lY; out.lZ = raw.lZ; out.lRz = raw.lRz;
+            out.lt = raw.brake; out.rt = raw.gas;
+            out.ltAlt = 0; out.rtAlt = 0;
+            out.pov = raw.pov;
+            memcpy(out.buttons, raw.buttons, sizeof(out.buttons));
+            return S_OK;
+        }
+        DIJOYSTATE2 st = {};
+        HRESULT hr = dev->GetDeviceState(sizeof(st), &st);
+        if (FAILED(hr)) return hr;
+        out.lX = st.lX; out.lY = st.lY; out.lZ = st.lZ; out.lRz = st.lRz;
+        out.lt = st.rglSlider[0]; out.rt = st.rglSlider[1];
+        out.ltAlt = st.lRx; out.rtAlt = st.lRy;
+        out.pov = st.rgdwPOV[0];
+        memcpy(out.buttons, st.rgbButtons, sizeof(out.buttons));
+        return S_OK;
     }
 
     BOOL CALLBACK CountSlidersCallback(LPCDIDEVICEOBJECTINSTANCEW obj, LPVOID pvRef) {
@@ -234,7 +267,10 @@ void Remapper::WorkerLoop(HWND hwnd) {
             continue;
         }
 
-        hr = joystick->SetDataFormat(&c_dfDIJoystick2);
+        // Preferred: map every control by HID usage so the analog triggers (Brake/Accelerator) are readable.
+        // Fallback: the standard DIJOYSTATE2 layout.
+        const bool usageFormat = SetPadDataFormat(joystick);
+        hr = usageFormat ? S_OK : joystick->SetDataFormat(&c_dfDIJoystick2);
         if (FAILED(hr)) {
             joystick->Release();
             NoteConnectFailure();
@@ -253,8 +289,8 @@ void Remapper::WorkerLoop(HWND hwnd) {
 
         // Verify genuine live communication before announcing connected
         joystick->Poll();
-        DIJOYSTATE2 testState = {};
-        hr = joystick->GetDeviceState(sizeof(DIJOYSTATE2), &testState);
+        PadSample testState = {};
+        hr = ReadPad(joystick, usageFormat, testState);
         if (FAILED(hr)) {
             joystick->Unacquire();
             joystick->Release();
@@ -267,17 +303,30 @@ void Remapper::WorkerLoop(HWND hwnd) {
         m_hideJustApplied = false;
         m_hideFailCount = 0;
 
-        // Cache idle resting positions of trigger axes/sliders
-        m_idleSlider0 = testState.rglSlider[0];
-        m_idleSlider1 = testState.rglSlider[1];
-        m_idleRx = testState.lRx;
-        m_idleRy = testState.lRy;
+        // Before the first real report arrives DirectInput answers with neutral placeholders (32767 on every
+        // axis, triggers included). Let a few reports come in so the resting positions below are real.
+        for (int settle = 0; settle < 3 && m_running.load(); ++settle) {
+            Sleep(20);
+            joystick->Poll();
+            ReadPad(joystick, usageFormat, testState);
+        }
 
-        // The analog trigger depth lives on the two slider axes. Only when they are missing does the
-        // digital click have to stand in for the trigger (same rule as the Linux version).
-        int sliderCount = 0;
-        joystick->EnumObjects(CountSlidersCallback, &sliderCount, DIDFT_AXIS);
-        const bool analogTriggers = (sliderCount >= 2);
+        // Resting positions of the trigger axes. The Brake/Accelerator usages are 0 when released (their HID
+        // range starts at 0, same as on Linux); only the legacy layout needs a measured resting value.
+        m_idleSlider0 = usageFormat ? 0 : testState.lt;
+        m_idleSlider1 = usageFormat ? 0 : testState.rt;
+        m_idleRx = usageFormat ? 0 : testState.ltAlt;
+        m_idleRy = usageFormat ? 0 : testState.rtAlt;
+
+        // The analog trigger depth is used whenever the controller provides it (the Brake/Accelerator axes
+        // of the usage format, or two real sliders in the legacy format). Only without analog axes does the
+        // digital click stand in for the trigger (same rule as the Linux version).
+        bool analogTriggers = usageFormat;
+        if (!analogTriggers) {
+            int sliderCount = 0;
+            joystick->EnumObjects(CountSlidersCallback, &sliderCount, DIDFT_AXIS);
+            analogTriggers = (sliderCount >= 2);
+        }
 
         // Plug in virtual target on-demand once physical controller is verified alive
         if (!m_targetPlugged && m_vigemClient && m_vigemTarget) {
@@ -300,13 +349,18 @@ void Remapper::WorkerLoop(HWND hwnd) {
 
         while (m_running.load()) {
             hr = joystick->Poll();
-            DIJOYSTATE2 state = {};
-            hr = joystick->GetDeviceState(sizeof(DIJOYSTATE2), &state);
+            PadSample state = {};
+            hr = ReadPad(joystick, usageFormat, state);
 
             if (FAILED(hr)) {
                 // Device lost, attempt to reacquire
                 hr = joystick->Acquire();
-                if (FAILED(hr)) {
+                if (SUCCEEDED(hr)) {
+                    // Nothing valid was read this pass; do not turn an empty sample into stick input.
+                    Sleep(1);
+                    continue;
+                }
+                {
                     if (m_logCallback) m_logCallback(loc.Get(StringId::LogMapperDisconnected));
                     if (m_statusCallback) m_statusCallback(RemapperStatus::Disconnected, L"");
                     if (m_targetPlugged && m_vigemClient && m_vigemTarget) {
@@ -333,18 +387,18 @@ void Remapper::WorkerLoop(HWND hwnd) {
             SHORT rx = ApplyResponseCurve(ApplyDeadzone(NormalizeAxis(state.lZ), curDz), curve);
             SHORT ry = NegateAxis(ApplyResponseCurve(ApplyDeadzone(NormalizeAxis(state.lRz), curDz), curve));
 
-            // Triggers: Hybrid Analog (Sliders / Rx / Ry) & Digital (LT=Button 8, RT=Button 9)
+            // Triggers: analog depth (Brake = LT, Accelerator = RT); the digital click (buttons 8 and 9) is only a fallback
             bool hair = m_hairTrigger.load();
             BYTE lt, rt;
             if (analogTriggers) {
                 // The click fires early in the pull and must not force the full value.
-                lt = (std::max)(CalculateTrigger(state.rglSlider[0], m_idleSlider0, hair),
-                                CalculateTrigger(state.lRx, m_idleRx, hair));
-                rt = (std::max)(CalculateTrigger(state.rglSlider[1], m_idleSlider1, hair),
-                                CalculateTrigger(state.lRy, m_idleRy, hair));
+                lt = (std::max)(CalculateTrigger(state.lt, m_idleSlider0, hair),
+                                CalculateTrigger(state.ltAlt, m_idleRx, hair));
+                rt = (std::max)(CalculateTrigger(state.rt, m_idleSlider1, hair),
+                                CalculateTrigger(state.rtAlt, m_idleRy, hair));
             } else {
-                lt = (state.rgbButtons[8] != 0) ? 255 : 0;
-                rt = (state.rgbButtons[9] != 0) ? 255 : 0;
+                lt = (state.buttons[8] != 0) ? 255 : 0;
+                rt = (state.buttons[9] != 0) ? 255 : 0;
             }
 
             bool nintendoMode = m_nintendoMode.load();
@@ -354,19 +408,19 @@ void Remapper::WorkerLoop(HWND hwnd) {
             USHORT btnY = static_cast<USHORT>(nintendoMode ? XUSB_GAMEPAD_X : XUSB_GAMEPAD_Y);
 
             USHORT buttons = 0;
-            if (state.rgbButtons[0])  buttons |= btnA;
-            if (state.rgbButtons[1])  buttons |= btnB;
-            if (state.rgbButtons[3])  buttons |= btnX;
-            if (state.rgbButtons[4])  buttons |= btnY;
-            if (state.rgbButtons[6])  buttons |= XUSB_GAMEPAD_LEFT_SHOULDER;
-            if (state.rgbButtons[7])  buttons |= XUSB_GAMEPAD_RIGHT_SHOULDER;
-            if (state.rgbButtons[10]) buttons |= XUSB_GAMEPAD_BACK;
-            if (state.rgbButtons[11]) buttons |= XUSB_GAMEPAD_START;
-            if (state.rgbButtons[13]) buttons |= XUSB_GAMEPAD_LEFT_THUMB;
-            if (state.rgbButtons[14]) buttons |= XUSB_GAMEPAD_RIGHT_THUMB;
+            if (state.buttons[0])  buttons |= btnA;
+            if (state.buttons[1])  buttons |= btnB;
+            if (state.buttons[3])  buttons |= btnX;
+            if (state.buttons[4])  buttons |= btnY;
+            if (state.buttons[6])  buttons |= XUSB_GAMEPAD_LEFT_SHOULDER;
+            if (state.buttons[7])  buttons |= XUSB_GAMEPAD_RIGHT_SHOULDER;
+            if (state.buttons[10]) buttons |= XUSB_GAMEPAD_BACK;
+            if (state.buttons[11]) buttons |= XUSB_GAMEPAD_START;
+            if (state.buttons[13]) buttons |= XUSB_GAMEPAD_LEFT_THUMB;
+            if (state.buttons[14]) buttons |= XUSB_GAMEPAD_RIGHT_THUMB;
 
             // D-Pad (POV)
-            DWORD pov = state.rgdwPOV[0];
+            DWORD pov = state.pov;
             if (LOWORD(pov) != 0xFFFF) {
                 if (pov >= 31500 || pov <= 4500)   buttons |= XUSB_GAMEPAD_DPAD_UP;
                 if (pov >= 4500 && pov <= 13500)   buttons |= XUSB_GAMEPAD_DPAD_RIGHT;

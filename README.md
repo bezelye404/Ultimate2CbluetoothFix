@@ -68,8 +68,8 @@ DirectInput `DIJOYSTATE2` axis layout for the 8BitDo Ultimate 2C in Bluetooth mo
 │ state.lY             │ Left Stick (Vertical)           │
 │ state.lZ             │ Right Stick (Horizontal)        │
 │ state.lRz            │ Right Stick (Vertical)          │
-│ state.rglSlider[0]   │ Left Trigger (LT) Analog Depth  │
-│ state.rglSlider[1]   │ Right Trigger (RT) Analog Depth │
+│ Brake axis (*)       │ Left Trigger (LT) Analog Depth  │
+│ Accelerator axis (*) │ Right Trigger (RT) Analog Depth │
 │ state.rgbButtons[6]  │ Left Bumper (LB)                │
 │ state.rgbButtons[7]  │ Right Bumper (RB)               │
 │ state.rgbButtons[8]  │ Left Trigger (LT) Digital Click │
@@ -79,6 +79,9 @@ DirectInput `DIJOYSTATE2` axis layout for the 8BitDo Ultimate 2C in Bluetooth mo
 
 > [!NOTE]
 > The Right Stick is mapped to `lZ` and `lRz`, not `lRx`/`lRy`.
+
+> [!NOTE]
+> (*) The analog triggers are the HID usages Brake and Accelerator. DirectInput exposes them as extra axes that the standard `DIJOYSTATE2` layout has no slot for, so the Windows version reads them through a custom DirectInput data format that selects every control by its HID usage. The digital click is only a fallback and never forces the full value.
 
 ---
 
