@@ -1,12 +1,19 @@
 #include "DriverInstaller.h"
+#include "DeviceHider.h"
 #include <urlmon.h>
 #include <shellapi.h>
+#include <wincrypt.h>
+#include <wintrust.h>
+#include <softpub.h>
+#include <algorithm>
 #include <thread>
 #include <vector>
 
 #pragma comment(lib, "urlmon.lib")
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "advapi32.lib")
+#pragma comment(lib, "wintrust.lib")
+#pragma comment(lib, "crypt32.lib")
 
 namespace Ultimate2CFixer {
 
@@ -65,6 +72,43 @@ private:
     DriverProgressCb m_cb;
     LONG m_ref;
 };
+
+// Checks the Authenticode signature of a downloaded file and that the publisher name
+// contains `publisherLower` (lower-case). Fails closed on any error.
+bool IsSignedByPublisher(const std::wstring& file, const wchar_t* publisherLower) {
+    WINTRUST_FILE_INFO fileInfo = {};
+    fileInfo.cbStruct = sizeof(fileInfo);
+    fileInfo.pcwszFilePath = file.c_str();
+
+    WINTRUST_DATA data = {};
+    data.cbStruct = sizeof(data);
+    data.dwUIChoice = WTD_UI_NONE;
+    data.fdwRevocationChecks = WTD_REVOKE_NONE;
+    data.dwUnionChoice = WTD_CHOICE_FILE;
+    data.pFile = &fileInfo;
+    data.dwStateAction = WTD_STATEACTION_VERIFY;
+
+    GUID action = WINTRUST_ACTION_GENERIC_VERIFY_V2;
+    bool trusted = false;
+
+    if (WinVerifyTrust(static_cast<HWND>(INVALID_HANDLE_VALUE), &action, &data) == ERROR_SUCCESS) {
+        CRYPT_PROVIDER_DATA* provData = WTHelperProvDataFromStateData(data.hWVTStateData);
+        CRYPT_PROVIDER_SGNR* signer = provData ? WTHelperGetProvSignerFromChain(provData, 0, FALSE, 0) : nullptr;
+        CRYPT_PROVIDER_CERT* cert = signer ? WTHelperGetProvCertFromChain(signer, 0) : nullptr;
+        if (cert && cert->pCert) {
+            wchar_t name[256] = {};
+            if (CertGetNameStringW(cert->pCert, CERT_NAME_SIMPLE_DISPLAY_TYPE, 0, nullptr, name, 256) > 1) {
+                std::wstring lower(name);
+                std::transform(lower.begin(), lower.end(), lower.begin(), [](wchar_t c) { return (wchar_t)towlower(c); });
+                trusted = lower.find(publisherLower) != std::wstring::npos;
+            }
+        }
+    }
+
+    data.dwStateAction = WTD_STATEACTION_CLOSE;
+    WinVerifyTrust(static_cast<HWND>(INVALID_HANDLE_VALUE), &action, &data);
+    return trusted;
+}
 
 } // namespace
 
@@ -147,6 +191,56 @@ void StartViGEmBusInstall(HWND hwnd, DriverProgressCb onProgress, DriverFinished
         if (onFinished) {
             onFinished(installed, installed ? L"" : L"Driver not detected after installation.");
         }
+    }).detach();
+}
+
+// MARK: - HidHide Installer
+void StartHidHideInstall(HWND hwnd, HidHideFinishedCb onFinished) {
+    std::thread([hwnd, onFinished = std::move(onFinished)]() {
+        // Official release published by the HidHide authors.
+        const wchar_t* kDownloadUrl = L"https://github.com/nefarius/HidHide/releases/download/v1.5.230.0/HidHide_1.5.230_x64.exe";
+
+        auto finish = [&](HidHideInstallResult r) { if (onFinished) onFinished(r); };
+
+        wchar_t tempDir[MAX_PATH];
+        DWORD tempLen = GetTempPathW(MAX_PATH, tempDir);
+        if (tempLen == 0 || tempLen > MAX_PATH) {
+            finish(HidHideInstallResult::DownloadFailed);
+            return;
+        }
+        std::wstring destFile = std::wstring(tempDir) + L"HidHide_Setup.exe";
+
+        if (FAILED(URLDownloadToFileW(NULL, kDownloadUrl, destFile.c_str(), 0, nullptr))) {
+            DeleteFileW(destFile.c_str());
+            finish(HidHideInstallResult::DownloadFailed);
+            return;
+        }
+
+        if (!IsSignedByPublisher(destFile, L"nefarius")) {
+            DeleteFileW(destFile.c_str());
+            finish(HidHideInstallResult::NotVerified);
+            return;
+        }
+
+        SHELLEXECUTEINFOW shEx = {};
+        shEx.cbSize = sizeof(SHELLEXECUTEINFOW);
+        shEx.fMask = SEE_MASK_NOCLOSEPROCESS;
+        shEx.hwnd = hwnd;
+        shEx.lpVerb = L"runas";
+        shEx.lpFile = destFile.c_str();
+        shEx.nShow = SW_SHOWNORMAL;
+
+        if (!ShellExecuteExW(&shEx) || !shEx.hProcess) {
+            DeleteFileW(destFile.c_str());
+            finish(HidHideInstallResult::Cancelled);
+            return;
+        }
+
+        WaitForSingleObject(shEx.hProcess, INFINITE);
+        CloseHandle(shEx.hProcess);
+        DeleteFileW(destFile.c_str());
+
+        finish(DeviceHider::IsAvailable() ? HidHideInstallResult::Installed : HidHideInstallResult::NeedsRestart);
     }).detach();
 }
 

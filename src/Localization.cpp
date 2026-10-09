@@ -60,6 +60,25 @@ std::wstring Localization::Get(StringId id) const {
             case StringId::LogMapperDisconnected: return L"Controller disconnected. Searching...";
             case StringId::LogBatteryActive: return L"Battery monitor active.";
             case StringId::LogBatteryError: return L"Battery monitor scan warning.";
+            case StringId::HideRealController: return L"Hide original controller from games (prevents double inputs)";
+            case StringId::HideInstallTitle: return L"Install hiding driver";
+            case StringId::HideInstallPrompt: return L"Hiding the original controller needs the free HidHide driver (about 8 MB, downloaded from its official release page). Download and install it now?";
+            case StringId::LogHideActive: return L"Original controller hidden from games.";
+            case StringId::LogHideAlready: return L"Original controller was already hidden from games.";
+            case StringId::LogHideMissing: return L"Hiding driver (HidHide) is not installed. Games may see two controllers.";
+            case StringId::LogHideNoDevice: return L"Could not find the original controller to hide.";
+            case StringId::LogHideCustomSetup: return L"Hiding skipped: your existing HidHide setup uses a custom layout and was left untouched.";
+            case StringId::LogHideFailed: return L"Could not hide the original controller. Games may see two controllers.";
+            case StringId::LogHideRestored: return L"Original controller is visible to games again.";
+            case StringId::LogHideSuspended: return L"Controller could not be read while hidden. Hiding is turned off for this session.";
+            case StringId::LogHideRecovered: return L"Restored controller visibility left over from a previous session.";
+            case StringId::LogHideApplyNext: return L"This change applies the next time the service starts.";
+            case StringId::LogHideInstalling: return L"Downloading hiding driver... Please accept the Windows prompt when it appears.";
+            case StringId::LogHideInstalled: return L"Hiding driver installed.";
+            case StringId::LogHideInstallFailed: return L"Hiding driver could not be downloaded. Please check your internet connection.";
+            case StringId::LogHideInstallUnverified: return L"Downloaded file could not be verified and was not run.";
+            case StringId::LogHideInstallCancelled: return L"Hiding driver setup was cancelled.";
+            case StringId::LogHideInstallRestart: return L"Hiding driver installed. Restart Windows to finish, then start the service again.";
             default: return L"";
         }
     } else {
@@ -119,6 +138,25 @@ std::wstring Localization::Get(StringId id) const {
             case StringId::LogMapperDisconnected: return L"Ba\x011Flant\x0131 koptu. Yeniden ba\x011Flan\x0131l\x0131yor...";
             case StringId::LogBatteryActive: return L"Pil monit\x00F6r\x00FC aktif.";
             case StringId::LogBatteryError: return L"Pil tarama uyar\x0131s\x0131.";
+            case StringId::HideRealController: return L"Orijinal kontrolcüyü oyunlardan gizle (çift girdiyi önler)";
+            case StringId::HideInstallTitle: return L"Gizleme sürücüsünü kur";
+            case StringId::HideInstallPrompt: return L"Orijinal kontrolcüyü gizlemek için ücretsiz HidHide sürücüsü gerekiyor (yaklaşık 8 MB, resmi yayın sayfasından indirilir). Şimdi indirilip kurulsun mu?";
+            case StringId::LogHideActive: return L"Orijinal kontrolcü oyunlardan gizlendi.";
+            case StringId::LogHideAlready: return L"Orijinal kontrolcü zaten oyunlardan gizliydi.";
+            case StringId::LogHideMissing: return L"Gizleme sürücüsü (HidHide) kurulu değil. Oyunlar iki kontrolcü görebilir.";
+            case StringId::LogHideNoDevice: return L"Gizlenecek orijinal kontrolcü bulunamadı.";
+            case StringId::LogHideCustomSetup: return L"Gizleme atlandı: mevcut HidHide ayarlarınız özel bir düzende olduğu için değiştirilmedi.";
+            case StringId::LogHideFailed: return L"Orijinal kontrolcü gizlenemedi. Oyunlar iki kontrolcü görebilir.";
+            case StringId::LogHideRestored: return L"Orijinal kontrolcü oyunlara yeniden görünür.";
+            case StringId::LogHideSuspended: return L"Kontrolcü gizliyken okunamadı. Gizleme bu oturum için kapatıldı.";
+            case StringId::LogHideRecovered: return L"Önceki oturumdan kalan kontrolcü gizleme ayarı geri alındı.";
+            case StringId::LogHideApplyNext: return L"Bu değişiklik servis bir sonraki başlatılışında uygulanır.";
+            case StringId::LogHideInstalling: return L"Gizleme sürücüsü indiriliyor... Windows onayı çıkınca lütfen kabul edin.";
+            case StringId::LogHideInstalled: return L"Gizleme sürücüsü kuruldu.";
+            case StringId::LogHideInstallFailed: return L"Gizleme sürücüsü indirilemedi. Lütfen internet bağlantınızı kontrol edin.";
+            case StringId::LogHideInstallUnverified: return L"İndirilen dosya doğrulanamadı ve çalıştırılmadı.";
+            case StringId::LogHideInstallCancelled: return L"Gizleme sürücüsü kurulumu iptal edildi.";
+            case StringId::LogHideInstallRestart: return L"Gizleme sürücüsü kuruldu. Tamamlamak için Windows'u yeniden başlatın, sonra servisi tekrar başlatın.";
             default: return L"";
         }
     }

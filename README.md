@@ -31,6 +31,7 @@ Because most modern Windows games expect an XInput device, Ultimate2CFixer reads
 * **Stick Response Curves:** Linear (1:1), Smooth Aim (cubic S-curve), and Aggressive (square-root).
 * **Optional Hair Trigger:** User-configurable toggle that maps any trigger pull beyond the deadzone directly to full activation (255).
 * **Live Input Telemetry:** Visual indicators for analog sticks, ABXY layout, LB/RB bumpers, and LT/RT analog triggers.
+* **Hide Original Controller:** Prevents games and Steam from seeing both the physical controller and the virtual one (double inputs). Enabled by default; uses the optional [HidHide](https://github.com/nefarius/HidHide) driver, which the application offers to download and install. Only the entries added by Ultimate2CFixer are removed again when the service stops.
 * **Battery Status:** Reads battery percentage via Windows WinRT Bluetooth Low Energy (BLE) GATT service.
 * **System Tray & Resource Trimming:** Flushes physical working set memory when minimized to the system tray.
 * **Settings Persistence:** Saves user preferences to the Windows Registry (`HKCU\Software\Ultimate2CFixer\Settings`).
@@ -43,6 +44,7 @@ Because most modern Windows games expect an XInput device, Ultimate2CFixer reads
 ### 1. Requirements
 * Windows 10 / 11 (64-bit)
 * [ViGEmBus](https://github.com/nefarius/ViGEmBus) driver (the application prompts to install this if not detected)
+* Optional: [HidHide](https://github.com/nefarius/HidHide) driver to hide the original controller from games (the application offers to install it)
 
 ### 2. Quick Start
 1. Download `Ultimate2CFixer.exe` from the [Releases](https://github.com/bezelye404/Ultimate2CbluetoothFix/releases) page.
@@ -115,3 +117,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 * [ViGEmBus](https://github.com/nefarius/ViGEmBus) by Benjamin Höglinger-Stelzer (Nefarius).
+* [HidHide](https://github.com/nefarius/HidHide) by Eric Korff de Gidts and Benjamin Höglinger-Stelzer (Nefarius).
+
+Third-party license texts are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
