@@ -5,7 +5,7 @@
 ![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?logo=c%2B%2B&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011%20(x64)-0078D6?logo=windows&logoColor=white)
 ![ViGEmBus](https://img.shields.io/badge/Driver-ViGEmBus-blueviolet)
-![Polling Rate](https://img.shields.io/badge/Polling%20Rate-Up%20to%201000%20Hz-orange)
+![Update Rate](https://img.shields.io/badge/Update%20Rate-Up%20to%201000%20Hz-orange)
 ![License](https://img.shields.io/badge/License-MIT-success)
 
 DirectInput-to-XInput remapper and companion utility for the 8BitDo Ultimate 2C controller in Bluetooth mode on Windows.
@@ -53,7 +53,8 @@ Because most modern Windows games expect an XInput device, Ultimate2CFixer reads
 ### 2. Quick Start
 1. Download `Ultimate2CFixer.exe` from the [Releases](https://github.com/bezelye404/Ultimate2CbluetoothFix/releases) page.
 2. Pair the 8BitDo Ultimate 2C controller via Windows Bluetooth settings.
-3. Open `Ultimate2CFixer.exe` and click **Start Service**.
+3. Open `Ultimate2CFixer.exe`. The service starts by itself (the **Auto-start service on launch** option is on by default); **Start Service** / **Stop Service** control it by hand.
+4. The **X** button closes the application and gives the physical controller back. Use the **_** button to keep it running in the tray.
 
 ---
 
