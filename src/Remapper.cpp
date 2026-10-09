@@ -128,6 +128,11 @@ bool Remapper::Start(HWND hwnd, LogCallback logCb, StatusCallback statusCb, Inpu
     m_statusCallback = std::move(statusCb);
     m_inputCallback = std::move(inputCb);
 
+    m_lastHideReport = -1;
+    m_hidingSuspended = false;
+    m_hideJustApplied = false;
+    m_hideFailCount = 0;
+
     if (!InitViGEm()) {
         return false;
     }
@@ -146,6 +151,10 @@ void Remapper::Stop() {
     }
 
     UninitViGEm();
+
+    if (m_hider.Restore() && m_logCallback) {
+        m_logCallback(Localization::Instance().Get(StringId::LogHideRestored));
+    }
 
     if (m_inputCallback) {
         XUSB_REPORT zeroReport = {};
@@ -192,6 +201,7 @@ void Remapper::WorkerLoop(HWND hwnd) {
         }
 
         if (!targetDevice) {
+            NoteConnectFailure();
             if (m_targetPlugged && m_vigemClient && m_vigemTarget) {
                 vigem_target_remove(m_vigemClient, m_vigemTarget);
                 m_targetPlugged = false;
@@ -205,9 +215,14 @@ void Remapper::WorkerLoop(HWND hwnd) {
 
         DeviceChoice chosen = *targetDevice;
 
+        if (m_hideReal.load() && !m_hidingSuspended) {
+            ApplyDeviceHiding(chosen.vid, chosen.pid);
+        }
+
         LPDIRECTINPUTDEVICE8W joystick = nullptr;
         hr = directInput->CreateDevice(chosen.guid, &joystick, NULL);
         if (FAILED(hr) || !joystick) {
+            NoteConnectFailure();
             Sleep(1000);
             continue;
         }
@@ -215,6 +230,7 @@ void Remapper::WorkerLoop(HWND hwnd) {
         hr = joystick->SetDataFormat(&c_dfDIJoystick2);
         if (FAILED(hr)) {
             joystick->Release();
+            NoteConnectFailure();
             Sleep(1000);
             continue;
         }
@@ -223,6 +239,7 @@ void Remapper::WorkerLoop(HWND hwnd) {
         hr = joystick->Acquire();
         if (FAILED(hr)) {
             joystick->Release();
+            NoteConnectFailure();
             Sleep(500);
             continue;
         }
@@ -234,9 +251,14 @@ void Remapper::WorkerLoop(HWND hwnd) {
         if (FAILED(hr)) {
             joystick->Unacquire();
             joystick->Release();
+            NoteConnectFailure();
             Sleep(500);
             continue;
         }
+
+        // The controller is readable, so hiding did not lock this application out.
+        m_hideJustApplied = false;
+        m_hideFailCount = 0;
 
         // Cache idle resting positions of trigger axes/sliders
         m_idleSlider0 = testState.rglSlider[0];
@@ -406,6 +428,45 @@ void Remapper::WorkerLoop(HWND hwnd) {
     if (directInput) {
         directInput->Release();
     }
+}
+
+// MARK: - Physical controller hiding
+void Remapper::ApplyDeviceHiding(DWORD vid, DWORD pid) {
+    HideResult result = m_hider.Hide(vid, pid);
+
+    int code = static_cast<int>(result);
+    if (code == m_lastHideReport) return;
+    m_lastHideReport = code;
+
+    if (result == HideResult::Hidden) m_hideJustApplied = true;
+
+    StringId msg = StringId::LogHideFailed;
+    switch (result) {
+        case HideResult::Hidden:           msg = StringId::LogHideActive; break;
+        case HideResult::AlreadyHidden:    msg = StringId::LogHideAlready; break;
+        case HideResult::NotInstalled:     msg = StringId::LogHideMissing; break;
+        case HideResult::DeviceNotFound:   msg = StringId::LogHideNoDevice; break;
+        case HideResult::UnsupportedSetup: msg = StringId::LogHideCustomSetup; break;
+        case HideResult::Failed:           msg = StringId::LogHideFailed; break;
+    }
+    if (m_logCallback) m_logCallback(Localization::Instance().Get(msg));
+}
+
+// If the controller cannot be opened shortly after hiding it, undo the hiding so the
+// user is never left without a working controller.
+void Remapper::NoteConnectFailure() {
+    if (!m_hideJustApplied) return;
+    if (++m_hideFailCount >= 3) {
+        RevertHiding(StringId::LogHideSuspended);
+    }
+}
+
+void Remapper::RevertHiding(StringId reason) {
+    m_hider.Restore();
+    m_hidingSuspended = true;
+    m_hideJustApplied = false;
+    m_hideFailCount = 0;
+    if (m_logCallback) m_logCallback(Localization::Instance().Get(reason));
 }
 
 SHORT Remapper::NormalizeAxis(LONG v) {

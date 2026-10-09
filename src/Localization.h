@@ -59,7 +59,26 @@ enum class StringId {
     LogMapperReady,
     LogMapperDisconnected,
     LogBatteryActive,
-    LogBatteryError
+    LogBatteryError,
+    HideRealController,
+    HideInstallTitle,
+    HideInstallPrompt,
+    LogHideActive,
+    LogHideAlready,
+    LogHideMissing,
+    LogHideNoDevice,
+    LogHideCustomSetup,
+    LogHideFailed,
+    LogHideRestored,
+    LogHideSuspended,
+    LogHideRecovered,
+    LogHideApplyNext,
+    LogHideInstalling,
+    LogHideInstalled,
+    LogHideInstallFailed,
+    LogHideInstallUnverified,
+    LogHideInstallCancelled,
+    LogHideInstallRestart
 };
 
 class Localization {

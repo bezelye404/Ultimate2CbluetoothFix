@@ -24,6 +24,7 @@ set(SOURCES
     src/BatteryMonitor.cpp
     src/Localization.cpp
     src/DriverInstaller.cpp
+    src/DeviceHider.cpp
     src/vigem/ViGEmClient.cpp
     src/resource.rc
 )
@@ -40,6 +41,8 @@ target_link_libraries(Ultimate2CFixer PRIVATE
     urlmon
     setupapi
     winmm
+    wintrust
+    crypt32
 )
 
 if(MSVC)
