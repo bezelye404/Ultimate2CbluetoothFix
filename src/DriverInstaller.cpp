@@ -152,7 +152,6 @@ void StartViGEmBusInstall(HWND hwnd, DriverProgressCb onProgress, DriverFinished
 
         // Download with progress callback
         DownloadCallback* pCallback = new DownloadCallback(onProgress);
-        pCallback->AddRef();
 
         if (onProgress) onProgress(0, L"downloading");
         HRESULT hr = URLDownloadToFileW(NULL, kDownloadUrl, destFile.c_str(), 0, pCallback);
@@ -160,6 +159,13 @@ void StartViGEmBusInstall(HWND hwnd, DriverProgressCb onProgress, DriverFinished
 
         if (FAILED(hr)) {
             if (onFinished) onFinished(false, L"Download failed. Please check your internet connection.");
+            return;
+        }
+
+        // Only run the installer when it carries a valid signature of the driver's publisher.
+        if (!IsSignedByPublisher(destFile, L"nefarius")) {
+            DeleteFileW(destFile.c_str());
+            if (onFinished) onFinished(false, kDriverNotVerified);
             return;
         }
 

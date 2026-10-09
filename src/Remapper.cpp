@@ -119,15 +119,19 @@ Remapper::~Remapper() {
 }
 
 bool Remapper::InitViGEm() {
+    auto reportUnavailable = [this]() {
+        if (m_logCallback) m_logCallback(Localization::Instance().Get(StringId::LogViGEmUnavailable), LevelOf(StringId::LogViGEmUnavailable));
+    };
+
     m_vigemClient = vigem_alloc();
     if (!m_vigemClient) {
-        if (m_logCallback) m_logCallback(L"ERROR: Could not allocate ViGEm client.");
+        reportUnavailable();
         return false;
     }
 
     VIGEM_ERROR err = vigem_connect(m_vigemClient);
     if (!VIGEM_SUCCESS(err)) {
-        if (m_logCallback) m_logCallback(L"ERROR: Could not connect to ViGEmBus driver.");
+        reportUnavailable();
         vigem_free(m_vigemClient);
         m_vigemClient = nullptr;
         return false;
@@ -135,6 +139,7 @@ bool Remapper::InitViGEm() {
 
     m_vigemTarget = vigem_target_x360_alloc();
     if (!m_vigemTarget) {
+        reportUnavailable();
         vigem_disconnect(m_vigemClient);
         vigem_free(m_vigemClient);
         m_vigemClient = nullptr;
@@ -168,9 +173,6 @@ bool Remapper::Start(HWND hwnd, LogCallback logCb, StatusCallback statusCb, Inpu
     m_statusCallback = std::move(statusCb);
     m_inputCallback = std::move(inputCb);
 
-    m_lastHideReport = -1;
-    m_hidingSuspended = false;
-    m_hideJustApplied = false;
     m_hideFailCount = 0;
 
     if (!InitViGEm()) {
@@ -192,10 +194,6 @@ void Remapper::Stop() {
 
     UninitViGEm();
 
-    if (m_hider.Restore() && m_logCallback) {
-        m_logCallback(Localization::Instance().Get(StringId::LogHideRestored));
-    }
-
     if (m_inputCallback) {
         XUSB_REPORT zeroReport = {};
         m_inputCallback(zeroReport);
@@ -208,12 +206,12 @@ void Remapper::Stop() {
 
 void Remapper::WorkerLoop(HWND hwnd) {
     auto& loc = Localization::Instance();
-    if (m_logCallback) m_logCallback(loc.Get(StringId::LogMapperStart));
+    if (m_logCallback) m_logCallback(loc.Get(StringId::LogMapperStart), LevelOf(StringId::LogMapperStart));
 
     IDirectInput8W* directInput = nullptr;
     HRESULT hr = DirectInput8Create(GetModuleHandle(NULL), DIRECTINPUT_VERSION, IID_IDirectInput8W, (VOID**)&directInput, NULL);
     if (FAILED(hr) || !directInput) {
-        if (m_logCallback) m_logCallback(L"ERROR: Failed to initialize DirectInput8.");
+        if (m_logCallback) m_logCallback(loc.Get(StringId::LogInputSystemFailed), LevelOf(StringId::LogInputSystemFailed));
         if (m_statusCallback) m_statusCallback(RemapperStatus::Disconnected, L"");
         return;
     }
@@ -241,7 +239,7 @@ void Remapper::WorkerLoop(HWND hwnd) {
         }
 
         if (!targetDevice) {
-            NoteConnectFailure();
+            CheckHidingLockout(false);
             if (m_targetPlugged && m_vigemClient && m_vigemTarget) {
                 vigem_target_remove(m_vigemClient, m_vigemTarget);
                 m_targetPlugged = false;
@@ -254,15 +252,16 @@ void Remapper::WorkerLoop(HWND hwnd) {
         }
 
         DeviceChoice chosen = *targetDevice;
+        CheckHidingLockout(true);
 
-        if (m_hideReal.load() && !m_hidingSuspended) {
-            ApplyDeviceHiding(chosen.vid, chosen.pid);
+        if (m_hiding) {
+            m_hiding->SetController(chosen.vid, chosen.pid);
+            m_hiding->HideNow();
         }
 
         LPDIRECTINPUTDEVICE8W joystick = nullptr;
         hr = directInput->CreateDevice(chosen.guid, &joystick, NULL);
         if (FAILED(hr) || !joystick) {
-            NoteConnectFailure();
             Sleep(1000);
             continue;
         }
@@ -273,7 +272,6 @@ void Remapper::WorkerLoop(HWND hwnd) {
         hr = usageFormat ? S_OK : joystick->SetDataFormat(&c_dfDIJoystick2);
         if (FAILED(hr)) {
             joystick->Release();
-            NoteConnectFailure();
             Sleep(1000);
             continue;
         }
@@ -282,7 +280,6 @@ void Remapper::WorkerLoop(HWND hwnd) {
         hr = joystick->Acquire();
         if (FAILED(hr)) {
             joystick->Release();
-            NoteConnectFailure();
             Sleep(500);
             continue;
         }
@@ -294,14 +291,9 @@ void Remapper::WorkerLoop(HWND hwnd) {
         if (FAILED(hr)) {
             joystick->Unacquire();
             joystick->Release();
-            NoteConnectFailure();
             Sleep(500);
             continue;
         }
-
-        // The controller is readable, so hiding did not lock this application out.
-        m_hideJustApplied = false;
-        m_hideFailCount = 0;
 
         // Before the first real report arrives DirectInput answers with neutral placeholders (32767 on every
         // axis, triggers included). Let a few reports come in so the resting positions below are real.
@@ -333,10 +325,31 @@ void Remapper::WorkerLoop(HWND hwnd) {
             VIGEM_ERROR plugErr = vigem_target_add(m_vigemClient, m_vigemTarget);
             if (VIGEM_SUCCESS(plugErr)) {
                 m_targetPlugged = true;
+
+                // Windows gives the virtual pad the lowest free XInput slot; show it as the player number games
+                // use (slot 0 = player 1). The driver needs a moment before it knows the slot.
+                ULONG userIndex = 0;
+                bool known = false;
+                for (int attempt = 0; attempt < 10 && !known; ++attempt) {
+                    known = VIGEM_SUCCESS(vigem_target_x360_get_user_index(m_vigemClient, m_vigemTarget, &userIndex));
+                    if (!known) Sleep(50);
+                }
+                if (known && m_logCallback) {
+                    wchar_t playerMsg[128];
+                    swprintf_s(playerMsg, loc.Get(StringId::LogVirtualPadPlayer).c_str(), static_cast<int>(userIndex) + 1);
+                    m_logCallback(playerMsg, LevelOf(StringId::LogVirtualPadPlayer));
+                }
             }
         }
 
-        if (m_logCallback) m_logCallback(chosen.displayName + L" connected.");
+        if (m_logCallback) {
+            wchar_t connectedMsg[256];
+            swprintf_s(connectedMsg, loc.Get(StringId::LogControllerConnected).c_str(), chosen.displayName.c_str());
+            m_logCallback(connectedMsg, LevelOf(StringId::LogControllerConnected));
+        }
+        m_lastInputTick.store(0);
+        m_liveHz.store(0);
+        m_liveMs.store(0.0f);
         if (m_statusCallback) m_statusCallback(RemapperStatus::Connected, chosen.displayName);
 
         // State cache for dirty checking
@@ -345,7 +358,7 @@ void Remapper::WorkerLoop(HWND hwnd) {
 
         timeBeginPeriod(1);
         auto lastHzTime = std::chrono::steady_clock::now();
-        int pollCount = 0;
+        int changeCount = 0;
 
         while (m_running.load()) {
             hr = joystick->Poll();
@@ -361,7 +374,7 @@ void Remapper::WorkerLoop(HWND hwnd) {
                     continue;
                 }
                 {
-                    if (m_logCallback) m_logCallback(loc.Get(StringId::LogMapperDisconnected));
+                    if (m_logCallback) m_logCallback(loc.Get(StringId::LogMapperDisconnected), LevelOf(StringId::LogMapperDisconnected));
                     if (m_statusCallback) m_statusCallback(RemapperStatus::Disconnected, L"");
                     if (m_targetPlugged && m_vigemClient && m_vigemTarget) {
                         vigem_target_remove(m_vigemClient, m_vigemTarget);
@@ -438,15 +451,23 @@ void Remapper::WorkerLoop(HWND hwnd) {
                 ry
             };
 
-            pollCount++;
+            // The readout shows how often the controller really updates, so only count passes that changed the output.
+            const bool changed = (memcmp(&report, &prevReport, sizeof(XUSB_REPORT)) != 0);
+            if (changed) {
+                ++changeCount;
+                m_lastInputTick.store(GetTickCount64());
+            }
+
             auto now = std::chrono::steady_clock::now();
             auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastHzTime).count();
             if (elapsedMs >= 1000) {
-                int currentHz = static_cast<int>((pollCount * 1000.0f) / elapsedMs);
-                float currentMs = currentHz > 0 ? (1000.0f / currentHz) : 0.0f;
-                m_liveHz.store(currentHz);
-                m_liveMs.store(currentMs);
-                pollCount = 0;
+                if (changeCount > 0) {
+                    int currentHz = static_cast<int>((changeCount * 1000.0f) / elapsedMs);
+                    float currentMs = currentHz > 0 ? (1000.0f / currentHz) : 0.0f;
+                    m_liveHz.store(currentHz);
+                    m_liveMs.store(currentMs);
+                }
+                changeCount = 0;
                 lastHzTime = now;
             }
 
@@ -454,7 +475,6 @@ void Remapper::WorkerLoop(HWND hwnd) {
             DWORD sleepMs = (targetHz >= 1000) ? 1 : (targetHz >= 500 ? 2 : (targetHz >= 250 ? 4 : 8));
 
             // Dirty checking
-            bool changed = (memcmp(&report, &prevReport, sizeof(XUSB_REPORT)) != 0);
             if (!changed) {
                 idleTicks++;
                 if (idleTicks < KeepAliveTicks) {
@@ -501,43 +521,24 @@ void Remapper::WorkerLoop(HWND hwnd) {
     }
 }
 
-// MARK: - Physical controller hiding
-void Remapper::ApplyDeviceHiding(DWORD vid, DWORD pid) {
-    HideResult result = m_hider.Hide(vid, pid);
-
-    int code = static_cast<int>(result);
-    if (code == m_lastHideReport) return;
-    m_lastHideReport = code;
-
-    if (result == HideResult::Hidden) m_hideJustApplied = true;
-
-    StringId msg = StringId::LogHideFailed;
-    switch (result) {
-        case HideResult::Hidden:           msg = StringId::LogHideActive; break;
-        case HideResult::AlreadyHidden:    msg = StringId::LogHideAlready; break;
-        case HideResult::NotInstalled:     msg = StringId::LogHideMissing; break;
-        case HideResult::DeviceNotFound:   msg = StringId::LogHideNoDevice; break;
-        case HideResult::UnsupportedSetup: msg = StringId::LogHideCustomSetup; break;
-        case HideResult::Failed:           msg = StringId::LogHideFailed; break;
+// Hiding must never lock this application out. The only case where the hiding can be the cause is a controller
+// that is connected (Windows lists it) while DirectInput does not offer it: this application is whitelisted, so
+// that means the whitelist is not working. A controller that DirectInput does offer but that fails to open has
+// some other problem (still starting up, in use), which must not switch the hiding off.
+void Remapper::CheckHidingLockout(bool controllerFound) {
+    if (controllerFound || !m_hiding) {
+        m_hideFailCount = 0;
+        return;
     }
-    if (m_logCallback) m_logCallback(Localization::Instance().Get(msg));
-}
-
-// If the controller cannot be opened shortly after hiding it, undo the hiding so the
-// user is never left without a working controller.
-void Remapper::NoteConnectFailure() {
-    if (!m_hideJustApplied) return;
-    if (++m_hideFailCount >= 3) {
-        RevertHiding(StringId::LogHideSuspended);
+    const DWORD vid = m_hiding->Vid();
+    if (m_hiding->IsHidden() && vid != 0 && DeviceHider::IsPresent(vid, m_hiding->Pid())) {
+        if (++m_hideFailCount >= 6) {   // about 9 seconds of scans
+            m_hideFailCount = 0;
+            m_hiding->Suspend(StringId::LogHideSuspended);
+        }
+    } else {
+        m_hideFailCount = 0;
     }
-}
-
-void Remapper::RevertHiding(StringId reason) {
-    m_hider.Restore();
-    m_hidingSuspended = true;
-    m_hideJustApplied = false;
-    m_hideFailCount = 0;
-    if (m_logCallback) m_logCallback(Localization::Instance().Get(reason));
 }
 
 SHORT Remapper::NormalizeAxis(LONG v) {

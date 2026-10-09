@@ -16,12 +16,14 @@
 #endif
 #include <windows.h>
 #include <commctrl.h>
+#include <richedit.h>
 #include <shellapi.h>
 #include <uxtheme.h>
 #include <string>
 #include <vector>
 #include <deque>
 #include <memory>
+#include <mutex>
 #include <algorithm>
 #include "UIStyles.h"
 #include "Localization.h"
@@ -29,6 +31,8 @@
 #include "BatteryMonitor.h"
 #include "DriverInstaller.h"
 #include "DeviceHider.h"
+#include "ControllerHiding.h"
+#include "ControllerDisconnect.h"
 
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "shell32.lib")
@@ -79,6 +83,8 @@ constexpr int WM_UPDATE_INPUT           = WM_USER + 5;
 constexpr int WM_DRIVER_INSTALL_DONE     = WM_USER + 6;
 constexpr int WM_DRIVER_INSTALL_PROGRESS = WM_USER + 7;
 constexpr int WM_HIDING_INSTALL_DONE    = WM_USER + 8;
+constexpr int WM_HIDING_NOTICE          = WM_USER + 9;
+constexpr int WM_HIDING_STARTUP_CHECK   = WM_USER + 10;
 
 constexpr int IDC_BTN_START         = 101;
 constexpr int IDC_BTN_STOP          = 102;
@@ -97,7 +103,7 @@ constexpr int IDC_CHK_NINTENDO_MODE = 114;
 constexpr int IDC_CHK_HAIR_TRIGGER  = 115;
 constexpr int IDC_BTN_POLLING_RATE  = 116;
 constexpr int IDC_BTN_CURVE         = 117;
-constexpr int IDC_CHK_HIDE_REAL     = 118;
+constexpr int IDC_CHK_DISCONNECT    = 118;
 
 constexpr int IDM_TRAY_OPEN         = 201;
 constexpr int IDM_TRAY_EXIT         = 202;
@@ -119,22 +125,24 @@ HWND g_hChkAutoStart                = nullptr;
 HWND g_hChkLowBattery               = nullptr;
 HWND g_hChkNintendoMode             = nullptr;
 HWND g_hChkHairTrigger              = nullptr;
-HWND g_hChkHideReal                 = nullptr;
+HWND g_hChkDisconnect               = nullptr;
 HWND g_hBtnDeadzone                 = nullptr;
 HWND g_hBtnPollingRate              = nullptr;
 HWND g_hBtnCurve                    = nullptr;
 HWND g_hBtnSettingsBack             = nullptr;
 
 bool g_showSettings                 = false;
-bool g_minimizeOnClose              = true;
+bool g_minimizeOnClose              = false;   // the X button closes the application; the _ button hides it to the tray
+bool g_disconnectOnExit             = false;
+bool g_sessionEnding                = false;
 bool g_startWithWindows             = false;
 bool g_autoStartService             = true;
 bool g_lowBatteryAlert              = true;
 bool g_nintendoMode                 = false;
 bool g_hairTrigger                  = false;
-bool g_hideReal                     = true;
 bool g_hidingInstalling             = false;
 bool g_hidingOffered                = false;
+bool g_pendingHidHideOffer          = false;   // the tray notification about the missing driver is waiting for a click
 bool g_driverInstalled              = false;
 bool g_driverInstalling             = false;
 int g_deadzoneLevel                 = 2; // 0=0%, 1=8%, 2=12%, 3=20%
@@ -144,6 +152,8 @@ const int kPollingRates[]           = { 125, 250, 500, 1000 };
 int g_responseCurve                 = 0; // 0=Linear, 1=Smooth, 2=Aggressive
 bool g_batteryWarningSent           = false;
 XUSB_REPORT g_liveInput             = {};
+std::mutex g_liveInputLock;                        // the worker thread writes, the UI thread reads
+UINT g_uShowWindowMsg               = 0;           // sent by a second instance to bring this window forward
 
 HFONT g_hFontTitle                  = nullptr;
 HFONT g_hFontBody                   = nullptr;
@@ -171,9 +181,14 @@ bool g_trayCreated                  = false;
 UINT g_uTaskbarRestartMsg           = 0;
 
 std::unique_ptr<Remapper> g_remapper;
+std::unique_ptr<ControllerHiding> g_hiding;   // lives as long as the window
 std::unique_ptr<BatteryMonitor> g_batteryMonitor;
 
-std::deque<std::wstring> g_logLines;
+struct LogLine {
+    std::wstring text;
+    LogLevel level;
+};
+std::deque<LogLine> g_logLines;
 std::wstring g_deviceName;
 RemapperStatus g_currentStatus      = RemapperStatus::Stopped;
 int g_batteryLevel                  = -1;
@@ -182,29 +197,73 @@ std::wstring g_batteryDevice;
 int g_dpi = 96;
 int S(int val) { return MulDiv(val, g_dpi, 96); }
 
+XUSB_REPORT GetLiveInput() {
+    std::lock_guard<std::mutex> lock(g_liveInputLock);
+    return g_liveInput;
+}
+
+void SetLiveInput(const XUSB_REPORT& report) {
+    std::lock_guard<std::mutex> lock(g_liveInputLock);
+    g_liveInput = report;
+}
+
 void TrimWorkingSet() {
     SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
 }
 
-void AppendLogMessage(const std::wstring& msg) {
+COLORREF LogColor(LogLevel level) {
+    switch (level) {
+        case LogLevel::Good:     return UI::ColorStatusGreen;
+        case LogLevel::Bad:      return UI::ColorStatusRed;
+        case LogLevel::Critical: return UI::ColorStatusAmber;
+        default:                 return UI::ColorTextSecondary;
+    }
+}
+
+void AppendLogMessage(const std::wstring& msg, LogLevel level = LogLevel::Info) {
     SYSTEMTIME st;
     GetLocalTime(&st);
     wchar_t timeBuf[32];
     swprintf_s(timeBuf, L"[%02d:%02d:%02d] ", st.wHour, st.wMinute, st.wSecond);
 
-    g_logLines.push_back(std::wstring(timeBuf) + msg);
+    g_logLines.push_back({ std::wstring(timeBuf) + msg, level });
     while (g_logLines.size() > MAX_LOG_LINES) {
         g_logLines.pop_front();
     }
 
     std::wstring allLogs;
     for (const auto& line : g_logLines) {
-        allLogs += line + L"\r\n";
+        allLogs += line.text + L"\r\n";
     }
 
+    SendMessageW(g_hEditLogs, WM_SETREDRAW, FALSE, 0);
     SetWindowTextW(g_hEditLogs, allLogs.c_str());
-    SendMessageW(g_hEditLogs, EM_SETSEL, (WPARAM)allLogs.length(), (LPARAM)allLogs.length());
+
+    // Colour the important lines. The rich edit stores a line break as one character.
+    LONG start = 0;
+    for (const auto& line : g_logLines) {
+        const LONG length = static_cast<LONG>(line.text.length());
+        if (line.level != LogLevel::Info) {
+            CHARRANGE range = { start, start + length };
+            SendMessageW(g_hEditLogs, EM_EXSETSEL, 0, (LPARAM)&range);
+            CHARFORMAT2W format = {};
+            format.cbSize = sizeof(format);
+            format.dwMask = CFM_COLOR;
+            format.crTextColor = LogColor(line.level);
+            SendMessageW(g_hEditLogs, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&format);
+        }
+        start += length + 1;
+    }
+
+    const LONG endPos = GetWindowTextLengthW(g_hEditLogs);
+    SendMessageW(g_hEditLogs, EM_SETSEL, endPos, endPos);
+    SendMessageW(g_hEditLogs, WM_SETREDRAW, TRUE, 0);
     SendMessageW(g_hEditLogs, EM_SCROLLCARET, 0, 0);
+    InvalidateRect(g_hEditLogs, NULL, TRUE);
+}
+
+void AppendLogId(StringId id) {
+    AppendLogMessage(Localization::Instance().Get(id), LevelOf(id));
 }
 
 bool CheckStartWithWindows() {
@@ -242,8 +301,19 @@ void LoadUserSettings() {
     HKEY hKey;
     if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Ultimate2CFixer\\Settings", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
         DWORD val = 0, size = sizeof(val);
-        if (RegQueryValueExW(hKey, L"MinimizeOnClose", NULL, NULL, (LPBYTE)&val, &size) == ERROR_SUCCESS) {
+        // Settings written before version 2 stored the old default (minimize to tray on close) even when the user
+        // never chose it, so that stored value is not trusted: the X button closes the application by default.
+        DWORD settingsVersion = 0;
+        if (RegQueryValueExW(hKey, L"SettingsVersion", NULL, NULL, (LPBYTE)&settingsVersion, &size) != ERROR_SUCCESS) {
+            settingsVersion = 0;
+        }
+        size = sizeof(val);
+        if (settingsVersion >= 2 && RegQueryValueExW(hKey, L"MinimizeOnClose", NULL, NULL, (LPBYTE)&val, &size) == ERROR_SUCCESS) {
             g_minimizeOnClose = (val != 0);
+        }
+        size = sizeof(val);
+        if (RegQueryValueExW(hKey, L"DisconnectOnExit", NULL, NULL, (LPBYTE)&val, &size) == ERROR_SUCCESS) {
+            g_disconnectOnExit = (val != 0);
         }
         size = sizeof(val);
         if (RegQueryValueExW(hKey, L"AutoStart", NULL, NULL, (LPBYTE)&val, &size) == ERROR_SUCCESS) {
@@ -260,10 +330,6 @@ void LoadUserSettings() {
         size = sizeof(val);
         if (RegQueryValueExW(hKey, L"HairTrigger", NULL, NULL, (LPBYTE)&val, &size) == ERROR_SUCCESS) {
             g_hairTrigger = (val != 0);
-        }
-        size = sizeof(val);
-        if (RegQueryValueExW(hKey, L"HideRealController", NULL, NULL, (LPBYTE)&val, &size) == ERROR_SUCCESS) {
-            g_hideReal = (val != 0);
         }
         size = sizeof(val);
         if (RegQueryValueExW(hKey, L"Deadzone", NULL, NULL, (LPBYTE)&val, &size) == ERROR_SUCCESS) {
@@ -291,8 +357,12 @@ void LoadUserSettings() {
 void SaveUserSettings() {
     HKEY hKey;
     if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\Ultimate2CFixer\\Settings", 0, NULL, 0, KEY_WRITE, NULL, &hKey, NULL) == ERROR_SUCCESS) {
-        DWORD val = g_minimizeOnClose ? 1 : 0;
+        DWORD val = 2;
+        RegSetValueExW(hKey, L"SettingsVersion", 0, REG_DWORD, (const BYTE*)&val, sizeof(val));
+        val = g_minimizeOnClose ? 1 : 0;
         RegSetValueExW(hKey, L"MinimizeOnClose", 0, REG_DWORD, (const BYTE*)&val, sizeof(val));
+        val = g_disconnectOnExit ? 1 : 0;
+        RegSetValueExW(hKey, L"DisconnectOnExit", 0, REG_DWORD, (const BYTE*)&val, sizeof(val));
         val = g_autoStartService ? 1 : 0;
         RegSetValueExW(hKey, L"AutoStart", 0, REG_DWORD, (const BYTE*)&val, sizeof(val));
         val = g_lowBatteryAlert ? 1 : 0;
@@ -301,8 +371,6 @@ void SaveUserSettings() {
         RegSetValueExW(hKey, L"NintendoMode", 0, REG_DWORD, (const BYTE*)&val, sizeof(val));
         val = g_hairTrigger ? 1 : 0;
         RegSetValueExW(hKey, L"HairTrigger", 0, REG_DWORD, (const BYTE*)&val, sizeof(val));
-        val = g_hideReal ? 1 : 0;
-        RegSetValueExW(hKey, L"HideRealController", 0, REG_DWORD, (const BYTE*)&val, sizeof(val));
         val = static_cast<DWORD>(g_deadzoneLevel);
         RegSetValueExW(hKey, L"Deadzone", 0, REG_DWORD, (const BYTE*)&val, sizeof(val));
         val = static_cast<DWORD>(g_pollingRateIndex);
@@ -364,7 +432,7 @@ void SwitchView(bool showSettings) {
     ShowWindow(g_hChkLowBattery, showSet);
     ShowWindow(g_hChkNintendoMode, showSet);
     ShowWindow(g_hChkHairTrigger, showSet);
-    ShowWindow(g_hChkHideReal, showSet);
+    ShowWindow(g_hChkDisconnect, showSet);
     ShowWindow(g_hBtnDeadzone, showSet);
     ShowWindow(g_hBtnPollingRate, showSet);
     ShowWindow(g_hBtnCurve, showSet);
@@ -410,7 +478,7 @@ void UpdateUIStrings() {
     SetWindowTextW(g_hChkLowBattery, loc.Get(StringId::LowBatteryNotification).c_str());
     SetWindowTextW(g_hChkNintendoMode, loc.Get(StringId::NintendoMode).c_str());
     SetWindowTextW(g_hChkHairTrigger, loc.Get(StringId::HairTrigger).c_str());
-    SetWindowTextW(g_hChkHideReal, loc.Get(StringId::HideRealController).c_str());
+    SetWindowTextW(g_hChkDisconnect, loc.Get(StringId::DisconnectOnExit).c_str());
     SetWindowTextW(g_hBtnSettingsBack, loc.Get(StringId::SettingsBack).c_str());
     UpdateDeadzoneButtonText();
     UpdatePollingRateButtonText();
@@ -423,22 +491,22 @@ void TriggerDriverInstall() {
     if (g_driverInstalling) return;
     g_driverInstalling = true;
     EnableWindow(g_hBtnStart, FALSE);
-    auto& loc = Localization::Instance();
-    AppendLogMessage(loc.Get(StringId::DriverInstalling));
+    AppendLogId(StringId::DriverInstalling);
     StartViGEmBusInstall(
         g_hWnd,
         [](int pct, const std::wstring&) {
             PostMessageW(g_hWnd, WM_DRIVER_INSTALL_PROGRESS, (WPARAM)pct, 0);
         },
-        [](bool success, const std::wstring&) {
-            PostMessageW(g_hWnd, WM_DRIVER_INSTALL_DONE, (WPARAM)(success ? 1 : 0), 0);
+        [](bool success, const std::wstring& message) {
+            int code = success ? 1 : (message == kDriverNotVerified ? 2 : 0);
+            PostMessageW(g_hWnd, WM_DRIVER_INSTALL_DONE, (WPARAM)code, 0);
         }
     );
 }
 
 // Offers the optional hiding driver when hiding is wanted but the driver is missing.
 void OfferHidingDriverInstall(bool force) {
-    if (!g_hideReal || g_hidingInstalling || DeviceHider::IsAvailable()) return;
+    if (g_hidingInstalling || DeviceHider::IsAvailable()) return;
     if (!force && g_hidingOffered) return;
     g_hidingOffered = true;
 
@@ -448,7 +516,7 @@ void OfferHidingDriverInstall(bool force) {
     if (answer != IDYES) return;
 
     g_hidingInstalling = true;
-    AppendLogMessage(loc.Get(StringId::LogHideInstalling));
+    AppendLogId(StringId::LogHideInstalling);
     StartHidHideInstall(g_hWnd, [](HidHideInstallResult result) {
         PostMessageW(g_hWnd, WM_HIDING_INSTALL_DONE, (WPARAM)result, 0);
     });
@@ -465,7 +533,7 @@ void StartServices() {
     EnableWindow(g_hBtnStop, TRUE);
 
     auto& loc = Localization::Instance();
-    AppendLogMessage(loc.Get(StringId::LogServicesStarting));
+    AppendLogId(StringId::LogServicesStarting);
 
     g_currentStatus = RemapperStatus::Searching;
     g_deviceName = loc.Get(StringId::StatusSearching);
@@ -477,28 +545,44 @@ void StartServices() {
     g_remapper->SetHairTrigger(g_hairTrigger);
     g_remapper->SetPollingRate(kPollingRates[g_pollingRateIndex]);
     g_remapper->SetResponseCurve(g_responseCurve);
-    g_remapper->SetHideRealDevice(g_hideReal);
-    g_remapper->Start(
+    g_remapper->SetHiding(g_hiding.get());
+    const bool started = g_remapper->Start(
         g_hWnd,
-        [](const std::wstring& msg) {
+        [](const std::wstring& msg, LogLevel level) {
             auto* pMsg = new std::wstring(msg);
-            PostMessageW(g_hWnd, WM_UPDATE_LOG, (WPARAM)pMsg, 0);
+            PostMessageW(g_hWnd, WM_UPDATE_LOG, (WPARAM)pMsg, (LPARAM)level);
         },
         [](RemapperStatus status, const std::wstring& devName) {
             auto* pName = new std::wstring(devName);
             PostMessageW(g_hWnd, WM_UPDATE_STATUS, (WPARAM)status, (LPARAM)pName);
         },
         [](const XUSB_REPORT& report) {
-            g_liveInput = report;
+            SetLiveInput(report);
             PostMessageW(g_hWnd, WM_UPDATE_INPUT, 0, 0);
         }
     );
 
+    if (!started) {
+        // The controller service could not start (the reason is in the log). Leave the window in a state the
+        // user can act on instead of showing "Searching" forever.
+        g_remapper.reset();
+        g_currentStatus = RemapperStatus::Stopped;
+        g_deviceName = loc.Get(StringId::NoDevice);
+        EnableWindow(g_hBtnStart, TRUE);
+        EnableWindow(g_hBtnStop, FALSE);
+        if (!IsViGEmBusInstalled()) {
+            g_driverInstalled = false;   // the driver went missing: offer the installer again
+            UpdateUIStrings();
+        }
+        InvalidateRect(g_hWnd, NULL, FALSE);
+        return;
+    }
+
     g_batteryMonitor = std::make_unique<BatteryMonitor>();
     g_batteryMonitor->Start(
-        [](const std::wstring& msg) {
+        [](const std::wstring& msg, LogLevel level) {
             auto* pMsg = new std::wstring(msg);
-            PostMessageW(g_hWnd, WM_UPDATE_LOG, (WPARAM)pMsg, 0);
+            PostMessageW(g_hWnd, WM_UPDATE_LOG, (WPARAM)pMsg, (LPARAM)level);
         },
         [](const std::wstring& devName, int level) {
             auto* pName = new std::wstring(devName);
@@ -521,7 +605,7 @@ void StopServices() {
     EnableWindow(g_hBtnStop, FALSE);
 
     auto& loc = Localization::Instance();
-    AppendLogMessage(loc.Get(StringId::LogServicesStopping));
+    AppendLogId(StringId::LogServicesStopping);
 
     g_currentStatus = RemapperStatus::Stopped;
     g_deviceName = loc.Get(StringId::NoDevice);
@@ -568,6 +652,16 @@ void SetupTray(HWND hwnd) {
         g_nid.uVersion = NOTIFYICON_VERSION_4;
         Shell_NotifyIconW(NIM_SETVERSION, &g_nid);
     }
+}
+
+void ShowTrayBalloon(const std::wstring& text) {
+    if (!g_trayCreated) return;
+    g_nid.uFlags |= NIF_INFO;
+    wcsncpy_s(g_nid.szInfoTitle, Localization::Instance().Get(StringId::AppTitle).c_str(), _TRUNCATE);
+    wcsncpy_s(g_nid.szInfo, text.c_str(), _TRUNCATE);
+    g_nid.dwInfoFlags = NIIF_INFO;
+    Shell_NotifyIconW(NIM_MODIFY, &g_nid);
+    g_nid.uFlags &= ~NIF_INFO;
 }
 
 void MinimizeToTray() {
@@ -667,6 +761,7 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     SetBkMode(memDC, TRANSPARENT);
 
     auto& loc = Localization::Instance();
+    const XUSB_REPORT live = GetLiveInput();
 
     if (g_showSettings) {
         // MARK: Settings View Card
@@ -748,7 +843,11 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     // Live Polling Rate Readout
     if (g_remapper && g_currentStatus == RemapperStatus::Connected) {
         wchar_t hzBuf[64];
-        swprintf_s(hzBuf, L"%d Hz \u2022 %.1f ms", g_remapper->GetLiveHz(), g_remapper->GetLiveMs());
+        if (g_remapper->IsInputIdle()) {
+            wcsncpy_s(hzBuf, loc.Get(StringId::Idle).c_str(), _TRUNCATE);
+        } else {
+            swprintf_s(hzBuf, L"%d Hz \u2022 %.1f ms", g_remapper->GetLiveHz(), g_remapper->GetLiveMs());
+        }
         SelectObject(memDC, g_hFontSmall);
         SetTextColor(memDC, UI::ColorTextMuted);
         TextOutW(memDC, cardTelemetry.left + S(16), cardTelemetry.top + S(28), hzBuf, (int)wcslen(hzBuf));
@@ -778,10 +877,10 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     LineTo(memDC, rsBox.right - S(6), rsBox.top + S(17));
 
     // Live Stick Dots
-    int lsDotX = lsBox.left + S(17) + (g_liveInput.sThumbLX * S(12)) / 32768;
-    int lsDotY = lsBox.top + S(17) - (g_liveInput.sThumbLY * S(12)) / 32768;
-    int rsDotX = rsBox.left + S(17) + (g_liveInput.sThumbRX * S(12)) / 32768;
-    int rsDotY = rsBox.top + S(17) - (g_liveInput.sThumbRY * S(12)) / 32768;
+    int lsDotX = lsBox.left + S(17) + (live.sThumbLX * S(12)) / 32768;
+    int lsDotY = lsBox.top + S(17) - (live.sThumbLY * S(12)) / 32768;
+    int rsDotX = rsBox.left + S(17) + (live.sThumbRX * S(12)) / 32768;
+    int rsDotY = rsBox.top + S(17) - (live.sThumbRY * S(12)) / 32768;
 
     SelectObject(memDC, g_hBrGreen);
     SelectObject(memDC, g_hPenNull);
@@ -809,7 +908,7 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     SelectObject(memDC, g_hFontSmall);
     SetBkMode(memDC, TRANSPARENT);
     for (const auto& b : bArr) {
-        bool on = (g_liveInput.wButtons & b.m) != 0;
+        bool on = (live.wButtons & b.m) != 0;
         SelectObject(memDC, on ? g_hBrGreen : g_hBrButtonNormal);
         SelectObject(memDC, on ? g_hPenGreen : g_hPenCardBorder);
         RECT brc = { b.x, b.y, b.x + S(12), b.y + S(12) };
@@ -826,7 +925,7 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     };
 
     for (const auto& bmp : bumpers) {
-        bool on = (g_liveInput.wButtons & bmp.m) != 0;
+        bool on = (live.wButtons & bmp.m) != 0;
         SelectObject(memDC, on ? g_hBrGreen : g_hBrButtonNormal);
         SelectObject(memDC, on ? g_hPenGreen : g_hPenCardBorder);
         RoundRect(memDC, bmp.rc.left, bmp.rc.top, bmp.rc.right, bmp.rc.bottom, S(4), S(4));
@@ -841,13 +940,13 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     FillRect(memDC, &ltRc, g_hBrStickBg);
     FillRect(memDC, &rtRc, g_hBrStickBg);
 
-    if (g_liveInput.bLeftTrigger > 0) {
-        int fh = (g_liveInput.bLeftTrigger * S(30)) / 255;
+    if (live.bLeftTrigger > 0) {
+        int fh = (live.bLeftTrigger * S(30)) / 255;
         RECT frc = { ltRc.left, ltRc.bottom - fh, ltRc.right, ltRc.bottom };
         FillRect(memDC, &frc, g_hBrGreen);
     }
-    if (g_liveInput.bRightTrigger > 0) {
-        int fh = (g_liveInput.bRightTrigger * S(30)) / 255;
+    if (live.bRightTrigger > 0) {
+        int fh = (live.bRightTrigger * S(30)) / 255;
         RECT frc = { rtRc.left, rtRc.bottom - fh, rtRc.right, rtRc.bottom };
         FillRect(memDC, &frc, g_hBrGreen);
     }
@@ -923,6 +1022,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         return 0;
     }
 
+    if (g_uShowWindowMsg != 0 && msg == g_uShowWindowMsg) {
+        RestoreFromTray();
+        return 0;
+    }
+
     switch (msg) {
         case WM_SIZE: {
             if (wParam == SIZE_MINIMIZED) {
@@ -985,11 +1089,19 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             int editTop = S(248);
             int editHeight = (rc.bottom - S(20)) - editTop - S(12);
             if (editHeight < S(140)) editHeight = S(140);
-            g_hEditLogs = CreateWindowExW(0, L"EDIT", L"",
+            g_hEditLogs = CreateWindowExW(0, MSFTEDIT_CLASS, L"",
                 WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
                 S(38), editTop, rc.right - S(76), editHeight, hwnd, (HMENU)(INT_PTR)IDC_EDIT_LOGS, GetModuleHandleW(NULL), NULL);
 
             SendMessageW(g_hEditLogs, WM_SETFONT, (WPARAM)g_hFontMono, TRUE);
+            SendMessageW(g_hEditLogs, EM_SETBKGNDCOLOR, 0, (LPARAM)UI::ColorCardBg);
+            {
+                CHARFORMAT2W normalText = {};
+                normalText.cbSize = sizeof(normalText);
+                normalText.dwMask = CFM_COLOR;
+                normalText.crTextColor = UI::ColorTextSecondary;
+                SendMessageW(g_hEditLogs, EM_SETCHARFORMAT, SCF_DEFAULT, (LPARAM)&normalText);
+            }
             SetWindowTheme(g_hEditLogs, L"DarkMode_Explorer", NULL);
 
             // MARK: Settings View Controls (Hidden by default)
@@ -1035,12 +1147,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             SendMessageW(g_hChkHairTrigger, BM_SETCHECK, g_hairTrigger ? BST_CHECKED : BST_UNCHECKED, 0);
             SetWindowTheme(g_hChkHairTrigger, L"DarkMode_Explorer", NULL);
 
-            g_hChkHideReal = CreateWindowW(L"BUTTON", loc.Get(StringId::HideRealController).c_str(),
+            g_hChkDisconnect = CreateWindowW(L"BUTTON", loc.Get(StringId::DisconnectOnExit).c_str(),
                 WS_TABSTOP | WS_CHILD | BS_AUTOCHECKBOX,
-                S(44), S(286), S(650), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_HIDE_REAL, GetModuleHandleW(NULL), NULL);
-            SendMessageW(g_hChkHideReal, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
-            SendMessageW(g_hChkHideReal, BM_SETCHECK, g_hideReal ? BST_CHECKED : BST_UNCHECKED, 0);
-            SetWindowTheme(g_hChkHideReal, L"DarkMode_Explorer", NULL);
+                S(44), S(286), S(650), S(22), hwnd, (HMENU)(INT_PTR)IDC_CHK_DISCONNECT, GetModuleHandleW(NULL), NULL);
+            SendMessageW(g_hChkDisconnect, WM_SETFONT, (WPARAM)g_hFontBody, TRUE);
+            SendMessageW(g_hChkDisconnect, BM_SETCHECK, g_disconnectOnExit ? BST_CHECKED : BST_UNCHECKED, 0);
+            SetWindowTheme(g_hChkDisconnect, L"DarkMode_Explorer", NULL);
 
             // Row 1 Buttons: Deadzone & Polling Rate
             g_hBtnDeadzone = CreateWindowW(L"BUTTON", L"",
@@ -1064,6 +1176,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             UpdatePollingRateButtonText();
             UpdateCurveButtonText();
             SetupTray(hwnd);
+            SetTimer(hwnd, 1, 500, nullptr);   // lets the rate readout fall back to "Idle" when no input arrives
 
             // MARK: Driver & First-Launch Check
             g_driverInstalled = IsViGEmBusInstalled();
@@ -1080,14 +1193,23 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
 
             UpdateUIStrings();
-            AppendLogMessage(loc.Get(StringId::LogAppReady));
-            if (DeviceHider::RecoverStale()) {
-                AppendLogMessage(loc.Get(StringId::LogHideRecovered));
-            }
+            AppendLogId(StringId::LogAppReady);
+            // The real controller stays hidden from other programs for as long as this window is open, whether
+            // or not the service is running (see ControllerHiding).
+            g_hiding = std::make_unique<ControllerHiding>(
+                [](const std::wstring& msg, LogLevel level) {
+                    auto* pMsg = new std::wstring(msg);
+                    PostMessageW(g_hWnd, WM_UPDATE_LOG, (WPARAM)pMsg, (LPARAM)level);
+                },
+                [](StringId notice) {
+                    PostMessageW(g_hWnd, WM_HIDING_NOTICE, (WPARAM)notice, 0);
+                });
+            g_hiding->Start();
+            PostMessageW(hwnd, WM_HIDING_STARTUP_CHECK, 0, 0);   // handled once the window is shown or hidden
             if (isFirstRun && g_driverInstalled) {
-                AppendLogMessage(loc.Get(StringId::DriverReadyFirstRun));
+                AppendLogId(StringId::DriverReadyFirstRun);
             } else if (!g_driverInstalled) {
-                AppendLogMessage(loc.Get(StringId::DriverMissing));
+                AppendLogId(StringId::DriverMissing);
             }
             return 0;
         }
@@ -1138,16 +1260,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     if (g_remapper) g_remapper->SetHairTrigger(g_hairTrigger);
                     SaveUserSettings();
                     break;
-                case IDC_CHK_HIDE_REAL:
-                    g_hideReal = (SendMessageW(g_hChkHideReal, BM_GETCHECK, 0, 0) == BST_CHECKED);
-                    if (g_remapper) g_remapper->SetHideRealDevice(g_hideReal);
+                case IDC_CHK_DISCONNECT:
+                    g_disconnectOnExit = (SendMessageW(g_hChkDisconnect, BM_GETCHECK, 0, 0) == BST_CHECKED);
                     SaveUserSettings();
-                    if (g_hideReal) {
-                        OfferHidingDriverInstall(true);
-                    }
-                    if (g_remapper && g_remapper->IsRunning()) {
-                        AppendLogMessage(Localization::Instance().Get(StringId::LogHideApplyNext));
-                    }
                     break;
                 case IDC_BTN_DEADZONE:
                     g_deadzoneLevel = (g_deadzoneLevel + 1) % 4;
@@ -1194,6 +1309,31 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             return 0;
         }
 
+        case WM_HIDING_NOTICE:
+            ShowTrayBalloon(Localization::Instance().Get(static_cast<StringId>(wParam)));
+            return 0;
+
+        case WM_HIDING_STARTUP_CHECK:
+            // Hiding is not optional, so a missing HidHide driver must not go unnoticed (also on an automatic start).
+            if (!DeviceHider::IsAvailable()) {
+                if (IsWindowVisible(hwnd)) {
+                    OfferHidingDriverInstall(false);
+                } else {
+                    g_pendingHidHideOffer = true;
+                    ShowTrayBalloon(Localization::Instance().Get(StringId::HideInstallBalloon));
+                }
+            }
+            return 0;
+
+        case WM_TIMER: {
+            if (wParam == 1 && !g_showSettings && g_currentStatus == RemapperStatus::Connected &&
+                IsWindowVisible(hwnd) && !IsIconic(hwnd)) {
+                RECT rcRate = { S(284), S(82), S(470), S(98) };
+                InvalidateRect(hwnd, &rcRate, FALSE);
+            }
+            return 0;
+        }
+
         case WM_UPDATE_INPUT: {
             if (!g_showSettings) {
                 RECT rcTelemetry = { S(278), S(56), S(558), S(152) };
@@ -1205,7 +1345,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         case WM_UPDATE_LOG: {
             auto* pMsg = reinterpret_cast<std::wstring*>(wParam);
             if (pMsg) {
-                AppendLogMessage(*pMsg);
+                AppendLogMessage(*pMsg, static_cast<LogLevel>(lParam));
                 delete pMsg;
             }
             return 0;
@@ -1220,7 +1360,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
             if (g_currentStatus != RemapperStatus::Connected) {
                 g_deviceName.clear();
-                memset(&g_liveInput, 0, sizeof(g_liveInput));
+                XUSB_REPORT zeroInput = {};
+                SetLiveInput(zeroInput);
             }
             UpdateTrayTooltip();
             InvalidateRect(hwnd, NULL, FALSE);
@@ -1273,42 +1414,36 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             bool success = (wParam == 1);
             g_driverInstalling = false;
             g_driverInstalled = success;
-            auto& loc = Localization::Instance();
             EnableWindow(g_hBtnStart, TRUE);
             UpdateUIStrings();
             if (success) {
-                AppendLogMessage(loc.Get(StringId::DriverSuccess));
+                AppendLogId(StringId::DriverSuccess);
                 if (g_autoStartService) {
                     StartServices();
                 }
             } else {
-                AppendLogMessage(loc.Get(StringId::DriverFailed));
+                AppendLogId(wParam == 2 ? StringId::LogHideInstallUnverified : StringId::DriverFailed);
             }
             return 0;
         }
 
         case WM_HIDING_INSTALL_DONE: {
             g_hidingInstalling = false;
-            auto& loc = Localization::Instance();
             switch (static_cast<HidHideInstallResult>(wParam)) {
                 case HidHideInstallResult::Installed:
-                    AppendLogMessage(loc.Get(StringId::LogHideInstalled));
-                    if (g_remapper && g_remapper->IsRunning()) {
-                        StopServices();
-                        StartServices();
-                    }
-                    break;
+                    AppendLogId(StringId::LogHideInstalled);
+                    break;   // the hiding starts by itself within half a second
                 case HidHideInstallResult::NeedsRestart:
-                    AppendLogMessage(loc.Get(StringId::LogHideInstallRestart));
+                    AppendLogId(StringId::LogHideInstallRestart);
                     break;
                 case HidHideInstallResult::DownloadFailed:
-                    AppendLogMessage(loc.Get(StringId::LogHideInstallFailed));
+                    AppendLogId(StringId::LogHideInstallFailed);
                     break;
                 case HidHideInstallResult::NotVerified:
-                    AppendLogMessage(loc.Get(StringId::LogHideInstallUnverified));
+                    AppendLogId(StringId::LogHideInstallUnverified);
                     break;
                 case HidHideInstallResult::Cancelled:
-                    AppendLogMessage(loc.Get(StringId::LogHideInstallCancelled));
+                    AppendLogId(StringId::LogHideInstallCancelled);
                     break;
             }
             return 0;
@@ -1318,7 +1453,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         case WM_CTLCOLOREDIT: {
             HDC hdcCtrl = (HDC)wParam;
             HWND hwndCtrl = (HWND)lParam;
-            if (hwndCtrl == g_hChkMinimizeClose || hwndCtrl == g_hChkStartWindows || hwndCtrl == g_hChkAutoStart || hwndCtrl == g_hChkLowBattery || hwndCtrl == g_hChkNintendoMode || hwndCtrl == g_hChkHairTrigger || hwndCtrl == g_hChkHideReal) {
+            if (hwndCtrl == g_hChkMinimizeClose || hwndCtrl == g_hChkStartWindows || hwndCtrl == g_hChkAutoStart || hwndCtrl == g_hChkLowBattery || hwndCtrl == g_hChkNintendoMode || hwndCtrl == g_hChkHairTrigger || hwndCtrl == g_hChkDisconnect) {
                 SetTextColor(hdcCtrl, UI::ColorTextSecondary);
                 SetBkColor(hdcCtrl, UI::ColorCardBg);
                 return (LRESULT)g_hBrCardBg;
@@ -1331,6 +1466,19 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             break;
         }
 
+        case WM_QUERYENDSESSION:
+            return TRUE;
+
+        case WM_ENDSESSION:
+            if (wParam) {
+                // Windows is shutting down or the user is logging off and will end this process right after
+                // this message: give the real controller back to other programs first.
+                g_sessionEnding = true;   // no permission prompt while Windows shuts down
+                StopServices();
+                g_hiding.reset();
+            }
+            return 0;
+
         case WM_CLOSE: {
             if (g_minimizeOnClose) {
                 MinimizeToTray();
@@ -1342,6 +1490,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
         case WM_TRAYICON: {
             UINT event = LOWORD(lParam);
+            if (event == NIN_BALLOONUSERCLICK && g_pendingHidHideOffer) {
+                g_pendingHidHideOffer = false;
+                OfferHidingDriverInstall(true);
+                return 0;
+            }
             if (event == WM_LBUTTONUP || event == WM_LBUTTONDBLCLK || event == NIN_SELECT) {
                 RestoreFromTray();
             } else if (event == WM_RBUTTONUP || event == WM_CONTEXTMENU) {
@@ -1362,7 +1515,18 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
 
         case WM_DESTROY: {
+            KillTimer(hwnd, 1);
             StopServices();
+            {
+                const DWORD controllerVid = g_hiding ? g_hiding->Vid() : 0;
+                const DWORD controllerPid = g_hiding ? g_hiding->Pid() : 0;
+                g_hiding.reset();   // gives the real controller back
+                // Optional: drop the Bluetooth connection so every program that was using the controller sees it
+                // disappear and arrive again. Needs permission (UAC), so only when the user closes the application.
+                if (g_disconnectOnExit && !g_sessionEnding) {
+                    DisconnectController(controllerVid, controllerPid);
+                }
+            }
             if (g_trayCreated) {
                 Shell_NotifyIconW(NIM_DELETE, &g_nid);
             }
@@ -1396,6 +1560,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     InitDpiAwareness();
+    LoadLibraryW(L"Msftedit.dll");   // rich edit control of the console
     LoadUserSettings();
 
     g_startWithWindows = CheckStartWithWindows();
@@ -1406,6 +1571,16 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     InitCommonControlsEx(&icex);
 
     const wchar_t CLASS_NAME[] = L"Ultimate2CFixer_Class";
+
+    // Only one copy may run: a second one would undo the first one's controller hiding when it starts.
+    g_uShowWindowMsg = RegisterWindowMessageW(L"Ultimate2CFixer_ShowWindow");
+    HANDLE hSingleInstance = CreateMutexW(nullptr, FALSE, L"Local\\Ultimate2CFixer_SingleInstance");
+    if (hSingleInstance && GetLastError() == ERROR_ALREADY_EXISTS) {
+        HWND existing = FindWindowW(CLASS_NAME, nullptr);
+        if (existing) PostMessageW(existing, g_uShowWindowMsg, 0, 0);
+        CloseHandle(hSingleInstance);
+        return 0;
+    }
 
     int cxSm = GetSystemMetrics(SM_CXSMICON);
     int cySm = GetSystemMetrics(SM_CYSMICON);

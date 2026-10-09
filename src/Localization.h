@@ -60,7 +60,6 @@ enum class StringId {
     LogMapperDisconnected,
     LogBatteryActive,
     LogBatteryError,
-    HideRealController,
     HideInstallTitle,
     HideInstallPrompt,
     LogHideActive,
@@ -72,7 +71,11 @@ enum class StringId {
     LogHideRestored,
     LogHideSuspended,
     LogHideRecovered,
-    LogHideApplyNext,
+    LogHideRepaired,
+    LogHideNeedsReconnect,
+    HideInstallBalloon,
+    DisconnectOnExit,
+    LogVirtualPadPlayer,
     LogHideInstalling,
     LogHideInstalled,
     LogHideInstallFailed,
@@ -82,7 +85,11 @@ enum class StringId {
     BatteryLowStatus,
     BatteryModerateStatus,
     BatteryHealthyStatus,
-    DriverDownloadingShort
+    DriverDownloadingShort,
+    LogViGEmUnavailable,
+    LogInputSystemFailed,
+    LogControllerConnected,
+    LogBatteryLevel
 };
 
 enum class Language {
@@ -90,6 +97,17 @@ enum class Language {
     Turkish,
     Spanish
 };
+
+// How a console line is shown: neutral, good (green), bad (red) or critical, needs the user's attention (yellow).
+enum class LogLevel {
+    Info,
+    Good,
+    Bad,
+    Critical
+};
+
+// The level a message is shown with.
+LogLevel LevelOf(StringId id);
 
 class Localization {
 public:

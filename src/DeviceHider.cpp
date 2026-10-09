@@ -23,6 +23,7 @@ constexpr DWORD kIoctlSetActive    = CTL_CODE(kHidHideDeviceType, 2053, METHOD_B
 constexpr DWORD kIoctlGetWlInverse = CTL_CODE(kHidHideDeviceType, 2054, METHOD_BUFFERED, FILE_READ_DATA);
 
 constexpr wchar_t kStateKey[] = L"Software\\Ultimate2CFixer\\HidHideState";
+constexpr wchar_t kLastControllerKey[] = L"Software\\Ultimate2CFixer\\LastController";
 
 using StrList = std::vector<std::wstring>;
 
@@ -119,13 +120,21 @@ bool GetOwnNtPath(std::wstring& out) {
     return true;
 }
 
-// Locates the HID device instances of the physical controller.
-StrList FindHidInstanceIds(DWORD vid, DWORD pid) {
-    StrList result;
+// Locates the HID device instances of the physical controller. With includeAbsent the entries Windows
+// remembers for a controller that is switched off right now are returned as well (including the other
+// Bluetooth identity of the same controller), so they can be hidden before the controller connects.
+constexpr size_t kMaxInstanceIds = 16;
+
+StrList FindHidInstanceIds(DWORD vid, DWORD pid, bool includeAbsent) {
+    // The entries of a controller that is connected right now come first, so the limit below can never cut
+    // the current one off when many old identities have piled up (every re-pairing leaves one behind).
+    StrList result = includeAbsent ? FindHidInstanceIds(vid, pid, false) : StrList{};
     // GUID_DEVINTERFACE_HID
     static const GUID kHidInterface = { 0x4D1E55B2, 0xF16F, 0x11CF, { 0x88, 0xCB, 0x00, 0x11, 0x11, 0x00, 0x00, 0x30 } };
 
-    HDEVINFO set = SetupDiGetClassDevsW(&kHidInterface, nullptr, nullptr, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT);
+    HDEVINFO set = includeAbsent
+        ? SetupDiGetClassDevsW(nullptr, L"HID", nullptr, DIGCF_ALLCLASSES)
+        : SetupDiGetClassDevsW(&kHidInterface, nullptr, nullptr, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT);
     if (set == INVALID_HANDLE_VALUE) return result;
 
     wchar_t vidStr[8], pidStr[8];
@@ -144,7 +153,7 @@ StrList FindHidInstanceIds(DWORD vid, DWORD pid) {
         if (upper.find(vidStr) == std::wstring::npos || upper.find(pidStr) == std::wstring::npos) continue;
 
         if (!Contains(result, id)) result.emplace_back(id);
-        if (result.size() >= 8) break;
+        if (result.size() >= kMaxInstanceIds) break;
     }
     SetupDiDestroyDeviceInfoList(set);
     return result;
@@ -154,27 +163,58 @@ StrList FindHidInstanceIds(DWORD vid, DWORD pid) {
 // What this application added is persisted so a crash can be cleaned up on the next launch.
 
 struct OwnedEntries {
-    StrList blacklist;
-    std::wstring whitelist;
-    bool activeChanged{false};
+    StrList blacklist;          // entries this app added to the blacklist
+    std::wstring whitelist;     // this app's own path, when this app added it
+    bool activeChanged{false};  // this app switched HidHide on
+    StrList baseline;           // blacklist entries that existed before this app added anything
+    bool hasBaseline{false};    // false for records written by older versions
 };
+
+std::vector<wchar_t> ToMultiSz(const StrList& list) {
+    std::vector<wchar_t> multi;
+    for (const auto& s : list) {
+        multi.insert(multi.end(), s.begin(), s.end());
+        multi.push_back(L'\0');
+    }
+    multi.push_back(L'\0');
+    if (list.empty()) multi.push_back(L'\0');
+    return multi;
+}
+
+bool WriteMultiSz(HKEY key, const wchar_t* name, const StrList& list) {
+    std::vector<wchar_t> multi = ToMultiSz(list);
+    return RegSetValueExW(key, name, 0, REG_MULTI_SZ, reinterpret_cast<const BYTE*>(multi.data()),
+                          static_cast<DWORD>(multi.size() * sizeof(wchar_t))) == ERROR_SUCCESS;
+}
+
+// Returns false when the value does not exist.
+bool ReadMultiSz(HKEY key, const wchar_t* name, StrList& out) {
+    out.clear();
+    DWORD size = 0;
+    if (RegQueryValueExW(key, name, nullptr, nullptr, nullptr, &size) != ERROR_SUCCESS) return false;
+    if (size < sizeof(wchar_t)) return true;
+    std::vector<wchar_t> buf(size / sizeof(wchar_t) + 2, L'\0');
+    DWORD got = size;
+    if (RegQueryValueExW(key, name, nullptr, nullptr, reinterpret_cast<LPBYTE>(buf.data()), &got) != ERROR_SUCCESS) return false;
+    size_t n = got / sizeof(wchar_t);
+    size_t i = 0;
+    while (i < n && buf[i] != L'\0') {
+        size_t start = i;
+        while (i < n && buf[i] != L'\0') ++i;
+        out.emplace_back(&buf[start], i - start);
+        ++i;
+    }
+    return true;
+}
 
 bool SaveOwned(const OwnedEntries& owned) {
     HKEY key;
     if (RegCreateKeyExW(HKEY_CURRENT_USER, kStateKey, 0, nullptr, 0, KEY_WRITE, nullptr, &key, nullptr) != ERROR_SUCCESS) {
         return false;
     }
-    std::vector<wchar_t> multi;
-    for (const auto& s : owned.blacklist) {
-        multi.insert(multi.end(), s.begin(), s.end());
-        multi.push_back(L'\0');
-    }
-    multi.push_back(L'\0');
-    if (owned.blacklist.empty()) multi.push_back(L'\0');
-
     bool ok = true;
-    ok &= RegSetValueExW(key, L"Blacklist", 0, REG_MULTI_SZ, reinterpret_cast<const BYTE*>(multi.data()),
-                         static_cast<DWORD>(multi.size() * sizeof(wchar_t))) == ERROR_SUCCESS;
+    ok &= WriteMultiSz(key, L"Blacklist", owned.blacklist);
+    ok &= WriteMultiSz(key, L"Baseline", owned.baseline);
     ok &= RegSetValueExW(key, L"Whitelist", 0, REG_SZ, reinterpret_cast<const BYTE*>(owned.whitelist.c_str()),
                          static_cast<DWORD>((owned.whitelist.size() + 1) * sizeof(wchar_t))) == ERROR_SUCCESS;
     DWORD flag = owned.activeChanged ? 1 : 0;
@@ -188,24 +228,10 @@ bool LoadOwned(OwnedEntries& owned) {
     if (RegOpenKeyExW(HKEY_CURRENT_USER, kStateKey, 0, KEY_READ, &key) != ERROR_SUCCESS) return false;
 
     owned = OwnedEntries{};
+    ReadMultiSz(key, L"Blacklist", owned.blacklist);
+    owned.hasBaseline = ReadMultiSz(key, L"Baseline", owned.baseline);
 
     DWORD size = 0;
-    if (RegQueryValueExW(key, L"Blacklist", nullptr, nullptr, nullptr, &size) == ERROR_SUCCESS && size >= sizeof(wchar_t)) {
-        std::vector<wchar_t> buf(size / sizeof(wchar_t) + 2, L'\0');
-        DWORD got = size;
-        if (RegQueryValueExW(key, L"Blacklist", nullptr, nullptr, reinterpret_cast<LPBYTE>(buf.data()), &got) == ERROR_SUCCESS) {
-            size_t n = got / sizeof(wchar_t);
-            size_t i = 0;
-            while (i < n && buf[i] != L'\0') {
-                size_t start = i;
-                while (i < n && buf[i] != L'\0') ++i;
-                owned.blacklist.emplace_back(&buf[start], i - start);
-                ++i;
-            }
-        }
-    }
-
-    size = 0;
     if (RegQueryValueExW(key, L"Whitelist", nullptr, nullptr, nullptr, &size) == ERROR_SUCCESS && size >= sizeof(wchar_t)) {
         std::vector<wchar_t> buf(size / sizeof(wchar_t) + 1, L'\0');
         DWORD got = size;
@@ -237,13 +263,14 @@ bool RestoreOwned() {
 
     bool ok = true;
 
-    if (!owned.blacklist.empty()) {
-        StrList black;
-        if (IoGetList(dev.h, kIoctlGetBlacklist, black)) {
-            if (RemoveAll(black, owned.blacklist)) ok &= IoSetList(dev.h, kIoctlSetBlacklist, black);
-        } else {
-            ok = false;
-        }
+    StrList black;
+    bool haveBlack = false;
+    if (!owned.blacklist.empty() || owned.activeChanged) {
+        haveBlack = IoGetList(dev.h, kIoctlGetBlacklist, black);
+        if (!haveBlack) ok = false;
+    }
+    if (haveBlack && !owned.blacklist.empty()) {
+        if (RemoveAll(black, owned.blacklist)) ok &= IoSetList(dev.h, kIoctlSetBlacklist, black);
     }
 
     if (!owned.whitelist.empty()) {
@@ -255,8 +282,17 @@ bool RestoreOwned() {
         }
     }
 
-    if (owned.activeChanged) {
-        ok &= IoSetBool(dev.h, kIoctlSetActive, FALSE);
+    if (owned.activeChanged && haveBlack) {
+        // Switch HidHide off again only when nothing else started relying on it meanwhile: every entry that is
+        // still in the blacklist must have been there before this app added anything (another tool such as
+        // DS4Windows may have added its own entries and needs HidHide to stay on).
+        bool othersAdded;
+        if (owned.hasBaseline) {
+            othersAdded = std::any_of(black.begin(), black.end(), [&](const std::wstring& s) { return !Contains(owned.baseline, s); });
+        } else {
+            othersAdded = !black.empty(); // record from an older version: be conservative
+        }
+        if (!othersAdded) ok &= IoSetBool(dev.h, kIoctlSetActive, FALSE);
     }
 
     if (ok) ClearOwned();
@@ -274,13 +310,45 @@ bool DeviceHider::RecoverStale() {
     return RestoreOwned();
 }
 
+bool DeviceHider::IsPresent(DWORD vid, DWORD pid) {
+    return !FindHidInstanceIds(vid, pid, false).empty();
+}
+
+std::vector<std::wstring> DeviceHider::PresentInstanceIds(DWORD vid, DWORD pid) {
+    return FindHidInstanceIds(vid, pid, false);
+}
+
+void DeviceHider::SaveLastController(DWORD vid, DWORD pid) {
+    HKEY key;
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, kLastControllerKey, 0, nullptr, 0, KEY_WRITE, nullptr, &key, nullptr) != ERROR_SUCCESS) return;
+    RegSetValueExW(key, L"Vid", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&vid), sizeof(vid));
+    RegSetValueExW(key, L"Pid", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&pid), sizeof(pid));
+    RegCloseKey(key);
+}
+
+bool DeviceHider::LoadLastController(DWORD& vid, DWORD& pid) {
+    HKEY key;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, kLastControllerKey, 0, KEY_READ, &key) != ERROR_SUCCESS) return false;
+    DWORD v = 0, p = 0, size = sizeof(DWORD);
+    bool ok = RegQueryValueExW(key, L"Vid", nullptr, nullptr, reinterpret_cast<LPBYTE>(&v), &size) == ERROR_SUCCESS;
+    size = sizeof(DWORD);
+    ok = ok && RegQueryValueExW(key, L"Pid", nullptr, nullptr, reinterpret_cast<LPBYTE>(&p), &size) == ERROR_SUCCESS;
+    RegCloseKey(key);
+    if (ok && v != 0) { vid = v; pid = p; }
+    return ok && v != 0;
+}
+
 HideResult DeviceHider::Hide(DWORD vid, DWORD pid) {
-    if (m_hidden) return HideResult::Hidden;
+    std::lock_guard<std::mutex> lock(m_lock);
+    if (m_hidden.load()) {
+        // Also picks up a new instance of the same controller.
+        return MaintainLocked() ? HideResult::Repaired : HideResult::StillHidden;
+    }
 
     HandleGuard dev(OpenHidHide());
     if (!dev.Valid()) return HideResult::NotInstalled;
 
-    StrList ids = FindHidInstanceIds(vid, pid);
+    StrList ids = FindHidInstanceIds(vid, pid, true);
     if (ids.empty()) return HideResult::DeviceNotFound;
 
     // An inverted application list changes the meaning of every entry; leave such setups alone.
@@ -297,31 +365,50 @@ HideResult DeviceHider::Hide(DWORD vid, DWORD pid) {
         return HideResult::Failed;
     }
 
+    // A record from an earlier session that ended unexpectedly means entries of ours may still be in place.
+    // Take them over instead of giving them back and hiding again: that gap would let programs grab the controller.
     OwnedEntries owned;
-    for (const auto& id : ids) {
-        if (!Contains(black, id)) owned.blacklist.push_back(id);
+    const bool hadRecord = LoadOwned(owned);
+    if (!hadRecord) {
+        owned = OwnedEntries{};
+        owned.activeChanged = !active;
+        owned.baseline = black;
+        owned.hasBaseline = true;
     }
-    if (!Contains(white, ntPath)) owned.whitelist = ntPath;
-    owned.activeChanged = !active;
 
-    if (owned.blacklist.empty() && owned.whitelist.empty() && !owned.activeChanged) {
+    StrList addBlack;
+    for (const auto& id : ids) {
+        if (!Contains(black, id)) addBlack.push_back(id);
+    }
+    const bool addWhite = !Contains(white, ntPath);
+    const bool turnOn = !active;
+
+    for (const auto& id : addBlack) {
+        const bool existedBefore = owned.hasBaseline && Contains(owned.baseline, id);
+        if (!existedBefore && !Contains(owned.blacklist, id)) owned.blacklist.push_back(id);
+    }
+    if (addWhite && owned.whitelist.empty()) owned.whitelist = ntPath;
+
+    if (addBlack.empty() && !addWhite && !turnOn) {
+        m_vid = vid;
+        m_pid = pid;
         m_hidden = true;
-        return HideResult::AlreadyHidden;
+        return hadRecord ? HideResult::Adopted : HideResult::AlreadyHidden;
     }
 
     // Record first, so a crash between the steps below can still be cleaned up.
     if (!SaveOwned(owned)) return HideResult::Failed;
 
     bool ok = true;
-    if (!owned.whitelist.empty()) {
-        white.push_back(owned.whitelist);
+    if (addWhite) {
+        white.push_back(ntPath);
         ok &= IoSetList(dev.h, kIoctlSetWhitelist, white);
     }
-    if (ok && !owned.blacklist.empty()) {
-        black.insert(black.end(), owned.blacklist.begin(), owned.blacklist.end());
+    if (ok && !addBlack.empty()) {
+        black.insert(black.end(), addBlack.begin(), addBlack.end());
         ok &= IoSetList(dev.h, kIoctlSetBlacklist, black);
     }
-    if (ok && owned.activeChanged) {
+    if (ok && turnOn) {
         ok &= IoSetBool(dev.h, kIoctlSetActive, TRUE);
     }
 
@@ -330,11 +417,71 @@ HideResult DeviceHider::Hide(DWORD vid, DWORD pid) {
         return HideResult::Failed;
     }
 
+    m_vid = vid;
+    m_pid = pid;
     m_hidden = true;
     return HideResult::Hidden;
 }
 
+bool DeviceHider::MaintainLocked() {
+    if (!m_hidden.load()) return false;
+
+    HandleGuard dev(OpenHidHide());
+    if (!dev.Valid()) return false;
+
+    StrList ids = FindHidInstanceIds(m_vid, m_pid, true);
+    StrList white, black;
+    BOOLEAN active = FALSE;
+    std::wstring ntPath;
+    if (!IoGetList(dev.h, kIoctlGetWhitelist, white) ||
+        !IoGetList(dev.h, kIoctlGetBlacklist, black) ||
+        !IoGetBool(dev.h, kIoctlGetActive, active) ||
+        !GetOwnNtPath(ntPath)) {
+        return false;
+    }
+
+    StrList addBlack;
+    for (const auto& id : ids) {
+        if (!Contains(black, id)) addBlack.push_back(id);
+    }
+    const bool addWhite = !Contains(white, ntPath);
+    const bool turnOn = !active;
+    if (addBlack.empty() && !addWhite && !turnOn) return false;
+
+    // Keep the ownership record in step so that Restore() still removes exactly what this app added.
+    // An entry that existed before this app started is not ours to remove, and "switched on by us" keeps
+    // its original meaning (HidHide was off when this app started).
+    OwnedEntries owned;
+    if (!LoadOwned(owned)) owned = OwnedEntries{};
+    for (const auto& id : addBlack) {
+        const bool existedBefore = owned.hasBaseline && Contains(owned.baseline, id);
+        if (!existedBefore && !Contains(owned.blacklist, id)) owned.blacklist.push_back(id);
+    }
+    if (addWhite && owned.whitelist.empty()) owned.whitelist = ntPath;
+    SaveOwned(owned);
+
+    bool ok = true;
+    if (addWhite) {
+        white.push_back(ntPath);
+        ok &= IoSetList(dev.h, kIoctlSetWhitelist, white);
+    }
+    if (ok && !addBlack.empty()) {
+        black.insert(black.end(), addBlack.begin(), addBlack.end());
+        ok &= IoSetList(dev.h, kIoctlSetBlacklist, black);
+    }
+    if (ok && turnOn) {
+        ok &= IoSetBool(dev.h, kIoctlSetActive, TRUE);
+    }
+    return ok;
+}
+
+bool DeviceHider::Maintain() {
+    std::lock_guard<std::mutex> lock(m_lock);
+    return MaintainLocked();
+}
+
 bool DeviceHider::Restore() {
+    std::lock_guard<std::mutex> lock(m_lock);
     bool restored = RestoreOwned();
     m_hidden = false;
     return restored;

@@ -15,6 +15,9 @@ bool IsViGEmBusInstalled();
 using DriverProgressCb = std::function<void(int percent, const std::wstring& status)>;
 using DriverFinishedCb = std::function<void(bool success, const std::wstring& message)>;
 
+// Message passed to DriverFinishedCb when the downloaded file was not signed by the expected publisher.
+inline constexpr const wchar_t* kDriverNotVerified = L"not-verified";
+
 void StartViGEmBusInstall(HWND hwnd, DriverProgressCb onProgress, DriverFinishedCb onFinished);
 
 // MARK: - Optional hiding driver (HidHide)

@@ -4,6 +4,11 @@
 //   InputProbe vigem          plug a virtual pad, feed trigger values 0..255 and read them back through XInput
 //   InputProbe pad [secs]     sample the controller the way the app reads it (trigger depth, sticks, clicks)
 //   InputProbe xinput [secs]  watch what games receive: every XInput pad (with the app running, the virtual one)
+//   InputProbe btstatus <12 hex digit address>   what Windows reports for the link of one Bluetooth LE device (read-only)
+//   InputProbe press <secs>   plug a virtual pad and keep pressing its A button and moving a stick, so a browser exposes it
+//   InputProbe btnode         show which Bluetooth node the disconnect would disable and the exact command (dry run, changes nothing)
+//   InputProbe rawinput       list the game controllers Raw Input reports (what browsers and many games read)
+//   InputProbe wgi            list the controllers Windows.Gaming.Input reports (what browsers and UWP games read)
 //   InputProbe dinput [secs]  show the DirectInput objects of the 8BitDo and, when secs > 0, sample it
 //                             for that long (pull both triggers slowly, press every button once)
 // Build: cmake --build build --config Release --target InputProbe
@@ -20,8 +25,16 @@ extern "C" {
 }
 #include <hidpi.h>
 #include <xinput.h>
+#include <winrt/base.h>
+#include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/Windows.Gaming.Input.h>
+#include <winrt/Windows.Devices.Bluetooth.h>
+#include <winrt/Windows.Devices.Enumeration.h>
 #include "ViGEm/Client.h"
 #include "PadFormat.h"
+#include "ControllerDisconnect.h"
+#include "DeviceHider.h"
 #include <cstdio>
 #include <cstdarg>
 #include <string>
@@ -35,6 +48,7 @@ extern "C" {
 #pragma comment(lib, "hid.lib")
 #pragma comment(lib, "advapi32.lib")
 #pragma comment(lib, "xinput.lib")
+#pragma comment(lib, "windowsapp.lib")
 
 namespace {
 
@@ -453,6 +467,96 @@ void WatchXInput(int seconds) {
     if (!any) Out(L"No XInput pad is connected (is the app running with the controller on?)\n");
 }
 
+// MARK: - What browsers and many games see
+void ShowRawInput() {
+    UINT count = 0;
+    GetRawInputDeviceList(nullptr, &count, sizeof(RAWINPUTDEVICELIST));
+    std::vector<RAWINPUTDEVICELIST> list(count);
+    if (count == 0 || GetRawInputDeviceList(list.data(), &count, sizeof(RAWINPUTDEVICELIST)) == (UINT)-1) {
+        Out(L"Raw Input returned no devices\n");
+        return;
+    }
+    int pads = 0;
+    for (UINT i = 0; i < count; ++i) {
+        if (list[i].dwType != RIM_TYPEHID) continue;
+        RID_DEVICE_INFO info = {};
+        info.cbSize = sizeof(info);
+        UINT size = sizeof(info);
+        if (GetRawInputDeviceInfoW(list[i].hDevice, RIDI_DEVICEINFO, &info, &size) == (UINT)-1) continue;
+        // Game pads and joysticks only (generic desktop page, usage 4 or 5).
+        if (info.hid.usUsagePage != 0x01 || (info.hid.usUsage != 0x04 && info.hid.usUsage != 0x05)) continue;
+        ++pads;
+        wchar_t name[512] = {};
+        UINT nameLen = 512;
+        GetRawInputDeviceInfoW(list[i].hDevice, RIDI_DEVICENAME, name, &nameLen);
+        Out(L"  VID %04lX PID %04lX  usage 0x%02X  %s\n", info.hid.dwVendorId, info.hid.dwProductId, info.hid.usUsage, name);
+    }
+    Out(L"Raw Input game controllers: %d\n", pads);
+}
+
+void ShowWgi() {
+    using namespace winrt::Windows::Gaming::Input;
+    winrt::init_apartment(winrt::apartment_type::multi_threaded);
+    Sleep(2000);   // the list is filled asynchronously
+    auto raws = RawGameController::RawGameControllers();
+    Out(L"Windows.Gaming.Input raw game controllers: %u\n", raws.Size());
+    for (auto const& c : raws) {
+        Out(L"  %s  (VID %04X PID %04X)\n", c.DisplayName().c_str(), (unsigned)c.HardwareVendorId(), (unsigned)c.HardwareProductId());
+    }
+    auto pads = Gamepad::Gamepads();
+    Out(L"Windows.Gaming.Input gamepads: %u\n", pads.Size());
+}
+
+// MARK: - Dry run of "disconnect the controller when the app closes"
+void ShowBluetoothNode() {
+    const DWORD vid = 0x2DC8, pid = 0x301B;
+    Out(L"Connected HID entries of the controller:\n");
+    for (const auto& id : Ultimate2CFixer::DeviceHider::PresentInstanceIds(vid, pid)) Out(L"  %s\n", id.c_str());
+    std::wstring node = Ultimate2CFixer::FindConnectedBluetoothNode(vid, pid);
+    if (node.empty()) { Out(L"No Bluetooth LE node found: nothing would be disconnected.\n"); return; }
+    Out(L"Bluetooth node that would be disabled and enabled again:\n  %s\n", node.c_str());
+    Out(L"cmd.exe would run (elevated, after the permission prompt):\n  %s\n", Ultimate2CFixer::BuildReconnectCommand(node).c_str());
+}
+
+// MARK: - Link state of a Bluetooth LE device
+void ShowBluetoothLinkState(const wchar_t* hexAddress) {
+    using namespace winrt::Windows::Devices::Bluetooth;
+    winrt::init_apartment(winrt::apartment_type::multi_threaded);
+    uint64_t address = _wcstoui64(hexAddress, nullptr, 16);
+    auto device = BluetoothLEDevice::FromBluetoothAddressAsync(address).get();
+    if (!device) { Out(L"Windows has no Bluetooth LE device with address %012llX\n", address); return; }
+    Out(L"Name: %s\n", device.Name().c_str());
+    Out(L"Connection status: %s\n", device.ConnectionStatus() == BluetoothConnectionStatus::Connected ? L"Connected" : L"Disconnected");
+    Out(L"Paired: %s\n", device.DeviceInformation().Pairing().IsPaired() ? L"yes" : L"no");
+}
+
+// MARK: - A virtual pad with activity (browsers only list a pad after it was used)
+void PressPad(int seconds) {
+    PVIGEM_CLIENT client = vigem_alloc();
+    if (!client || !VIGEM_SUCCESS(vigem_connect(client))) { Out(L"Could not connect to ViGEmBus\n"); return; }
+    PVIGEM_TARGET pad = vigem_target_x360_alloc();
+    if (!VIGEM_SUCCESS(vigem_target_add(client, pad))) { Out(L"Could not plug the virtual pad\n"); vigem_target_free(pad); vigem_free(client); return; }
+    Sleep(800);
+    ULONG idx = 99;
+    vigem_target_x360_get_user_index(client, pad, &idx);
+    Out(L"virtual pad plugged, Windows gave it XInput slot %lu (player %lu)\n", idx, idx + 1);
+    ULONGLONG end = GetTickCount64() + (ULONGLONG)seconds * 1000;
+    int tick = 0;
+    while (GetTickCount64() < end) {
+        XUSB_REPORT r = {};
+        r.wButtons = (tick / 3) % 2 ? XUSB_GAMEPAD_A : 0;
+        r.sThumbLX = (SHORT)((tick % 20) * 1500);
+        vigem_target_x360_update(client, pad, r);
+        Sleep(100);
+        ++tick;
+    }
+    vigem_target_remove(client, pad);
+    vigem_target_free(pad);
+    vigem_disconnect(client);
+    vigem_free(client);
+    Out(L"virtual pad removed\n");
+}
+
 } // namespace
 
 int wmain(int argc, wchar_t** argv) {
@@ -463,7 +567,12 @@ int wmain(int argc, wchar_t** argv) {
     else if (mode == L"vigem") TestVigem();
     else if (mode == L"pad") SamplePad(argc > 2 ? _wtoi(argv[2]) : 0);
     else if (mode == L"xinput") WatchXInput(argc > 2 ? _wtoi(argv[2]) : 3);
+    else if (mode == L"press") PressPad(argc > 2 ? _wtoi(argv[2]) : 10);
+    else if (mode == L"btstatus" && argc > 2) ShowBluetoothLinkState(argv[2]);
+    else if (mode == L"btnode") ShowBluetoothNode();
+    else if (mode == L"rawinput") ShowRawInput();
+    else if (mode == L"wgi") ShowWgi();
     else if (mode == L"dinput") ShowDirectInput(argc > 2 ? _wtoi(argv[2]) : 0);
-    else Out(L"usage: InputProbe hidhide | hid | vigem | pad [seconds] | xinput [seconds] | dinput [seconds]\n");
+    else Out(L"usage: InputProbe hidhide | hid | vigem | pad [seconds] | xinput [seconds] | btnode | rawinput | wgi | dinput [seconds]\n");
     return 0;
 }
