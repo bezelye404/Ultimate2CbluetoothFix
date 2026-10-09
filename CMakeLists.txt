@@ -6,8 +6,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(MSVC)
     add_compile_options(/W4 /utf-8 /permissive- /EHsc /wd4828)
-    # Enable C++/WinRT if available
-    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/await>)
+endif()
+
+if(MSVC)
+    add_compile_options($<$<CONFIG:Release>:/GL>)
+    add_link_options($<$<CONFIG:Release>:/LTCG> $<$<CONFIG:Release>:/OPT:REF> $<$<CONFIG:Release>:/OPT:ICF>)
 endif()
 
 add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
