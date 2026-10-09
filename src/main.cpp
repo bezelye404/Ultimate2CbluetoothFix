@@ -1176,6 +1176,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             UpdatePollingRateButtonText();
             UpdateCurveButtonText();
             SetupTray(hwnd);
+            SetTimer(hwnd, 2, 5000, nullptr);   // one-shot: give back the memory used only while starting
             SetTimer(hwnd, 1, 500, nullptr);   // lets the rate readout fall back to "Idle" when no input arrives
 
             // MARK: Driver & First-Launch Check
@@ -1326,6 +1327,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             return 0;
 
         case WM_TIMER: {
+            if (wParam == 2) {
+                KillTimer(hwnd, 2);
+                TrimWorkingSet();
+                return 0;
+            }
             if (wParam == 1 && !g_showSettings && g_currentStatus == RemapperStatus::Connected &&
                 IsWindowVisible(hwnd) && !IsIconic(hwnd)) {
                 RECT rcRate = { S(284), S(82), S(470), S(98) };
