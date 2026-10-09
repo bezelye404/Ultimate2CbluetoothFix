@@ -4,6 +4,8 @@
 //   InputProbe vigem          plug a virtual pad, feed trigger values 0..255 and read them back through XInput
 //   InputProbe pad [secs]     sample the controller the way the app reads it (trigger depth, sticks, clicks)
 //   InputProbe xinput [secs]  watch what games receive: every XInput pad (with the app running, the virtual one)
+//   InputProbe rawinput       list the game controllers Raw Input reports (what browsers and many games read)
+//   InputProbe wgi            list the controllers Windows.Gaming.Input reports (what browsers and UWP games read)
 //   InputProbe dinput [secs]  show the DirectInput objects of the 8BitDo and, when secs > 0, sample it
 //                             for that long (pull both triggers slowly, press every button once)
 // Build: cmake --build build --config Release --target InputProbe
@@ -20,6 +22,10 @@ extern "C" {
 }
 #include <hidpi.h>
 #include <xinput.h>
+#include <winrt/base.h>
+#include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/Windows.Gaming.Input.h>
 #include "ViGEm/Client.h"
 #include "PadFormat.h"
 #include <cstdio>
@@ -35,6 +41,7 @@ extern "C" {
 #pragma comment(lib, "hid.lib")
 #pragma comment(lib, "advapi32.lib")
 #pragma comment(lib, "xinput.lib")
+#pragma comment(lib, "windowsapp.lib")
 
 namespace {
 
@@ -453,6 +460,46 @@ void WatchXInput(int seconds) {
     if (!any) Out(L"No XInput pad is connected (is the app running with the controller on?)\n");
 }
 
+// MARK: - What browsers and many games see
+void ShowRawInput() {
+    UINT count = 0;
+    GetRawInputDeviceList(nullptr, &count, sizeof(RAWINPUTDEVICELIST));
+    std::vector<RAWINPUTDEVICELIST> list(count);
+    if (count == 0 || GetRawInputDeviceList(list.data(), &count, sizeof(RAWINPUTDEVICELIST)) == (UINT)-1) {
+        Out(L"Raw Input returned no devices\n");
+        return;
+    }
+    int pads = 0;
+    for (UINT i = 0; i < count; ++i) {
+        if (list[i].dwType != RIM_TYPEHID) continue;
+        RID_DEVICE_INFO info = {};
+        info.cbSize = sizeof(info);
+        UINT size = sizeof(info);
+        if (GetRawInputDeviceInfoW(list[i].hDevice, RIDI_DEVICEINFO, &info, &size) == (UINT)-1) continue;
+        // Game pads and joysticks only (generic desktop page, usage 4 or 5).
+        if (info.hid.usUsagePage != 0x01 || (info.hid.usUsage != 0x04 && info.hid.usUsage != 0x05)) continue;
+        ++pads;
+        wchar_t name[512] = {};
+        UINT nameLen = 512;
+        GetRawInputDeviceInfoW(list[i].hDevice, RIDI_DEVICENAME, name, &nameLen);
+        Out(L"  VID %04lX PID %04lX  usage 0x%02X  %s\n", info.hid.dwVendorId, info.hid.dwProductId, info.hid.usUsage, name);
+    }
+    Out(L"Raw Input game controllers: %d\n", pads);
+}
+
+void ShowWgi() {
+    using namespace winrt::Windows::Gaming::Input;
+    winrt::init_apartment(winrt::apartment_type::multi_threaded);
+    Sleep(2000);   // the list is filled asynchronously
+    auto raws = RawGameController::RawGameControllers();
+    Out(L"Windows.Gaming.Input raw game controllers: %u\n", raws.Size());
+    for (auto const& c : raws) {
+        Out(L"  %s  (VID %04X PID %04X)\n", c.DisplayName().c_str(), (unsigned)c.HardwareVendorId(), (unsigned)c.HardwareProductId());
+    }
+    auto pads = Gamepad::Gamepads();
+    Out(L"Windows.Gaming.Input gamepads: %u\n", pads.Size());
+}
+
 } // namespace
 
 int wmain(int argc, wchar_t** argv) {
@@ -463,7 +510,9 @@ int wmain(int argc, wchar_t** argv) {
     else if (mode == L"vigem") TestVigem();
     else if (mode == L"pad") SamplePad(argc > 2 ? _wtoi(argv[2]) : 0);
     else if (mode == L"xinput") WatchXInput(argc > 2 ? _wtoi(argv[2]) : 3);
+    else if (mode == L"rawinput") ShowRawInput();
+    else if (mode == L"wgi") ShowWgi();
     else if (mode == L"dinput") ShowDirectInput(argc > 2 ? _wtoi(argv[2]) : 0);
-    else Out(L"usage: InputProbe hidhide | hid | vigem | pad [seconds] | xinput [seconds] | dinput [seconds]\n");
+    else Out(L"usage: InputProbe hidhide | hid | vigem | pad [seconds] | xinput [seconds] | rawinput | wgi | dinput [seconds]\n");
     return 0;
 }
