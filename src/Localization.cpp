@@ -76,7 +76,7 @@ std::wstring GetEnglish(StringId id) {
         case StringId::LogHideRestored: return L"Original controller is visible to games again.";
         case StringId::LogHideSuspended: return L"Controller could not be read while hidden. Hiding is turned off for this session.";
         case StringId::LogHideRecovered: return L"Restored controller visibility left over from a previous session.";
-        case StringId::LogHideApplyNext: return L"This change applies the next time the service starts.";
+        case StringId::LogHideRepaired: return L"Hiding was changed by another program and has been restored. If games still see two controllers, turn the controller off and on again.";
         case StringId::LogHideInstalling: return L"Downloading hiding driver... Please accept the Windows prompt when it appears.";
         case StringId::LogHideInstalled: return L"Hiding driver installed.";
         case StringId::LogHideInstallFailed: return L"Hiding driver could not be downloaded. Please check your internet connection.";
@@ -164,7 +164,7 @@ std::wstring GetTurkish(StringId id) {
         case StringId::LogHideRestored: return L"Orijinal kontrolcü oyunlara yeniden görünür.";
         case StringId::LogHideSuspended: return L"Kontrolcü gizliyken okunamadı. Gizleme bu oturum için kapatıldı.";
         case StringId::LogHideRecovered: return L"Önceki oturumdan kalan kontrolcü gizleme ayarı geri alındı.";
-        case StringId::LogHideApplyNext: return L"Bu değişiklik servis bir sonraki başlatılışında uygulanır.";
+        case StringId::LogHideRepaired: return L"Gizleme başka bir program tarafından değiştirildi ve yeniden uygulandı. Oyunlar hâlâ iki kontrolcü görüyorsa kontrolcüyü kapatıp açın.";
         case StringId::LogHideInstalling: return L"Gizleme sürücüsü indiriliyor... Windows onayı çıkınca lütfen kabul edin.";
         case StringId::LogHideInstalled: return L"Gizleme sürücüsü kuruldu.";
         case StringId::LogHideInstallFailed: return L"Gizleme sürücüsü indirilemedi. Lütfen internet bağlantınızı kontrol edin.";
@@ -252,7 +252,7 @@ std::wstring GetSpanish(StringId id) {
         case StringId::LogHideRestored: return L"El control real vuelve a ser visible para los juegos.";
         case StringId::LogHideSuspended: return L"No se pudo leer el control mientras estaba oculto. La ocultación se desactivó en esta sesión.";
         case StringId::LogHideRecovered: return L"Se restauró la visibilidad del control que quedó de una sesión anterior.";
-        case StringId::LogHideApplyNext: return L"Este cambio se aplicará la próxima vez que se inicie el servicio.";
+        case StringId::LogHideRepaired: return L"Otro programa cambió la ocultación y se restableció. Si los juegos siguen viendo dos controles, apaga y vuelve a encender el control.";
         case StringId::LogHideInstalling: return L"Descargando controlador de ocultación... Acepta el aviso de Windows cuando aparezca.";
         case StringId::LogHideInstalled: return L"Controlador de ocultación instalado.";
         case StringId::LogHideInstallFailed: return L"No se pudo descargar el controlador de ocultación. Comprueba tu conexión a Internet.";

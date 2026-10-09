@@ -23,6 +23,7 @@ constexpr DWORD kIoctlSetActive    = CTL_CODE(kHidHideDeviceType, 2053, METHOD_B
 constexpr DWORD kIoctlGetWlInverse = CTL_CODE(kHidHideDeviceType, 2054, METHOD_BUFFERED, FILE_READ_DATA);
 
 constexpr wchar_t kStateKey[] = L"Software\\Ultimate2CFixer\\HidHideState";
+constexpr wchar_t kLastControllerKey[] = L"Software\\Ultimate2CFixer\\LastController";
 
 using StrList = std::vector<std::wstring>;
 
@@ -119,13 +120,17 @@ bool GetOwnNtPath(std::wstring& out) {
     return true;
 }
 
-// Locates the HID device instances of the physical controller.
-StrList FindHidInstanceIds(DWORD vid, DWORD pid) {
+// Locates the HID device instances of the physical controller. With includeAbsent the entries Windows
+// remembers for a controller that is switched off right now are returned as well (including the other
+// Bluetooth identity of the same controller), so they can be hidden before the controller connects.
+StrList FindHidInstanceIds(DWORD vid, DWORD pid, bool includeAbsent) {
     StrList result;
     // GUID_DEVINTERFACE_HID
     static const GUID kHidInterface = { 0x4D1E55B2, 0xF16F, 0x11CF, { 0x88, 0xCB, 0x00, 0x11, 0x11, 0x00, 0x00, 0x30 } };
 
-    HDEVINFO set = SetupDiGetClassDevsW(&kHidInterface, nullptr, nullptr, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT);
+    HDEVINFO set = includeAbsent
+        ? SetupDiGetClassDevsW(nullptr, L"HID", nullptr, DIGCF_ALLCLASSES)
+        : SetupDiGetClassDevsW(&kHidInterface, nullptr, nullptr, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT);
     if (set == INVALID_HANDLE_VALUE) return result;
 
     wchar_t vidStr[8], pidStr[8];
@@ -144,7 +149,7 @@ StrList FindHidInstanceIds(DWORD vid, DWORD pid) {
         if (upper.find(vidStr) == std::wstring::npos || upper.find(pidStr) == std::wstring::npos) continue;
 
         if (!Contains(result, id)) result.emplace_back(id);
-        if (result.size() >= 8) break;
+        if (result.size() >= 16) break;
     }
     SetupDiDestroyDeviceInfoList(set);
     return result;
@@ -301,13 +306,41 @@ bool DeviceHider::RecoverStale() {
     return RestoreOwned();
 }
 
+bool DeviceHider::IsPresent(DWORD vid, DWORD pid) {
+    return !FindHidInstanceIds(vid, pid, false).empty();
+}
+
+void DeviceHider::SaveLastController(DWORD vid, DWORD pid) {
+    HKEY key;
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, kLastControllerKey, 0, nullptr, 0, KEY_WRITE, nullptr, &key, nullptr) != ERROR_SUCCESS) return;
+    RegSetValueExW(key, L"Vid", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&vid), sizeof(vid));
+    RegSetValueExW(key, L"Pid", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&pid), sizeof(pid));
+    RegCloseKey(key);
+}
+
+bool DeviceHider::LoadLastController(DWORD& vid, DWORD& pid) {
+    HKEY key;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, kLastControllerKey, 0, KEY_READ, &key) != ERROR_SUCCESS) return false;
+    DWORD v = 0, p = 0, size = sizeof(DWORD);
+    bool ok = RegQueryValueExW(key, L"Vid", nullptr, nullptr, reinterpret_cast<LPBYTE>(&v), &size) == ERROR_SUCCESS;
+    size = sizeof(DWORD);
+    ok = ok && RegQueryValueExW(key, L"Pid", nullptr, nullptr, reinterpret_cast<LPBYTE>(&p), &size) == ERROR_SUCCESS;
+    RegCloseKey(key);
+    if (ok && v != 0) { vid = v; pid = p; }
+    return ok && v != 0;
+}
+
 HideResult DeviceHider::Hide(DWORD vid, DWORD pid) {
-    if (m_hidden) return HideResult::Hidden;
+    std::lock_guard<std::mutex> lock(m_lock);
+    if (m_hidden.load()) {
+        MaintainLocked();   // also picks up a new instance of the same controller
+        return HideResult::Hidden;
+    }
 
     HandleGuard dev(OpenHidHide());
     if (!dev.Valid()) return HideResult::NotInstalled;
 
-    StrList ids = FindHidInstanceIds(vid, pid);
+    StrList ids = FindHidInstanceIds(vid, pid, true);
     if (ids.empty()) return HideResult::DeviceNotFound;
 
     // An inverted application list changes the meaning of every entry; leave such setups alone.
@@ -334,6 +367,8 @@ HideResult DeviceHider::Hide(DWORD vid, DWORD pid) {
     owned.hasBaseline = true;
 
     if (owned.blacklist.empty() && owned.whitelist.empty() && !owned.activeChanged) {
+        m_vid = vid;
+        m_pid = pid;
         m_hidden = true;
         return HideResult::AlreadyHidden;
     }
@@ -359,11 +394,71 @@ HideResult DeviceHider::Hide(DWORD vid, DWORD pid) {
         return HideResult::Failed;
     }
 
+    m_vid = vid;
+    m_pid = pid;
     m_hidden = true;
     return HideResult::Hidden;
 }
 
+bool DeviceHider::MaintainLocked() {
+    if (!m_hidden.load()) return false;
+
+    HandleGuard dev(OpenHidHide());
+    if (!dev.Valid()) return false;
+
+    StrList ids = FindHidInstanceIds(m_vid, m_pid, true);
+    StrList white, black;
+    BOOLEAN active = FALSE;
+    std::wstring ntPath;
+    if (!IoGetList(dev.h, kIoctlGetWhitelist, white) ||
+        !IoGetList(dev.h, kIoctlGetBlacklist, black) ||
+        !IoGetBool(dev.h, kIoctlGetActive, active) ||
+        !GetOwnNtPath(ntPath)) {
+        return false;
+    }
+
+    StrList addBlack;
+    for (const auto& id : ids) {
+        if (!Contains(black, id)) addBlack.push_back(id);
+    }
+    const bool addWhite = !Contains(white, ntPath);
+    const bool turnOn = !active;
+    if (addBlack.empty() && !addWhite && !turnOn) return false;
+
+    // Keep the ownership record in step so that Restore() still removes exactly what this app added.
+    // An entry that existed before this app started is not ours to remove, and "switched on by us" keeps
+    // its original meaning (HidHide was off when this app started).
+    OwnedEntries owned;
+    if (!LoadOwned(owned)) owned = OwnedEntries{};
+    for (const auto& id : addBlack) {
+        const bool existedBefore = owned.hasBaseline && Contains(owned.baseline, id);
+        if (!existedBefore && !Contains(owned.blacklist, id)) owned.blacklist.push_back(id);
+    }
+    if (addWhite && owned.whitelist.empty()) owned.whitelist = ntPath;
+    SaveOwned(owned);
+
+    bool ok = true;
+    if (addWhite) {
+        white.push_back(ntPath);
+        ok &= IoSetList(dev.h, kIoctlSetWhitelist, white);
+    }
+    if (ok && !addBlack.empty()) {
+        black.insert(black.end(), addBlack.begin(), addBlack.end());
+        ok &= IoSetList(dev.h, kIoctlSetBlacklist, black);
+    }
+    if (ok && turnOn) {
+        ok &= IoSetBool(dev.h, kIoctlSetActive, TRUE);
+    }
+    return ok;
+}
+
+bool DeviceHider::Maintain() {
+    std::lock_guard<std::mutex> lock(m_lock);
+    return MaintainLocked();
+}
+
 bool DeviceHider::Restore() {
+    std::lock_guard<std::mutex> lock(m_lock);
     bool restored = RestoreOwned();
     m_hidden = false;
     return restored;

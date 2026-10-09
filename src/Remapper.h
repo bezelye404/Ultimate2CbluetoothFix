@@ -65,7 +65,8 @@ private:
     void WorkerLoop(HWND hwnd);
     bool InitViGEm();
     void UninitViGEm();
-    void ApplyDeviceHiding(DWORD vid, DWORD pid);
+    void ApplyDeviceHiding(DWORD vid, DWORD pid, bool quietWhenNotFound);
+    void HideWatchdogLoop();
     void NoteConnectFailure();
     void RevertHiding(StringId reason);
 
@@ -101,11 +102,15 @@ private:
     LONG m_idleRy{0};
 
     // Worker-thread only state for hiding the physical controller.
+    // Hiding is shared between the worker thread and the hiding watchdog thread.
     DeviceHider m_hider;
-    int m_lastHideReport{-1};
-    bool m_hidingSuspended{false};   // Hiding proved unsafe this session; stay visible.
-    bool m_hideJustApplied{false};   // Hiding was applied but the device is not yet confirmed readable.
-    int m_hideFailCount{0};
+    std::thread m_hideThread;
+    std::atomic<DWORD> m_knownVid{0};         // USB id of the controller (remembered from earlier sessions too)
+    std::atomic<DWORD> m_knownPid{0};
+    std::atomic<int> m_lastHideReport{-1};
+    std::atomic<bool> m_hidingSuspended{false};   // Hiding proved unsafe this session; stay visible.
+    std::atomic<bool> m_hideJustApplied{false};   // Hidden, but the device is not yet confirmed readable.
+    std::atomic<int> m_hideFailCount{0};
 };
 
 } // namespace Ultimate2CFixer

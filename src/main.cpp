@@ -1186,9 +1186,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     if (g_hideReal) {
                         OfferHidingDriverInstall(true);
                     }
-                    if (g_remapper && g_remapper->IsRunning()) {
-                        AppendLogMessage(Localization::Instance().Get(StringId::LogHideApplyNext));
-                    }
                     break;
                 case IDC_BTN_DEADZONE:
                     g_deadzoneLevel = (g_deadzoneLevel + 1) % 4;
