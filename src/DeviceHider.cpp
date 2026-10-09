@@ -123,8 +123,12 @@ bool GetOwnNtPath(std::wstring& out) {
 // Locates the HID device instances of the physical controller. With includeAbsent the entries Windows
 // remembers for a controller that is switched off right now are returned as well (including the other
 // Bluetooth identity of the same controller), so they can be hidden before the controller connects.
+constexpr size_t kMaxInstanceIds = 16;
+
 StrList FindHidInstanceIds(DWORD vid, DWORD pid, bool includeAbsent) {
-    StrList result;
+    // The entries of a controller that is connected right now come first, so the limit below can never cut
+    // the current one off when many old identities have piled up (every re-pairing leaves one behind).
+    StrList result = includeAbsent ? FindHidInstanceIds(vid, pid, false) : StrList{};
     // GUID_DEVINTERFACE_HID
     static const GUID kHidInterface = { 0x4D1E55B2, 0xF16F, 0x11CF, { 0x88, 0xCB, 0x00, 0x11, 0x11, 0x00, 0x00, 0x30 } };
 
@@ -149,7 +153,7 @@ StrList FindHidInstanceIds(DWORD vid, DWORD pid, bool includeAbsent) {
         if (upper.find(vidStr) == std::wstring::npos || upper.find(pidStr) == std::wstring::npos) continue;
 
         if (!Contains(result, id)) result.emplace_back(id);
-        if (result.size() >= 16) break;
+        if (result.size() >= kMaxInstanceIds) break;
     }
     SetupDiDestroyDeviceInfoList(set);
     return result;
