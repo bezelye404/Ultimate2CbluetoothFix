@@ -403,7 +403,7 @@ void UpdateUIStrings() {
     }
     SetWindowTextW(g_hBtnStop, loc.Get(StringId::StopBtn).c_str());
     SetWindowTextW(g_hBtnClearLogs, loc.Get(StringId::ClearBtn).c_str());
-    SetWindowTextW(g_hBtnLang, loc.NextCode());
+    SetWindowTextW(g_hBtnLang, loc.Code());
     SetWindowTextW(g_hChkStartWindows, loc.Get(StringId::StartWithWindows).c_str());
     SetWindowTextW(g_hChkMinimizeClose, loc.Get(StringId::MinimizeOnClose).c_str());
     SetWindowTextW(g_hChkAutoStart, loc.Get(StringId::AutoStartService).c_str());

@@ -261,11 +261,10 @@ std::wstring GetSpanish(StringId id) {
 
 } // namespace
 
-const wchar_t* Localization::NextCode() const {
-    // English -> Turkish -> Spanish -> English
+const wchar_t* Localization::Code() const {
     switch (m_language) {
-        case Language::English: return L"TR";
-        case Language::Turkish: return L"ES";
+        case Language::Turkish: return L"TR";
+        case Language::Spanish: return L"ES";
         default: return L"EN";
     }
 }

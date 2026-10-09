@@ -106,8 +106,8 @@ public:
         m_language = static_cast<Language>((static_cast<int>(m_language) + 1) % 3);
     }
 
-    // Code of the language the button switches to ("TR" while English is active).
-    const wchar_t* NextCode() const;
+    // Short code of the active language, shown on the language button.
+    const wchar_t* Code() const;
 
     std::wstring Get(StringId id) const;
 
