@@ -12,13 +12,10 @@ std::wstring GetEnglish(StringId id) {
         case StringId::AppTitle: return L"Ultimate2CFixer";
         case StringId::StatusTitle: return L"CONTROLLER STATUS";
         case StringId::BatteryTitle: return L"BATTERY";
-        case StringId::ModeDesc: return L"DirectInput -> XInput (Xbox 360)";
         case StringId::StartBtn: return L"Start Service";
         case StringId::StopBtn: return L"Stop Service";
-        case StringId::TrayBtn: return L"Minimize to Tray";
         case StringId::LogsTitle: return L"Terminal & Diagnostics";
         case StringId::ClearBtn: return L"Clear";
-        case StringId::Footer: return L"";
         case StringId::MinimizeOnClose: return L"Minimize to tray on close";
         case StringId::SettingsTitle: return L"SETTINGS";
         case StringId::StartWithWindows: return L"Start with Windows";
@@ -34,7 +31,6 @@ std::wstring GetEnglish(StringId id) {
         case StringId::DriverReadyFirstRun: return L"Gamepad driver (ViGEmBus) detected and ready. Have fun!";
         case StringId::DriverMissing: return L"Gamepad driver (ViGEmBus) is required to play.";
         case StringId::InstallDriverBtn: return L"Install Driver";
-        case StringId::DriverDownloading: return L"Downloading driver... %d%%";
         case StringId::DriverInstalling: return L"Starting installer... Please accept the Windows prompt.";
         case StringId::DriverSuccess: return L"Driver installed successfully! Ready to connect.";
         case StringId::DriverFailed: return L"Driver setup cancelled or could not be completed.";
@@ -51,7 +47,6 @@ std::wstring GetEnglish(StringId id) {
         case StringId::TrayExit: return L"Exit";
         case StringId::StatusSearching: return L"Searching for controller...";
         case StringId::StatusConnected: return L"Connected & Active";
-        case StringId::StatusDisconnected: return L"Disconnected";
         case StringId::StatusStopped: return L"Service Stopped";
         case StringId::NoDevice: return L"No Device Detected";
         case StringId::Idle: return L"Idle";
@@ -60,10 +55,8 @@ std::wstring GetEnglish(StringId id) {
         case StringId::LogServicesStarting: return L"Starting controller and battery services...";
         case StringId::LogServicesStopping: return L"Stopping services...";
         case StringId::LogMapperStart: return L"Controller service started.";
-        case StringId::LogMapperReady: return L"Controller connected and ready.";
         case StringId::LogMapperDisconnected: return L"Controller disconnected. Searching...";
         case StringId::LogBatteryActive: return L"Battery monitor active.";
-        case StringId::LogBatteryError: return L"Battery monitor scan warning.";
         case StringId::HideInstallTitle: return L"Install hiding driver";
         case StringId::HideInstallPrompt: return L"Hiding the original controller needs the free HidHide driver (about 8 MB, downloaded from its official release page). Download and install it now?";
         case StringId::LogHideActive: return L"Original controller hidden from games.";
@@ -103,13 +96,10 @@ std::wstring GetTurkish(StringId id) {
         case StringId::AppTitle: return L"Ultimate2CFixer";
         case StringId::StatusTitle: return L"KONTROLCÜ DURUMU";
         case StringId::BatteryTitle: return L"PİL";
-        case StringId::ModeDesc: return L"DirectInput -> XInput (Xbox 360)";
         case StringId::StartBtn: return L"Servisi Başlat";
         case StringId::StopBtn: return L"Servisi Durdur";
-        case StringId::TrayBtn: return L"Tepsiye Küçült";
         case StringId::LogsTitle: return L"Terminal ve Tanılama";
         case StringId::ClearBtn: return L"Temizle";
-        case StringId::Footer: return L"";
         case StringId::MinimizeOnClose: return L"Kapatıldığında tepsiye küçült";
         case StringId::SettingsTitle: return L"AYARLAR";
         case StringId::StartWithWindows: return L"Windows ile başlat";
@@ -125,7 +115,6 @@ std::wstring GetTurkish(StringId id) {
         case StringId::DriverReadyFirstRun: return L"Gerekli gamepad sürücüsü (ViGEmBus) sisteminizde hazır. İyi oyunlar!";
         case StringId::DriverMissing: return L"Oynamak için gamepad sürücüsü (ViGEmBus) gerekiyor.";
         case StringId::InstallDriverBtn: return L"Sürücüyü Kur";
-        case StringId::DriverDownloading: return L"Sürücü indiriliyor... %%%d";
         case StringId::DriverInstalling: return L"Kurulum başlatılıyor... Lütfen ekrandaki Windows onayını kabul edin.";
         case StringId::DriverSuccess: return L"Sürücü başarıyla kuruldu! Bağlanmaya hazır.";
         case StringId::DriverFailed: return L"Sürücü kurulumu iptal edildi veya tamamlanamadı.";
@@ -142,7 +131,6 @@ std::wstring GetTurkish(StringId id) {
         case StringId::TrayExit: return L"Çıkış";
         case StringId::StatusSearching: return L"Kontrolcü aranıyor...";
         case StringId::StatusConnected: return L"Bağlı ve Aktif";
-        case StringId::StatusDisconnected: return L"Bağlantı Koptu";
         case StringId::StatusStopped: return L"Servis Durduruldu";
         case StringId::NoDevice: return L"Cihaz Algılanmadı";
         case StringId::Idle: return L"Boşta";
@@ -151,10 +139,8 @@ std::wstring GetTurkish(StringId id) {
         case StringId::LogServicesStarting: return L"Servisler başlatılıyor...";
         case StringId::LogServicesStopping: return L"Servisler durduruluyor...";
         case StringId::LogMapperStart: return L"Kontrolcü servisi başlatıldı.";
-        case StringId::LogMapperReady: return L"Kontrolcü bağlanıldı ve hazır.";
         case StringId::LogMapperDisconnected: return L"Bağlantı koptu. Yeniden bağlanılıyor...";
         case StringId::LogBatteryActive: return L"Pil monitörü aktif.";
-        case StringId::LogBatteryError: return L"Pil tarama uyarısı.";
         case StringId::HideInstallTitle: return L"Gizleme sürücüsünü kur";
         case StringId::HideInstallPrompt: return L"Orijinal kontrolcüyü gizlemek için ücretsiz HidHide sürücüsü gerekiyor (yaklaşık 8 MB, resmi yayın sayfasından indirilir). Şimdi indirilip kurulsun mu?";
         case StringId::LogHideActive: return L"Orijinal kontrolcü oyunlardan gizlendi.";
@@ -194,13 +180,10 @@ std::wstring GetSpanish(StringId id) {
         case StringId::AppTitle: return L"Ultimate2CFixer";
         case StringId::StatusTitle: return L"ESTADO DEL CONTROL";
         case StringId::BatteryTitle: return L"BATERÍA";
-        case StringId::ModeDesc: return L"DirectInput -> XInput (Xbox 360)";
         case StringId::StartBtn: return L"Iniciar servicio";
         case StringId::StopBtn: return L"Detener servicio";
-        case StringId::TrayBtn: return L"Minimizar a la bandeja";
         case StringId::LogsTitle: return L"Terminal y diagnóstico";
         case StringId::ClearBtn: return L"Limpiar";
-        case StringId::Footer: return L"";
         case StringId::MinimizeOnClose: return L"Minimizar a la bandeja al cerrar";
         case StringId::SettingsTitle: return L"CONFIGURACIÓN";
         case StringId::StartWithWindows: return L"Iniciar con Windows";
@@ -216,7 +199,6 @@ std::wstring GetSpanish(StringId id) {
         case StringId::DriverReadyFirstRun: return L"El controlador del gamepad (ViGEmBus) está detectado y listo. ¡A jugar!";
         case StringId::DriverMissing: return L"Se necesita el controlador del gamepad (ViGEmBus) para jugar.";
         case StringId::InstallDriverBtn: return L"Instalar controlador";
-        case StringId::DriverDownloading: return L"Descargando controlador... %d%%";
         case StringId::DriverInstalling: return L"Iniciando instalador... Acepta el aviso de Windows.";
         case StringId::DriverSuccess: return L"¡Controlador instalado correctamente! Listo para conectar.";
         case StringId::DriverFailed: return L"La instalación del controlador se canceló o no pudo completarse.";
@@ -233,7 +215,6 @@ std::wstring GetSpanish(StringId id) {
         case StringId::TrayExit: return L"Salir";
         case StringId::StatusSearching: return L"Buscando el control...";
         case StringId::StatusConnected: return L"Conectado y activo";
-        case StringId::StatusDisconnected: return L"Desconectado";
         case StringId::StatusStopped: return L"Servicio detenido";
         case StringId::NoDevice: return L"Sin dispositivo";
         case StringId::Idle: return L"Inactivo";
@@ -242,10 +223,8 @@ std::wstring GetSpanish(StringId id) {
         case StringId::LogServicesStarting: return L"Iniciando los servicios del control y de la batería...";
         case StringId::LogServicesStopping: return L"Deteniendo los servicios...";
         case StringId::LogMapperStart: return L"Servicio del control iniciado.";
-        case StringId::LogMapperReady: return L"Control conectado y listo.";
         case StringId::LogMapperDisconnected: return L"Control desconectado. Buscando...";
         case StringId::LogBatteryActive: return L"Monitor de batería activo.";
-        case StringId::LogBatteryError: return L"Aviso en el análisis de la batería.";
         case StringId::HideInstallTitle: return L"Instalar controlador de ocultación";
         case StringId::HideInstallPrompt: return L"Para ocultar el control real se necesita el controlador gratuito HidHide (unos 8 MB, descargado desde su página oficial de versiones). ¿Descargarlo e instalarlo ahora?";
         case StringId::LogHideActive: return L"Control real oculto para los juegos.";
@@ -286,7 +265,6 @@ LogLevel LevelOf(StringId id) {
     switch (id) {
         // Something worked.
         case StringId::LogControllerConnected:
-        case StringId::LogMapperReady:
         case StringId::LogHideActive:
         case StringId::LogHideAlready:
         case StringId::LogHideRestored:
@@ -312,7 +290,6 @@ LogLevel LevelOf(StringId id) {
         case StringId::LogHideRepaired:
         case StringId::LogHideCustomSetup:
         case StringId::LogHideInstallRestart:
-        case StringId::LogBatteryError:
         case StringId::DriverMissing:
             return LogLevel::Critical;
         default:

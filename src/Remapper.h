@@ -36,19 +36,14 @@ public:
     bool IsRunning() const { return m_running.load(); }
 
     void SetDeadzone(int dz) { m_deadzone.store(dz); }
-    int GetDeadzone() const { return m_deadzone.load(); }
 
     void SetNintendoMode(bool enable) { m_nintendoMode.store(enable); }
-    bool GetNintendoMode() const { return m_nintendoMode.load(); }
 
     void SetHairTrigger(bool enable) { m_hairTrigger.store(enable); }
-    bool GetHairTrigger() const { return m_hairTrigger.load(); }
 
     void SetPollingRate(int hz) { m_pollingRateHz.store(hz); }
-    int GetPollingRate() const { return m_pollingRateHz.load(); }
 
     void SetResponseCurve(int curve) { m_responseCurve.store(curve); }
-    int GetResponseCurve() const { return m_responseCurve.load(); }
 
     // The hiding of the physical controller belongs to the application (it must outlive service restarts).
     void SetHiding(ControllerHiding* hiding) { m_hiding = hiding; }
