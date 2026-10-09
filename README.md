@@ -35,7 +35,7 @@ Because most modern Windows games expect an XInput device, Ultimate2CFixer reads
 * **Battery Status:** Reads battery percentage via Windows WinRT Bluetooth Low Energy (BLE) GATT service.
 * **System Tray & Resource Trimming:** Flushes physical working set memory when minimized to the system tray.
 * **Settings Persistence:** Saves user preferences to the Windows Registry (`HKCU\Software\Ultimate2CFixer\Settings`).
-* **Localization:** English and Turkish interface support.
+* **Localization:** English, Turkish and Spanish interface. The language button cycles through them and the choice is remembered.
 
 ---
 

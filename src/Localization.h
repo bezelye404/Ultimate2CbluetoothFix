@@ -78,7 +78,16 @@ enum class StringId {
     LogHideInstallFailed,
     LogHideInstallUnverified,
     LogHideInstallCancelled,
-    LogHideInstallRestart
+    LogHideInstallRestart,
+    BatteryLowStatus,
+    BatteryModerateStatus,
+    BatteryHealthyStatus
+};
+
+enum class Language {
+    English,
+    Turkish,
+    Spanish
 };
 
 class Localization {
@@ -88,14 +97,22 @@ public:
         return instance;
     }
 
-    bool IsEnglish() const { return m_isEnglish; }
-    void ToggleLanguage() { m_isEnglish = !m_isEnglish; }
+    Language Current() const { return m_language; }
+    void SetLanguage(Language language) { m_language = language; }
+
+    // Cycles English -> Turkish -> Spanish -> English.
+    void NextLanguage() {
+        m_language = static_cast<Language>((static_cast<int>(m_language) + 1) % 3);
+    }
+
+    // Short code of the active language, shown on the language button.
+    const wchar_t* Code() const;
 
     std::wstring Get(StringId id) const;
 
 private:
-    Localization() : m_isEnglish(true) {}
-    bool m_isEnglish;
+    Localization() : m_language(Language::English) {}
+    Language m_language;
 };
 
 } // namespace Ultimate2CFixer
