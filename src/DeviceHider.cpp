@@ -342,7 +342,7 @@ HideResult DeviceHider::Hide(DWORD vid, DWORD pid) {
     std::lock_guard<std::mutex> lock(m_lock);
     if (m_hidden.load()) {
         // Also picks up a new instance of the same controller.
-        return MaintainLocked() ? HideResult::Repaired : HideResult::StillHidden;
+        return MaintainLocked(true) ? HideResult::Repaired : HideResult::StillHidden;
     }
 
     HandleGuard dev(OpenHidHide());
@@ -392,6 +392,7 @@ HideResult DeviceHider::Hide(DWORD vid, DWORD pid) {
     if (addBlack.empty() && !addWhite && !turnOn) {
         m_vid = vid;
         m_pid = pid;
+        m_ids.clear();
         m_hidden = true;
         return hadRecord ? HideResult::Adopted : HideResult::AlreadyHidden;
     }
@@ -419,24 +420,26 @@ HideResult DeviceHider::Hide(DWORD vid, DWORD pid) {
 
     m_vid = vid;
     m_pid = pid;
+    m_ids.clear();   // the next Maintain() searches again
     m_hidden = true;
     return HideResult::Hidden;
 }
 
-bool DeviceHider::MaintainLocked() {
+bool DeviceHider::MaintainLocked(bool rescan) {
     if (!m_hidden.load()) return false;
 
     HandleGuard dev(OpenHidHide());
     if (!dev.Valid()) return false;
 
-    StrList ids = FindHidInstanceIds(m_vid, m_pid, true);
+    if (rescan || m_ids.empty()) m_ids = FindHidInstanceIds(m_vid, m_pid, true);
+    const StrList& ids = m_ids;
     StrList white, black;
     BOOLEAN active = FALSE;
-    std::wstring ntPath;
+    if (m_ntPath.empty() && !GetOwnNtPath(m_ntPath)) return false;
+    const std::wstring& ntPath = m_ntPath;
     if (!IoGetList(dev.h, kIoctlGetWhitelist, white) ||
         !IoGetList(dev.h, kIoctlGetBlacklist, black) ||
-        !IoGetBool(dev.h, kIoctlGetActive, active) ||
-        !GetOwnNtPath(ntPath)) {
+        !IoGetBool(dev.h, kIoctlGetActive, active)) {
         return false;
     }
 
@@ -475,9 +478,9 @@ bool DeviceHider::MaintainLocked() {
     return ok;
 }
 
-bool DeviceHider::Maintain() {
+bool DeviceHider::Maintain(bool rescan) {
     std::lock_guard<std::mutex> lock(m_lock);
-    return MaintainLocked();
+    return MaintainLocked(rescan);
 }
 
 bool DeviceHider::Restore() {

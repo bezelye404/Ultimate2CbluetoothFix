@@ -20,11 +20,15 @@ public:
     void Stop();
     bool IsRunning() const { return m_running.load(); }
 
+    // The controller just connected: read the battery now instead of waiting for the next (slow) scan.
+    void ScanSoon() { m_scanSoon.store(true); }
+
 private:
     void WorkerLoop();
     bool PollBattery();
 
     std::atomic<bool> m_running{false};
+    std::atomic<bool> m_scanSoon{false};
     std::thread m_workerThread;
     LogCallback m_logCallback;
     BatteryCallback m_batteryCallback;

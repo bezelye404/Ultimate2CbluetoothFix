@@ -19,6 +19,13 @@ namespace Ultimate2CFixer {
 namespace {
     constexpr int Deadzone = 4000;
     constexpr int KeepAliveTicks = 50; // ~250ms
+    constexpr DWORD KeepAliveMs = 250;
+
+    // Closes the event handle DirectInput signals when the controller has a new report.
+    struct EventHandle {
+        HANDLE h = nullptr;
+        ~EventHandle() { if (h) CloseHandle(h); }
+    };
 
     struct DeviceChoice {
         GUID guid;
@@ -277,6 +284,13 @@ void Remapper::WorkerLoop(HWND hwnd) {
         }
 
         joystick->SetCooperativeLevel(hwnd, DISCL_BACKGROUND | DISCL_NONEXCLUSIVE);
+
+        // Wake up when the controller sends a report instead of polling every few milliseconds. If DirectInput
+        // refuses the notification, the loop below falls back to the timed polling.
+        EventHandle inputEvent;
+        inputEvent.h = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+        const bool eventDriven = inputEvent.h && SUCCEEDED(joystick->SetEventNotification(inputEvent.h));
+
         hr = joystick->Acquire();
         if (FAILED(hr)) {
             joystick->Release();
@@ -356,7 +370,12 @@ void Remapper::WorkerLoop(HWND hwnd) {
         XUSB_REPORT prevReport = {};
         int idleTicks = 0;
 
-        timeBeginPeriod(1);
+        // Timed polling needs the fine system timer for the whole connection. The event driven loop asks for it
+        // only while input is flowing, so an idle controller does not keep the whole system on a fast timer.
+        bool fineTimer = !eventDriven;
+        if (fineTimer) timeBeginPeriod(1);
+        ULONGLONG lastActiveTick = GetTickCount64();
+        ULONGLONG lastSendTick = lastActiveTick;
         auto lastHzTime = std::chrono::steady_clock::now();
         int changeCount = 0;
 
@@ -455,7 +474,12 @@ void Remapper::WorkerLoop(HWND hwnd) {
             const bool changed = (memcmp(&report, &prevReport, sizeof(XUSB_REPORT)) != 0);
             if (changed) {
                 ++changeCount;
-                m_lastInputTick.store(GetTickCount64());
+                lastActiveTick = GetTickCount64();
+                m_lastInputTick.store(lastActiveTick);
+                if (!fineTimer) {
+                    timeBeginPeriod(1);
+                    fineTimer = true;
+                }
             }
 
             auto now = std::chrono::steady_clock::now();
@@ -477,8 +501,18 @@ void Remapper::WorkerLoop(HWND hwnd) {
             // Dirty checking
             if (!changed) {
                 idleTicks++;
-                if (idleTicks < KeepAliveTicks) {
-                    Sleep(sleepMs);
+                const bool keepAliveDue = eventDriven ? (GetTickCount64() - lastSendTick >= KeepAliveMs)
+                                                      : (idleTicks >= KeepAliveTicks);
+                if (!keepAliveDue) {
+                    if (eventDriven) {
+                        if (fineTimer && GetTickCount64() - lastActiveTick > 2000) {
+                            timeEndPeriod(1);
+                            fineTimer = false;
+                        }
+                        WaitForSingleObject(inputEvent.h, KeepAliveMs);
+                    } else {
+                        Sleep(sleepMs);
+                    }
                     continue;
                 }
             } else if (m_inputCallback) {
@@ -486,16 +520,17 @@ void Remapper::WorkerLoop(HWND hwnd) {
             }
 
             idleTicks = 0;
+            lastSendTick = GetTickCount64();
             prevReport = report;
 
             if (m_vigemClient && m_vigemTarget) {
                 vigem_target_x360_update(m_vigemClient, m_vigemTarget, report);
             }
 
-            Sleep(sleepMs);
+            if (fineTimer) Sleep(sleepMs);   // caps the update rate to the chosen setting
         }
 
-        timeEndPeriod(1);
+        if (fineTimer) timeEndPeriod(1);
 
         if (m_targetPlugged && m_vigemClient && m_vigemTarget) {
             vigem_target_remove(m_vigemClient, m_vigemTarget);
