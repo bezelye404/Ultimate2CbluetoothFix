@@ -279,11 +279,10 @@ void LoadUserSettings() {
         }
         size = sizeof(val);
         if (RegQueryValueExW(hKey, L"Language", NULL, NULL, (LPBYTE)&val, &size) == ERROR_SUCCESS) {
-            if (val == 1 && !Localization::Instance().IsEnglish()) {
-                Localization::Instance().ToggleLanguage();
-            } else if (val == 0 && Localization::Instance().IsEnglish()) {
-                Localization::Instance().ToggleLanguage();
-            }
+            // Stored values: 0 = Turkish, 1 = English (kept for older settings), 2 = Spanish.
+            if (val == 0) Localization::Instance().SetLanguage(Language::Turkish);
+            else if (val == 1) Localization::Instance().SetLanguage(Language::English);
+            else if (val == 2) Localization::Instance().SetLanguage(Language::Spanish);
         }
         RegCloseKey(hKey);
     }
@@ -310,7 +309,11 @@ void SaveUserSettings() {
         RegSetValueExW(hKey, L"PollingRate", 0, REG_DWORD, (const BYTE*)&val, sizeof(val));
         val = static_cast<DWORD>(g_responseCurve);
         RegSetValueExW(hKey, L"ResponseCurve", 0, REG_DWORD, (const BYTE*)&val, sizeof(val));
-        val = Localization::Instance().IsEnglish() ? 1 : 0;
+        switch (Localization::Instance().Current()) {
+            case Language::Turkish: val = 0; break;
+            case Language::Spanish: val = 2; break;
+            default: val = 1; break;
+        }
         RegSetValueExW(hKey, L"Language", 0, REG_DWORD, (const BYTE*)&val, sizeof(val));
         RegCloseKey(hKey);
     }
@@ -400,7 +403,7 @@ void UpdateUIStrings() {
     }
     SetWindowTextW(g_hBtnStop, loc.Get(StringId::StopBtn).c_str());
     SetWindowTextW(g_hBtnClearLogs, loc.Get(StringId::ClearBtn).c_str());
-    SetWindowTextW(g_hBtnLang, loc.IsEnglish() ? L"TR" : L"EN");
+    SetWindowTextW(g_hBtnLang, loc.Code());
     SetWindowTextW(g_hChkStartWindows, loc.Get(StringId::StartWithWindows).c_str());
     SetWindowTextW(g_hChkMinimizeClose, loc.Get(StringId::MinimizeOnClose).c_str());
     SetWindowTextW(g_hChkAutoStart, loc.Get(StringId::AutoStartService).c_str());
@@ -881,13 +884,13 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     COLORREF bStatusCol = UI::ColorTextMuted;
     if (g_batteryLevel >= 0) {
         if (g_batteryLevel <= 20) {
-            bStatusStr = loc.IsEnglish() ? L"Low Battery - Please Recharge" : L"D\x00FC\x015F\x00FCk Pil - L\x00FCtfen \x015Farj Edin";
+            bStatusStr = loc.Get(StringId::BatteryLowStatus);
             bStatusCol = UI::ColorStatusRed;
         } else if (g_batteryLevel <= 50) {
-            bStatusStr = loc.IsEnglish() ? L"Wireless - Moderate Level" : L"Kablosuz - Orta Seviye";
+            bStatusStr = loc.Get(StringId::BatteryModerateStatus);
             bStatusCol = UI::ColorTextSecondary;
         } else {
-            bStatusStr = loc.IsEnglish() ? L"Wireless - Healthy Level" : L"Kablosuz - \x0130yi Seviye";
+            bStatusStr = loc.Get(StringId::BatteryHealthyStatus);
             bStatusCol = UI::ColorTextSecondary;
         }
     } else {
@@ -1174,7 +1177,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     SetWindowTextW(g_hEditLogs, L"");
                     break;
                 case IDC_BTN_LANG:
-                    Localization::Instance().ToggleLanguage();
+                    Localization::Instance().NextLanguage();
                     UpdateUIStrings();
                     SaveUserSettings();
                     break;
