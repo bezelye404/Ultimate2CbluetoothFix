@@ -2,6 +2,8 @@
 //   InputProbe hidhide        show the current HidHide configuration and the state recorded by this app
 //   InputProbe hid            list the HID inputs (usage, range) the 8BitDo exposes to Windows
 //   InputProbe vigem          plug a virtual pad, feed trigger values 0..255 and read them back through XInput
+//   InputProbe pad [secs]     sample the controller the way the app reads it (trigger depth, sticks, clicks)
+//   InputProbe xinput [secs]  watch what games receive: every XInput pad (with the app running, the virtual one)
 //   InputProbe dinput [secs]  show the DirectInput objects of the 8BitDo and, when secs > 0, sample it
 //                             for that long (pull both triggers slowly, press every button once)
 // Build: cmake --build build --config Release --target InputProbe
@@ -19,6 +21,7 @@ extern "C" {
 #include <hidpi.h>
 #include <xinput.h>
 #include "ViGEm/Client.h"
+#include "PadFormat.h"
 #include <cstdio>
 #include <cstdarg>
 #include <string>
@@ -353,6 +356,103 @@ void TestVigem() {
     vigem_free(client);
 }
 
+// MARK: - The app's own reading (usage based data format)
+void SamplePad(int seconds) {
+    IDirectInput8W* di = nullptr;
+    if (FAILED(DirectInput8Create(GetModuleHandleW(nullptr), DIRECTINPUT_VERSION, IID_IDirectInput8W, (void**)&di, nullptr))) {
+        Out(L"DirectInput8Create failed\n");
+        return;
+    }
+    std::vector<Found> devs;
+    di->EnumDevices(DI8DEVCLASS_GAMECTRL, EnumDev, &devs, DIEDFL_ATTACHEDONLY);
+    const Found* target = nullptr;
+    for (auto& d : devs) if (d.vid == 0x2DC8 && !target) target = &d;
+    if (!target) { Out(L"No 8BitDo controller is visible to DirectInput (controller off or hidden).\n"); di->Release(); return; }
+
+    IDirectInputDevice8W* dev = nullptr;
+    if (FAILED(di->CreateDevice(target->guid, &dev, nullptr))) { Out(L"Could not open the device\n"); di->Release(); return; }
+    bool ok = Ultimate2CFixer::SetPadDataFormat(dev);
+    Out(L"Usage based data format accepted: %s\n", ok ? L"yes" : L"NO (the app would fall back to the standard layout)");
+    if (!ok) { dev->Release(); di->Release(); return; }
+    dev->SetCooperativeLevel(GetDesktopWindow(), DISCL_BACKGROUND | DISCL_NONEXCLUSIVE);
+    if (FAILED(dev->Acquire())) { Out(L"Acquire failed\n"); dev->Release(); di->Release(); return; }
+
+    Out(L"Sampling for %d s: pull LT slowly all the way, release, then RT, then press the stick clicks...\n", seconds);
+    const wchar_t* names[] = { L"leftX", L"leftY", L"rightX", L"rightY", L"LT(brake)", L"RT(gas)" };
+    Stat st[6];
+    bool prev[16] = {};
+    bool captured[2] = {};
+    LONG ltAtClick[2] = {}, rtAtClick[2] = {};
+    int clicks[2] = {};
+    ULONGLONG endTick = GetTickCount64() + (ULONGLONG)seconds * 1000;
+    DWORD frames = 0;
+    while (GetTickCount64() < endTick) {
+        dev->Poll();
+        Ultimate2CFixer::PadRaw raw = {};
+        if (FAILED(dev->GetDeviceState(sizeof(raw), &raw))) { dev->Acquire(); Sleep(2); continue; }
+        LONG v[6] = { raw.lX, raw.lY, raw.lZ, raw.lRz, raw.brake, raw.gas };
+        for (int i = 0; i < 6; ++i) st[i].Add(v[i]);
+        for (int k = 0; k < 2; ++k) {
+            bool down = raw.buttons[8 + k] != 0;
+            if (down && !prev[8 + k]) {
+                ++clicks[k];
+                if (!captured[k]) { captured[k] = true; ltAtClick[k] = raw.brake; rtAtClick[k] = raw.gas; }
+            }
+            prev[8 + k] = down;
+        }
+        ++frames;
+        Sleep(2);
+    }
+    Out(L"\n%lu samples (first / min..max / distinct values):\n", frames);
+    for (int i = 0; i < 6; ++i) {
+        Out(L"  %-10s first %6ld   %6ld..%-6ld   %zu distinct\n", names[i], st[i].first, st[i].min, st[i].max, st[i].distinct.size());
+    }
+    for (int k = 0; k < 2; ++k) {
+        if (!clicks[k]) { Out(L"Trigger click %d: never pressed\n", 8 + k); continue; }
+        Out(L"Trigger click button %d went down %d time(s); at the first one LT=%ld RT=%ld (of 65535)\n", 8 + k, clicks[k], ltAtClick[k], rtAtClick[k]);
+    }
+    dev->Unacquire();
+    dev->Release();
+    di->Release();
+}
+
+// MARK: - What games see (XInput)
+void WatchXInput(int seconds) {
+    if (seconds < 1) seconds = 1;
+    struct Slot { bool seen = false; Stat lt, rt, lx, ly, rx, ry; std::set<WORD> buttons; };
+    Slot slot[4];
+    ULONGLONG endTick = GetTickCount64() + (ULONGLONG)seconds * 1000;
+    DWORD frames = 0;
+    while (GetTickCount64() < endTick) {
+        for (DWORD i = 0; i < 4; ++i) {
+            XINPUT_STATE st = {};
+            if (XInputGetState(i, &st) != ERROR_SUCCESS) continue;
+            Slot& s = slot[i];
+            s.seen = true;
+            s.lt.Add(st.Gamepad.bLeftTrigger);
+            s.rt.Add(st.Gamepad.bRightTrigger);
+            s.lx.Add(st.Gamepad.sThumbLX);
+            s.ly.Add(st.Gamepad.sThumbLY);
+            s.rx.Add(st.Gamepad.sThumbRX);
+            s.ry.Add(st.Gamepad.sThumbRY);
+            if (st.Gamepad.wButtons) s.buttons.insert(st.Gamepad.wButtons);
+        }
+        ++frames;
+        Sleep(4);
+    }
+    bool any = false;
+    for (DWORD i = 0; i < 4; ++i) {
+        if (!slot[i].seen) continue;
+        any = true;
+        Slot& s = slot[i];
+        Out(L"XInput slot %lu (%lu samples)\n", i, frames);
+        Out(L"  LT %3ld..%-3ld  %zu distinct   RT %3ld..%-3ld  %zu distinct\n", s.lt.min, s.lt.max, s.lt.distinct.size(), s.rt.min, s.rt.max, s.rt.distinct.size());
+        Out(L"  left stick X %6ld..%-6ld Y %6ld..%-6ld   right stick X %6ld..%-6ld Y %6ld..%-6ld\n", s.lx.min, s.lx.max, s.ly.min, s.ly.max, s.rx.min, s.rx.max, s.ry.min, s.ry.max);
+        Out(L"  distinct button states seen: %zu\n", s.buttons.size());
+    }
+    if (!any) Out(L"No XInput pad is connected (is the app running with the controller on?)\n");
+}
+
 } // namespace
 
 int wmain(int argc, wchar_t** argv) {
@@ -361,7 +461,9 @@ int wmain(int argc, wchar_t** argv) {
     if (mode == L"hidhide") ShowHidHide();
     else if (mode == L"hid") ShowHid();
     else if (mode == L"vigem") TestVigem();
+    else if (mode == L"pad") SamplePad(argc > 2 ? _wtoi(argv[2]) : 0);
+    else if (mode == L"xinput") WatchXInput(argc > 2 ? _wtoi(argv[2]) : 3);
     else if (mode == L"dinput") ShowDirectInput(argc > 2 ? _wtoi(argv[2]) : 0);
-    else Out(L"usage: InputProbe hidhide | hid | vigem | dinput [seconds]\n");
+    else Out(L"usage: InputProbe hidhide | hid | vigem | pad [seconds] | xinput [seconds] | dinput [seconds]\n");
     return 0;
 }
