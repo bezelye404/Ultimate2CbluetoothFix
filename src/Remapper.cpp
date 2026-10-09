@@ -325,6 +325,20 @@ void Remapper::WorkerLoop(HWND hwnd) {
             VIGEM_ERROR plugErr = vigem_target_add(m_vigemClient, m_vigemTarget);
             if (VIGEM_SUCCESS(plugErr)) {
                 m_targetPlugged = true;
+
+                // Windows gives the virtual pad the lowest free XInput slot; show it as the player number games
+                // use (slot 0 = player 1). The driver needs a moment before it knows the slot.
+                ULONG userIndex = 0;
+                bool known = false;
+                for (int attempt = 0; attempt < 10 && !known; ++attempt) {
+                    known = VIGEM_SUCCESS(vigem_target_x360_get_user_index(m_vigemClient, m_vigemTarget, &userIndex));
+                    if (!known) Sleep(50);
+                }
+                if (known && m_logCallback) {
+                    wchar_t playerMsg[128];
+                    swprintf_s(playerMsg, loc.Get(StringId::LogVirtualPadPlayer).c_str(), static_cast<int>(userIndex) + 1);
+                    m_logCallback(playerMsg, LevelOf(StringId::LogVirtualPadPlayer));
+                }
             }
         }
 

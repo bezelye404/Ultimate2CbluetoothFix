@@ -5,6 +5,7 @@
 //   InputProbe pad [secs]     sample the controller the way the app reads it (trigger depth, sticks, clicks)
 //   InputProbe xinput [secs]  watch what games receive: every XInput pad (with the app running, the virtual one)
 //   InputProbe btstatus <12 hex digit address>   what Windows reports for the link of one Bluetooth LE device (read-only)
+//   InputProbe press <secs>   plug a virtual pad and keep pressing its A button and moving a stick, so a browser exposes it
 //   InputProbe btnode         show which Bluetooth node the disconnect would disable and the exact command (dry run, changes nothing)
 //   InputProbe rawinput       list the game controllers Raw Input reports (what browsers and many games read)
 //   InputProbe wgi            list the controllers Windows.Gaming.Input reports (what browsers and UWP games read)
@@ -529,6 +530,33 @@ void ShowBluetoothLinkState(const wchar_t* hexAddress) {
     Out(L"Paired: %s\n", device.DeviceInformation().Pairing().IsPaired() ? L"yes" : L"no");
 }
 
+// MARK: - A virtual pad with activity (browsers only list a pad after it was used)
+void PressPad(int seconds) {
+    PVIGEM_CLIENT client = vigem_alloc();
+    if (!client || !VIGEM_SUCCESS(vigem_connect(client))) { Out(L"Could not connect to ViGEmBus\n"); return; }
+    PVIGEM_TARGET pad = vigem_target_x360_alloc();
+    if (!VIGEM_SUCCESS(vigem_target_add(client, pad))) { Out(L"Could not plug the virtual pad\n"); vigem_target_free(pad); vigem_free(client); return; }
+    Sleep(800);
+    ULONG idx = 99;
+    vigem_target_x360_get_user_index(client, pad, &idx);
+    Out(L"virtual pad plugged, Windows gave it XInput slot %lu (player %lu)\n", idx, idx + 1);
+    ULONGLONG end = GetTickCount64() + (ULONGLONG)seconds * 1000;
+    int tick = 0;
+    while (GetTickCount64() < end) {
+        XUSB_REPORT r = {};
+        r.wButtons = (tick / 3) % 2 ? XUSB_GAMEPAD_A : 0;
+        r.sThumbLX = (SHORT)((tick % 20) * 1500);
+        vigem_target_x360_update(client, pad, r);
+        Sleep(100);
+        ++tick;
+    }
+    vigem_target_remove(client, pad);
+    vigem_target_free(pad);
+    vigem_disconnect(client);
+    vigem_free(client);
+    Out(L"virtual pad removed\n");
+}
+
 } // namespace
 
 int wmain(int argc, wchar_t** argv) {
@@ -539,6 +567,7 @@ int wmain(int argc, wchar_t** argv) {
     else if (mode == L"vigem") TestVigem();
     else if (mode == L"pad") SamplePad(argc > 2 ? _wtoi(argv[2]) : 0);
     else if (mode == L"xinput") WatchXInput(argc > 2 ? _wtoi(argv[2]) : 3);
+    else if (mode == L"press") PressPad(argc > 2 ? _wtoi(argv[2]) : 10);
     else if (mode == L"btstatus" && argc > 2) ShowBluetoothLinkState(argv[2]);
     else if (mode == L"btnode") ShowBluetoothNode();
     else if (mode == L"rawinput") ShowRawInput();

@@ -77,6 +77,7 @@ std::wstring GetEnglish(StringId id) {
         case StringId::LogHideNeedsReconnect: return L"The controller was already connected. Turn it off and on once so browsers and games see only one controller.";
         case StringId::HideInstallBalloon: return L"Install the HidHide driver so games see only one controller. Click here to install it.";
         case StringId::DisconnectOnExit: return L"Disconnect the controller when the app closes (asks for permission)";
+        case StringId::LogVirtualPadPlayer: return L"Virtual gamepad is player %d.";
         case StringId::LogHideRecovered: return L"Restored controller visibility left over from a previous session.";
         case StringId::LogHideRepaired: return L"Hiding was changed by another program and has been restored. If games still see two controllers, turn the controller off and on again.";
         case StringId::LogHideInstalling: return L"Downloading hiding driver... Please accept the Windows prompt when it appears.";
@@ -167,6 +168,7 @@ std::wstring GetTurkish(StringId id) {
         case StringId::LogHideNeedsReconnect: return L"Kontrolcü zaten bağlıydı. Tarayıcıların ve oyunların tek kontrolcü görmesi için kontrolcüyü bir kez kapatıp açın.";
         case StringId::HideInstallBalloon: return L"Oyunların tek kontrolcü görmesi için HidHide sürücüsünü kurun. Kurmak için buraya tıklayın.";
         case StringId::DisconnectOnExit: return L"Uygulama kapanırken kontrolcünün bağlantısını kes (izin ister)";
+        case StringId::LogVirtualPadPlayer: return L"Sanal gamepad %d. oyuncu.";
         case StringId::LogHideRecovered: return L"Önceki oturumdan kalan kontrolcü gizleme ayarı geri alındı.";
         case StringId::LogHideRepaired: return L"Gizleme başka bir program tarafından değiştirildi ve yeniden uygulandı. Oyunlar hâlâ iki kontrolcü görüyorsa kontrolcüyü kapatıp açın.";
         case StringId::LogHideInstalling: return L"Gizleme sürücüsü indiriliyor... Windows onayı çıkınca lütfen kabul edin.";
@@ -257,6 +259,7 @@ std::wstring GetSpanish(StringId id) {
         case StringId::LogHideNeedsReconnect: return L"El control ya estaba conectado. Apágalo y vuelve a encenderlo una vez para que los navegadores y juegos vean un solo control.";
         case StringId::HideInstallBalloon: return L"Instala el controlador HidHide para que los juegos vean un solo control. Haz clic aquí para instalarlo.";
         case StringId::DisconnectOnExit: return L"Desconectar el control al cerrar la aplicación (pide permiso)";
+        case StringId::LogVirtualPadPlayer: return L"El gamepad virtual es el jugador %d.";
         case StringId::LogHideRecovered: return L"Se restauró la visibilidad del control que quedó de una sesión anterior.";
         case StringId::LogHideRepaired: return L"Otro programa cambió la ocultación y se restableció. Si los juegos siguen viendo dos controles, apaga y vuelve a encender el control.";
         case StringId::LogHideInstalling: return L"Descargando controlador de ocultación... Acepta el aviso de Windows cuando aparezca.";

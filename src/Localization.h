@@ -75,6 +75,7 @@ enum class StringId {
     LogHideNeedsReconnect,
     HideInstallBalloon,
     DisconnectOnExit,
+    LogVirtualPadPlayer,
     LogHideInstalling,
     LogHideInstalled,
     LogHideInstallFailed,
