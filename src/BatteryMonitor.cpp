@@ -114,7 +114,10 @@ bool BatteryMonitor::PollBattery() {
                         if (m_lastReportedLevel != static_cast<int>(level)) {
                             m_lastReportedLevel = static_cast<int>(level);
                             if (m_logCallback) {
-                                m_logCallback(devName + L" Battery: " + std::to_wstring(level) + L"%");
+                                wchar_t levelMsg[256];
+                                swprintf_s(levelMsg, Localization::Instance().Get(StringId::LogBatteryLevel).c_str(),
+                                           devName.c_str(), static_cast<int>(level));
+                                m_logCallback(levelMsg);
                             }
                         }
                         return true;

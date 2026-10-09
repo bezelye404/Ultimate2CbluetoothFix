@@ -22,6 +22,7 @@
 #include <vector>
 #include <deque>
 #include <memory>
+#include <mutex>
 #include <algorithm>
 #include "UIStyles.h"
 #include "Localization.h"
@@ -144,6 +145,8 @@ const int kPollingRates[]           = { 125, 250, 500, 1000 };
 int g_responseCurve                 = 0; // 0=Linear, 1=Smooth, 2=Aggressive
 bool g_batteryWarningSent           = false;
 XUSB_REPORT g_liveInput             = {};
+std::mutex g_liveInputLock;                        // the worker thread writes, the UI thread reads
+UINT g_uShowWindowMsg               = 0;           // sent by a second instance to bring this window forward
 
 HFONT g_hFontTitle                  = nullptr;
 HFONT g_hFontBody                   = nullptr;
@@ -181,6 +184,16 @@ std::wstring g_batteryDevice;
 
 int g_dpi = 96;
 int S(int val) { return MulDiv(val, g_dpi, 96); }
+
+XUSB_REPORT GetLiveInput() {
+    std::lock_guard<std::mutex> lock(g_liveInputLock);
+    return g_liveInput;
+}
+
+void SetLiveInput(const XUSB_REPORT& report) {
+    std::lock_guard<std::mutex> lock(g_liveInputLock);
+    g_liveInput = report;
+}
 
 void TrimWorkingSet() {
     SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
@@ -430,8 +443,9 @@ void TriggerDriverInstall() {
         [](int pct, const std::wstring&) {
             PostMessageW(g_hWnd, WM_DRIVER_INSTALL_PROGRESS, (WPARAM)pct, 0);
         },
-        [](bool success, const std::wstring&) {
-            PostMessageW(g_hWnd, WM_DRIVER_INSTALL_DONE, (WPARAM)(success ? 1 : 0), 0);
+        [](bool success, const std::wstring& message) {
+            int code = success ? 1 : (message == kDriverNotVerified ? 2 : 0);
+            PostMessageW(g_hWnd, WM_DRIVER_INSTALL_DONE, (WPARAM)code, 0);
         }
     );
 }
@@ -478,7 +492,7 @@ void StartServices() {
     g_remapper->SetPollingRate(kPollingRates[g_pollingRateIndex]);
     g_remapper->SetResponseCurve(g_responseCurve);
     g_remapper->SetHideRealDevice(g_hideReal);
-    g_remapper->Start(
+    const bool started = g_remapper->Start(
         g_hWnd,
         [](const std::wstring& msg) {
             auto* pMsg = new std::wstring(msg);
@@ -489,10 +503,26 @@ void StartServices() {
             PostMessageW(g_hWnd, WM_UPDATE_STATUS, (WPARAM)status, (LPARAM)pName);
         },
         [](const XUSB_REPORT& report) {
-            g_liveInput = report;
+            SetLiveInput(report);
             PostMessageW(g_hWnd, WM_UPDATE_INPUT, 0, 0);
         }
     );
+
+    if (!started) {
+        // The controller service could not start (the reason is in the log). Leave the window in a state the
+        // user can act on instead of showing "Searching" forever.
+        g_remapper.reset();
+        g_currentStatus = RemapperStatus::Stopped;
+        g_deviceName = loc.Get(StringId::NoDevice);
+        EnableWindow(g_hBtnStart, TRUE);
+        EnableWindow(g_hBtnStop, FALSE);
+        if (!IsViGEmBusInstalled()) {
+            g_driverInstalled = false;   // the driver went missing: offer the installer again
+            UpdateUIStrings();
+        }
+        InvalidateRect(g_hWnd, NULL, FALSE);
+        return;
+    }
 
     g_batteryMonitor = std::make_unique<BatteryMonitor>();
     g_batteryMonitor->Start(
@@ -667,6 +697,7 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     SetBkMode(memDC, TRANSPARENT);
 
     auto& loc = Localization::Instance();
+    const XUSB_REPORT live = GetLiveInput();
 
     if (g_showSettings) {
         // MARK: Settings View Card
@@ -748,7 +779,11 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     // Live Polling Rate Readout
     if (g_remapper && g_currentStatus == RemapperStatus::Connected) {
         wchar_t hzBuf[64];
-        swprintf_s(hzBuf, L"%d Hz \u2022 %.1f ms", g_remapper->GetLiveHz(), g_remapper->GetLiveMs());
+        if (g_remapper->IsInputIdle()) {
+            wcsncpy_s(hzBuf, loc.Get(StringId::Idle).c_str(), _TRUNCATE);
+        } else {
+            swprintf_s(hzBuf, L"%d Hz \u2022 %.1f ms", g_remapper->GetLiveHz(), g_remapper->GetLiveMs());
+        }
         SelectObject(memDC, g_hFontSmall);
         SetTextColor(memDC, UI::ColorTextMuted);
         TextOutW(memDC, cardTelemetry.left + S(16), cardTelemetry.top + S(28), hzBuf, (int)wcslen(hzBuf));
@@ -778,10 +813,10 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     LineTo(memDC, rsBox.right - S(6), rsBox.top + S(17));
 
     // Live Stick Dots
-    int lsDotX = lsBox.left + S(17) + (g_liveInput.sThumbLX * S(12)) / 32768;
-    int lsDotY = lsBox.top + S(17) - (g_liveInput.sThumbLY * S(12)) / 32768;
-    int rsDotX = rsBox.left + S(17) + (g_liveInput.sThumbRX * S(12)) / 32768;
-    int rsDotY = rsBox.top + S(17) - (g_liveInput.sThumbRY * S(12)) / 32768;
+    int lsDotX = lsBox.left + S(17) + (live.sThumbLX * S(12)) / 32768;
+    int lsDotY = lsBox.top + S(17) - (live.sThumbLY * S(12)) / 32768;
+    int rsDotX = rsBox.left + S(17) + (live.sThumbRX * S(12)) / 32768;
+    int rsDotY = rsBox.top + S(17) - (live.sThumbRY * S(12)) / 32768;
 
     SelectObject(memDC, g_hBrGreen);
     SelectObject(memDC, g_hPenNull);
@@ -809,7 +844,7 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     SelectObject(memDC, g_hFontSmall);
     SetBkMode(memDC, TRANSPARENT);
     for (const auto& b : bArr) {
-        bool on = (g_liveInput.wButtons & b.m) != 0;
+        bool on = (live.wButtons & b.m) != 0;
         SelectObject(memDC, on ? g_hBrGreen : g_hBrButtonNormal);
         SelectObject(memDC, on ? g_hPenGreen : g_hPenCardBorder);
         RECT brc = { b.x, b.y, b.x + S(12), b.y + S(12) };
@@ -826,7 +861,7 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     };
 
     for (const auto& bmp : bumpers) {
-        bool on = (g_liveInput.wButtons & bmp.m) != 0;
+        bool on = (live.wButtons & bmp.m) != 0;
         SelectObject(memDC, on ? g_hBrGreen : g_hBrButtonNormal);
         SelectObject(memDC, on ? g_hPenGreen : g_hPenCardBorder);
         RoundRect(memDC, bmp.rc.left, bmp.rc.top, bmp.rc.right, bmp.rc.bottom, S(4), S(4));
@@ -841,13 +876,13 @@ void PaintDashboard(HWND hwnd, HDC hdc) {
     FillRect(memDC, &ltRc, g_hBrStickBg);
     FillRect(memDC, &rtRc, g_hBrStickBg);
 
-    if (g_liveInput.bLeftTrigger > 0) {
-        int fh = (g_liveInput.bLeftTrigger * S(30)) / 255;
+    if (live.bLeftTrigger > 0) {
+        int fh = (live.bLeftTrigger * S(30)) / 255;
         RECT frc = { ltRc.left, ltRc.bottom - fh, ltRc.right, ltRc.bottom };
         FillRect(memDC, &frc, g_hBrGreen);
     }
-    if (g_liveInput.bRightTrigger > 0) {
-        int fh = (g_liveInput.bRightTrigger * S(30)) / 255;
+    if (live.bRightTrigger > 0) {
+        int fh = (live.bRightTrigger * S(30)) / 255;
         RECT frc = { rtRc.left, rtRc.bottom - fh, rtRc.right, rtRc.bottom };
         FillRect(memDC, &frc, g_hBrGreen);
     }
@@ -920,6 +955,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     if (msg != 0 && msg == g_uTaskbarRestartMsg) {
         SetupTray(hwnd);
         UpdateTrayTooltip();
+        return 0;
+    }
+
+    if (g_uShowWindowMsg != 0 && msg == g_uShowWindowMsg) {
+        RestoreFromTray();
         return 0;
     }
 
@@ -1064,6 +1104,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             UpdatePollingRateButtonText();
             UpdateCurveButtonText();
             SetupTray(hwnd);
+            SetTimer(hwnd, 1, 500, nullptr);   // lets the rate readout fall back to "Idle" when no input arrives
 
             // MARK: Driver & First-Launch Check
             g_driverInstalled = IsViGEmBusInstalled();
@@ -1194,6 +1235,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             return 0;
         }
 
+        case WM_TIMER: {
+            if (wParam == 1 && !g_showSettings && g_currentStatus == RemapperStatus::Connected &&
+                IsWindowVisible(hwnd) && !IsIconic(hwnd)) {
+                RECT rcRate = { S(284), S(82), S(470), S(98) };
+                InvalidateRect(hwnd, &rcRate, FALSE);
+            }
+            return 0;
+        }
+
         case WM_UPDATE_INPUT: {
             if (!g_showSettings) {
                 RECT rcTelemetry = { S(278), S(56), S(558), S(152) };
@@ -1220,7 +1270,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
             if (g_currentStatus != RemapperStatus::Connected) {
                 g_deviceName.clear();
-                memset(&g_liveInput, 0, sizeof(g_liveInput));
+                XUSB_REPORT zeroInput = {};
+                SetLiveInput(zeroInput);
             }
             UpdateTrayTooltip();
             InvalidateRect(hwnd, NULL, FALSE);
@@ -1282,7 +1333,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     StartServices();
                 }
             } else {
-                AppendLogMessage(loc.Get(StringId::DriverFailed));
+                AppendLogMessage(loc.Get(wParam == 2 ? StringId::LogHideInstallUnverified : StringId::DriverFailed));
             }
             return 0;
         }
@@ -1331,6 +1382,17 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             break;
         }
 
+        case WM_QUERYENDSESSION:
+            return TRUE;
+
+        case WM_ENDSESSION:
+            if (wParam) {
+                // Windows is shutting down or the user is logging off and will end this process right after
+                // this message: give the real controller back to other programs first.
+                StopServices();
+            }
+            return 0;
+
         case WM_CLOSE: {
             if (g_minimizeOnClose) {
                 MinimizeToTray();
@@ -1362,6 +1424,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
 
         case WM_DESTROY: {
+            KillTimer(hwnd, 1);
             StopServices();
             if (g_trayCreated) {
                 Shell_NotifyIconW(NIM_DELETE, &g_nid);
@@ -1406,6 +1469,16 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow) {
     InitCommonControlsEx(&icex);
 
     const wchar_t CLASS_NAME[] = L"Ultimate2CFixer_Class";
+
+    // Only one copy may run: a second one would undo the first one's controller hiding when it starts.
+    g_uShowWindowMsg = RegisterWindowMessageW(L"Ultimate2CFixer_ShowWindow");
+    HANDLE hSingleInstance = CreateMutexW(nullptr, FALSE, L"Local\\Ultimate2CFixer_SingleInstance");
+    if (hSingleInstance && GetLastError() == ERROR_ALREADY_EXISTS) {
+        HWND existing = FindWindowW(CLASS_NAME, nullptr);
+        if (existing) PostMessageW(existing, g_uShowWindowMsg, 0, 0);
+        CloseHandle(hSingleInstance);
+        return 0;
+    }
 
     int cxSm = GetSystemMetrics(SM_CXSMICON);
     int cySm = GetSystemMetrics(SM_CYSMICON);

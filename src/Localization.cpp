@@ -87,6 +87,10 @@ std::wstring GetEnglish(StringId id) {
         case StringId::BatteryModerateStatus: return L"Wireless - Moderate Level";
         case StringId::BatteryHealthyStatus: return L"Wireless - Healthy Level";
         case StringId::DriverDownloadingShort: return L"Downloading %d%%";
+        case StringId::LogViGEmUnavailable: return L"Could not connect to the gamepad driver (ViGEmBus). Try reinstalling it.";
+        case StringId::LogInputSystemFailed: return L"Could not start the controller input system.";
+        case StringId::LogControllerConnected: return L"%ls connected.";
+        case StringId::LogBatteryLevel: return L"%ls Battery: %d%%";
         default: return L"";
     }
 }
@@ -171,6 +175,10 @@ std::wstring GetTurkish(StringId id) {
         case StringId::BatteryModerateStatus: return L"Kablosuz - Orta Seviye";
         case StringId::BatteryHealthyStatus: return L"Kablosuz - İyi Seviye";
         case StringId::DriverDownloadingShort: return L"İndiriliyor %%%d";
+        case StringId::LogViGEmUnavailable: return L"Gamepad sürücüsüne (ViGEmBus) bağlanılamadı. Yeniden kurmayı deneyin.";
+        case StringId::LogInputSystemFailed: return L"Kontrolcü girdi sistemi başlatılamadı.";
+        case StringId::LogControllerConnected: return L"%ls bağlandı.";
+        case StringId::LogBatteryLevel: return L"%ls Pil: %%%d";
         default: return L"";
     }
 }
@@ -255,6 +263,10 @@ std::wstring GetSpanish(StringId id) {
         case StringId::BatteryModerateStatus: return L"Inalámbrico - Nivel medio";
         case StringId::BatteryHealthyStatus: return L"Inalámbrico - Buen nivel";
         case StringId::DriverDownloadingShort: return L"Descargando %d%%";
+        case StringId::LogViGEmUnavailable: return L"No se pudo conectar con el controlador del gamepad (ViGEmBus). Intenta reinstalarlo.";
+        case StringId::LogInputSystemFailed: return L"No se pudo iniciar el sistema de entrada del control.";
+        case StringId::LogControllerConnected: return L"%ls conectado.";
+        case StringId::LogBatteryLevel: return L"%ls Batería: %d%%";
         default: return L"";
     }
 }

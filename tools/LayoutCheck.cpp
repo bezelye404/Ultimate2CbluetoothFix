@@ -74,6 +74,8 @@ void CheckLanguage(Language language, const wchar_t* name) {
 
     // Telemetry card (280 wide): caption sits left of the 66 px mode badge
     Check(name, L"Live input caption", g_fontSmall, T(StringId::LiveInputTitle), 280 - 80 - 16 - 8);
+    Check(name, L"Idle readout", g_fontSmall, T(StringId::Idle), 280 - 80 - 16 - 8);
+    Check(name, L"Rate readout", g_fontSmall, L"1000 Hz \u2022 1000.0 ms", 280 - 80 - 16 - 8);
 
     // Battery card (244 wide)
     Check(name, L"Battery caption", g_fontSmall, T(StringId::BatteryTitle), 244 - 32 - 60);

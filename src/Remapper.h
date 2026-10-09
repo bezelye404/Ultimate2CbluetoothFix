@@ -52,8 +52,14 @@ public:
     void SetHideRealDevice(bool enable) { m_hideReal.store(enable); }
     bool GetHideRealDevice() const { return m_hideReal.load(); }
 
+    // Measured rate of controller updates (reports that changed the output), not the loop speed.
     int GetLiveHz() const { return m_liveHz.load(); }
     float GetLiveMs() const { return m_liveMs.load(); }
+    // True until the first input, and again 2 seconds after the last one (the readout then shows "Idle").
+    bool IsInputIdle() const {
+        ULONGLONG last = m_lastInputTick.load();
+        return last == 0 || GetTickCount64() - last > 2000;
+    }
 
 private:
     void WorkerLoop(HWND hwnd);
@@ -78,6 +84,7 @@ private:
     std::atomic<bool> m_hideReal{true};
     std::atomic<int> m_liveHz{250};
     std::atomic<float> m_liveMs{4.0f};
+    std::atomic<ULONGLONG> m_lastInputTick{0};
 
     std::thread m_workerThread;
     LogCallback m_logCallback;

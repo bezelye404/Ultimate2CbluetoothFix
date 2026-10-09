@@ -119,15 +119,19 @@ Remapper::~Remapper() {
 }
 
 bool Remapper::InitViGEm() {
+    auto reportUnavailable = [this]() {
+        if (m_logCallback) m_logCallback(Localization::Instance().Get(StringId::LogViGEmUnavailable));
+    };
+
     m_vigemClient = vigem_alloc();
     if (!m_vigemClient) {
-        if (m_logCallback) m_logCallback(L"ERROR: Could not allocate ViGEm client.");
+        reportUnavailable();
         return false;
     }
 
     VIGEM_ERROR err = vigem_connect(m_vigemClient);
     if (!VIGEM_SUCCESS(err)) {
-        if (m_logCallback) m_logCallback(L"ERROR: Could not connect to ViGEmBus driver.");
+        reportUnavailable();
         vigem_free(m_vigemClient);
         m_vigemClient = nullptr;
         return false;
@@ -135,6 +139,7 @@ bool Remapper::InitViGEm() {
 
     m_vigemTarget = vigem_target_x360_alloc();
     if (!m_vigemTarget) {
+        reportUnavailable();
         vigem_disconnect(m_vigemClient);
         vigem_free(m_vigemClient);
         m_vigemClient = nullptr;
@@ -213,7 +218,7 @@ void Remapper::WorkerLoop(HWND hwnd) {
     IDirectInput8W* directInput = nullptr;
     HRESULT hr = DirectInput8Create(GetModuleHandle(NULL), DIRECTINPUT_VERSION, IID_IDirectInput8W, (VOID**)&directInput, NULL);
     if (FAILED(hr) || !directInput) {
-        if (m_logCallback) m_logCallback(L"ERROR: Failed to initialize DirectInput8.");
+        if (m_logCallback) m_logCallback(loc.Get(StringId::LogInputSystemFailed));
         if (m_statusCallback) m_statusCallback(RemapperStatus::Disconnected, L"");
         return;
     }
@@ -336,7 +341,14 @@ void Remapper::WorkerLoop(HWND hwnd) {
             }
         }
 
-        if (m_logCallback) m_logCallback(chosen.displayName + L" connected.");
+        if (m_logCallback) {
+            wchar_t connectedMsg[256];
+            swprintf_s(connectedMsg, loc.Get(StringId::LogControllerConnected).c_str(), chosen.displayName.c_str());
+            m_logCallback(connectedMsg);
+        }
+        m_lastInputTick.store(0);
+        m_liveHz.store(0);
+        m_liveMs.store(0.0f);
         if (m_statusCallback) m_statusCallback(RemapperStatus::Connected, chosen.displayName);
 
         // State cache for dirty checking
@@ -345,7 +357,7 @@ void Remapper::WorkerLoop(HWND hwnd) {
 
         timeBeginPeriod(1);
         auto lastHzTime = std::chrono::steady_clock::now();
-        int pollCount = 0;
+        int changeCount = 0;
 
         while (m_running.load()) {
             hr = joystick->Poll();
@@ -438,15 +450,23 @@ void Remapper::WorkerLoop(HWND hwnd) {
                 ry
             };
 
-            pollCount++;
+            // The readout shows how often the controller really updates, so only count passes that changed the output.
+            const bool changed = (memcmp(&report, &prevReport, sizeof(XUSB_REPORT)) != 0);
+            if (changed) {
+                ++changeCount;
+                m_lastInputTick.store(GetTickCount64());
+            }
+
             auto now = std::chrono::steady_clock::now();
             auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastHzTime).count();
             if (elapsedMs >= 1000) {
-                int currentHz = static_cast<int>((pollCount * 1000.0f) / elapsedMs);
-                float currentMs = currentHz > 0 ? (1000.0f / currentHz) : 0.0f;
-                m_liveHz.store(currentHz);
-                m_liveMs.store(currentMs);
-                pollCount = 0;
+                if (changeCount > 0) {
+                    int currentHz = static_cast<int>((changeCount * 1000.0f) / elapsedMs);
+                    float currentMs = currentHz > 0 ? (1000.0f / currentHz) : 0.0f;
+                    m_liveHz.store(currentHz);
+                    m_liveMs.store(currentMs);
+                }
+                changeCount = 0;
                 lastHzTime = now;
             }
 
@@ -454,7 +474,6 @@ void Remapper::WorkerLoop(HWND hwnd) {
             DWORD sleepMs = (targetHz >= 1000) ? 1 : (targetHz >= 500 ? 2 : (targetHz >= 250 ? 4 : 8));
 
             // Dirty checking
-            bool changed = (memcmp(&report, &prevReport, sizeof(XUSB_REPORT)) != 0);
             if (!changed) {
                 idleTicks++;
                 if (idleTicks < KeepAliveTicks) {
