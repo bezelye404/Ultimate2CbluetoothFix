@@ -23,7 +23,7 @@ std::wstring GetEnglish(StringId id) {
         case StringId::LowBatteryNotification: return L"Low battery notification (<=15%)";
         case StringId::NintendoMode: return L"Nintendo Mode";
         case StringId::HairTrigger: return L"Hair Trigger (instant pull)";
-        case StringId::PollingRateLabel: return L"Polling Rate";
+        case StringId::PollingRateLabel: return L"Max Update Rate";
         case StringId::CurveLabel: return L"Stick Curve";
         case StringId::CurveLinear: return L"Linear (1:1)";
         case StringId::CurveSmooth: return L"Smooth Aim";
@@ -107,7 +107,7 @@ std::wstring GetTurkish(StringId id) {
         case StringId::LowBatteryNotification: return L"Düşük pil bildirimi (<=%15)";
         case StringId::NintendoMode: return L"Nintendo Mode";
         case StringId::HairTrigger: return L"Hair Trigger (anında tetik)";
-        case StringId::PollingRateLabel: return L"Yoklama Hızı (Polling Rate)";
+        case StringId::PollingRateLabel: return L"Maksimum Güncelleme Hızı";
         case StringId::CurveLabel: return L"Stick Eğrisi";
         case StringId::CurveLinear: return L"Lineer (1:1)";
         case StringId::CurveSmooth: return L"Yumuşak Nişan (Smooth)";
@@ -191,7 +191,7 @@ std::wstring GetSpanish(StringId id) {
         case StringId::LowBatteryNotification: return L"Aviso de batería baja (<=15%)";
         case StringId::NintendoMode: return L"Modo Nintendo";
         case StringId::HairTrigger: return L"Hair Trigger (disparo instantáneo)";
-        case StringId::PollingRateLabel: return L"Frecuencia de sondeo";
+        case StringId::PollingRateLabel: return L"Frecuencia máx. de actualización";
         case StringId::CurveLabel: return L"Curva del stick";
         case StringId::CurveLinear: return L"Lineal (1:1)";
         case StringId::CurveSmooth: return L"Apuntado suave";

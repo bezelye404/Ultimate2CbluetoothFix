@@ -53,6 +53,8 @@ target_link_libraries(Ultimate2CFixer PRIVATE
 )
 
 if(MSVC)
+    # The manifest is embedded from src/resource.rc, so the linker must not generate a second one.
+    target_link_options(Ultimate2CFixer PRIVATE /MANIFEST:NO)
     target_link_libraries(Ultimate2CFixer PRIVATE windowsapp)
 endif()
 

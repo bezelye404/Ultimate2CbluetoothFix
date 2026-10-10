@@ -1,0 +1,6 @@
+# winget version manifest (template). Release steps: see packaging/WINGET.md.
+PackageIdentifier: bezelye404.Ultimate2CFixer
+PackageVersion: 1.1.0
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.6.0
