@@ -8,4 +8,6 @@ At release time:
 3. `winget validate --manifest packaging\winget` and test with `winget install --manifest packaging\winget` (needs `winget settings --enable LocalManifestFiles`).
 4. Open the pull request against `microsoft/winget-pkgs` from the owner's account.
 
-Drivers: the app downloads ViGEmBus and HidHide itself (publisher check), so they are not listed as winget dependencies.
+Drivers: ViGEmBus (`ViGEm.ViGEmBus`) and HidHide (`Nefarius.HidHide`) are listed as winget package dependencies, so `winget install` sets them up first. The app can still install them itself (publisher check) for people who download the exe by hand.
+
+Folder layout in winget-pkgs: `manifests/b/bezelye404/Ultimate2CFixer/<version>/` with the three yaml files.
