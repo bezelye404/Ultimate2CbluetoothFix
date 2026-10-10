@@ -6,6 +6,6 @@ Commands:
 Installers:
 - Architecture: x64
   InstallerUrl: https://github.com/bezelye404/Ultimate2CbluetoothFix/releases/download/v1.1.0/Ultimate2CFixer.exe
-  InstallerSha256: REPLACE_WITH_SHA256_OF_THE_RELEASE_EXE
+  InstallerSha256: 65331E8B3AB73B3394D5D40F0556C901036237591E635FDC7A779B376441C63F
 ManifestType: installer
 ManifestVersion: 1.6.0
