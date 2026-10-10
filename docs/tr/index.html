@@ -64,7 +64,8 @@
         },
         "inLanguage": [
           "en",
-          "tr"
+          "tr",
+          "es"
         ]
       },
       {
@@ -84,6 +85,22 @@
             "acceptedAnswer": {
               "@type": "Answer",
               "text": "ViGEmBus, programların sanal gamepad oluşturmasını sağlayan açık kaynaklı bir sürücüdür ve Ultimate2CFixer buna ihtiyaç duyar. Kurulu değilse uygulama indirip kurmayı önerir."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "HidHide nedir, uygulama kontrolcümü neden gizliyor?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Bu olmasa Steam ve oyunlar iki kontrolcü görür, biri gerçek biri sanal, ve her basış iki kez sayılırdı. HidHide, gerçek kontrolcüyü diğer programlardan gizleyen açık kaynaklı bir sürücüdür. Ultimate2CFixer çalıştığı sürece bunu açık tutar (bunun için bir ayar yok) ve uygulamayı kapatınca kontrolcüyü geri verir. Sürücü yoksa uygulama kurmayı önerir."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Kontrolcüyü neden bazen kapatıp açmam gerekiyor?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Gizleme başlarken kontrolcüyü zaten tutan programlar olabilir, örneğin bir tarayıcı sekmesi ya da Steam; Windows onlara bir şeyin değiştiğini söylemez. Uygulamayı kontrolcü zaten açıkken başlatırsan seni uyarır: kontrolcüyü bir kez kapatıp aç, tarayıcı sayfasını da yenile. Uygulama Windows ile birlikte, kontrolcü bağlanmadan önce açılıyorsa bununla hiç karşılaşmazsın."
             }
           },
           {
@@ -123,7 +140,7 @@
             "name": "Windows ile başlayıp arka planda durabilir mi?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Evet. Windows ile başlatma seçeneği var ve pencereyi kapatınca uygulama sistem tepsisine küçülebilir."
+              "text": "Evet. Windows ile başlatma seçeneği var, _ düğmesi uygulamayı sistem tepsisine kaldırır, X düğmesi kapatır."
             }
           },
           {
@@ -131,7 +148,7 @@
             "name": "Arayüz hangi dillerde?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "İngilizce ve Türkçe."
+              "text": "İngilizce, Türkçe ve İspanyolca. İspanyolca metin makine çevirisidir."
             }
           },
           {
@@ -225,8 +242,8 @@
         <p class="intro">Üç adım; çeviriyi arka planda küçük bir sürücü yapar.</p>
         <ol class="steps">
           <li><span class="num">1</span><div><h3>Kontrolcüyü eşleştir</h3><p>8BitDo Ultimate 2C'yi Bluetooth modunda, Windows'un Bluetooth ayarlarından bağla.</p></div></li>
-          <li><span class="num">2</span><div><h3>Hizmeti başlat</h3><p>Ultimate2CFixer.exe'yi aç ve Start Service düğmesine bas. ViGEmBus sürücüsü yoksa uygulama kurmayı önerir.</p></div></li>
-          <li><span class="num">3</span><div><h3>Oyna</h3><p>Oyunlar artık Ultimate 2C'ni izleyen sanal bir Xbox 360 kontrolcüsü görür.</p></div></li>
+          <li><span class="num">2</span><div><h3>Uygulamayı aç</h3><p>Ultimate2CFixer.exe'yi aç. Kendiliğinden çalışmaya başlar; elle yönetmek istersen Start Service ve Stop Service düğmeleri orada. Bir sürücü eksikse uygulama senin yerine kurmayı önerir.</p></div></li>
+          <li><span class="num">3</span><div><h3>Oyna</h3><p>Oyunlar, Ultimate 2C'n ne yaparsa onu yapan bir Xbox 360 kontrolcüsü görür. Gerçeği gizlenir, böylece bir tuşa basışın iki kez sayılmaz.</p></div></li>
         </ol>
       </div>
     </section>
@@ -239,12 +256,12 @@
           <article class="card">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>
             <h3>DirectInput'tan XInput'a</h3>
-            <p>Sağ analogun lZ ve lRz eksenlerinde olduğu DirectInput durumunu okur ve ViGEmBus üzerinden sanal bir Xbox 360 gamepad'ine aktarır.</p>
+            <p>Sağ analogun lZ ve lRz eksenlerinde, iki tetiğin de analog eksen olarak bulunduğu DirectInput durumunu okur ve ViGEmBus üzerinden sanal bir Xbox 360 gamepad'ine aktarır.</p>
           </article>
           <article class="card">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
-            <h3>Örnekleme hızı</h3>
-            <p>125, 250, 500 ya da 1000 Hz seç; yani 8, 4, 2 ya da 1 ms'de bir güncelleme.</p>
+            <h3>Azami güncelleme hızı</h3>
+            <p>125, 250, 500 ya da 1000 Hz'lik bir üst sınır seç. Uygulama yalnızca kontrolcünün söyleyecek bir şeyi olduğunda uyanır; boştaki bir kontrolcü neredeyse hiçbir şeye mal olmaz.</p>
           </article>
           <article class="card">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19C9 19 9 5 12 12s3 7 8 7"/><path d="M4 19h16" opacity=".5"/></svg>
@@ -255,6 +272,11 @@
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h6a4 4 0 0 1 4 4v10H7z"/><path d="M7 10h10"/></svg>
             <h3>Hair trigger</h3>
             <p>Ölü bölgeyi aşan her tetik çekişini tam basış sayan isteğe bağlı bir ayar.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8V5h12v10h-3M4 9h12v10H4z"/></svg>
+            <h3>Çift girdi yok</h3>
+            <p>Bu olmasa Steam ve oyunlar iki kontrolcü görür, her basış iki kez sayılırdı. Bu yüzden uygulama açıkken yalnızca sanal gamepad görünür. Gerçek kontrolcü HidHide sürücüsüyle gizlenir, uygulamayı kapatınca geri verilir.</p>
           </article>
           <article class="card">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg>
@@ -269,12 +291,12 @@
           <article class="card">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M3.5 14h5l1.5 2.5h4L15.5 14h5"/></svg>
             <h3>Tepsi ve küçük boyut</h3>
-            <p>Sistem tepsisinde durabilir ve Windows ile başlayabilir. Sürüm notları, kullanımda 6 MB'tan az, tepsideyken 2 MB'tan az bellek belirtiyor.</p>
+            <p>_ düğmesi uygulamayı sistem tepsisine kaldırır, X düğmesi kapatır; istersen Windows ile birlikte de açılır. v1.1.0 sürüm notlarına göre çalıştırılabilir dosya 332 KB, boştayken bellek kullanımı yaklaşık 2 ila 5 MB.</p>
           </article>
           <article class="card">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2" fill="var(--surface)"/><circle cx="15" cy="12" r="2" fill="var(--surface)"/><circle cx="8" cy="17" r="2" fill="var(--surface)"/></svg>
             <h3>Yerleşim ve dil</h3>
-            <p>Nintendo yerleşimi seçeneği A ile B'yi, X ile Y'yi değiştirir. Arayüz İngilizce ya da Türkçe. Ayarlar çalıştırmalar arasında hatırlanır.</p>
+            <p>Nintendo yerleşimi seçeneği A ile B'yi, X ile Y'yi değiştirir. Arayüz İngilizce, Türkçe ya da İspanyolca (İspanyolca makine çevirisi). Ayarlar çalıştırmalar arasında hatırlanır.</p>
           </article>
         </div>
       </div>
@@ -283,42 +305,39 @@
     <section id="mapping">
       <div class="wrap">
         <h2>Eksen eşlemesi</h2>
-        <p class="intro">8BitDo Ultimate 2C'nin Bluetooth modunda kontrollerini DirectInput'a nasıl bildirdiği. Sağ analog lRx ve lRy'de değil, lZ ve lRz'de.</p>
+        <p class="intro">8BitDo Ultimate 2C'nin Bluetooth üzerinden kontrollerini nasıl bildirdiği ve bunların sanal Xbox gamepad'inde nereye düştüğü. Sağ analog lRx ve lRy'de değil, lZ ve lRz'de.</p>
         <div class="table-scroll">
           <table>
-            <thead><tr><th scope="col">DirectInput alanı</th><th scope="col">Kontrol</th></tr></thead>
+            <thead><tr><th scope="col">DirectInput</th><th scope="col">Sanal Xbox gamepad'inde</th></tr></thead>
             <tbody>
-              <tr><td><code>state.lX</code></td><td>Sol analog (yatay)</td></tr>
-              <tr><td><code>state.lY</code></td><td>Sol analog (dikey)</td></tr>
-              <tr><td><code>state.lZ</code></td><td>Sağ analog (yatay)</td></tr>
-              <tr><td><code>state.lRz</code></td><td>Sağ analog (dikey)</td></tr>
-              <tr><td><code>state.rglSlider[0]</code></td><td>Sol tetik (LT), analog derinlik</td></tr>
-              <tr><td><code>state.rglSlider[1]</code></td><td>Sağ tetik (RT), analog derinlik</td></tr>
-              <tr><td><code>state.rgbButtons[6]</code></td><td>Sol bumper (LB)</td></tr>
-              <tr><td><code>state.rgbButtons[7]</code></td><td>Sağ bumper (RB)</td></tr>
-              <tr><td><code>state.rgbButtons[8]</code></td><td>Sol tetik (LT), dijital tık</td></tr>
-              <tr><td><code>state.rgbButtons[9]</code></td><td>Sağ tetik (RT), dijital tık</td></tr>
+              <tr><td><code>lX</code>, <code>lY</code></td><td>Sol analog</td></tr>
+              <tr><td><code>lZ</code>, <code>lRz</code></td><td>Sağ analog</td></tr>
+              <tr><td>Brake ekseni</td><td>Sol tetik, analog</td></tr>
+              <tr><td>Accelerator ekseni</td><td>Sağ tetik, analog</td></tr>
+              <tr><td>6 ve 7. tuşlar</td><td>Sol ve sağ bumper</td></tr>
+              <tr><td>8 ve 9. tuşlar</td><td>Tetik tıkı; yalnızca kontrolcü analog çekişi bildirmezse kullanılır</td></tr>
             </tbody>
           </table>
         </div>
+        <p class="note">Tetik eksenleri HID kullanımları (Brake ve Accelerator) olarak bildirilir ve DirectInput'un standart düzeninde onlara yer yoktur. Bu yüzden uygulama kontrolcüyü kendi biçimiyle okur ve her kontrolü HID kullanımına göre seçer.</p>
       </div>
     </section>
 
     <section id="kurulum">
       <div class="wrap">
         <h2>Kurulum</h2>
-        <p class="intro">Windows 10 ya da 11 (64 bit) ve ViGEmBus sürücüsü gerekir.</p>
+        <p class="intro">Windows 10 ya da 11 (64 bit) ve iki küçük sürücü gerekir: ViGEmBus ve HidHide. Yoksa uygulama kurmayı önerir.</p>
         <div class="install-grid">
           <div class="install-card">
             <h3><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/></svg>İndir</h3>
             <p>Ultimate2CFixer.exe'yi sürümler sayfasından al. Tek dosya, açılacak bir şey yok.</p>
             <a class="btn" href="https://github.com/bezelye404/Ultimate2CbluetoothFix/releases/latest">Sürümler sayfasını aç</a>
-            <p class="small">Kontrolcüyü Windows'un Bluetooth ayarlarından eşleştir, uygulamayı aç ve Start Service'e bas.</p>
+            <p class="small">Kontrolcüyü Windows'un Bluetooth ayarlarından eşleştir ve uygulamayı aç. Dosya henüz kod imzalı değil, bu yüzden Windows SmartScreen ilk açılışta seni uyarabilir.</p>
           </div>
           <div class="install-card">
-            <h3><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>ViGEmBus sürücüsü</h3>
-            <p>ViGEmBus, sanal gamepad oluşturan açık kaynaklı bir sürücüdür. Kurulu değilse Ultimate2CFixer yükleyicisini GitHub'daki ViGEmBus sürümlerinden indirir ve çalıştırır.</p>
-            <p class="small"><a href="https://github.com/nefarius/ViGEmBus">github.com/nefarius/ViGEmBus</a></p>
+            <h3><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>ViGEmBus ve HidHide</h3>
+            <p>ViGEmBus sanal gamepad'i oluşturur, HidHide ise gerçek kontrolcüyü diğer programlardan gizler. Biri eksikse uygulama yükleyicisini projenin GitHub sürümlerinden indirir ve çalıştırır; ama önce doğrulanmış bir yayıncı tarafından imzalanıp imzalanmadığına bakar.</p>
+            <p class="small"><a href="https://github.com/nefarius/ViGEmBus">ViGEmBus</a> · <a href="https://github.com/nefarius/HidHide">HidHide</a></p>
           </div>
         </div>
         <div class="build">
@@ -338,8 +357,9 @@ cmake --build build --config Release</code></pre>
         <p class="intro">Uygulamanın bilgisayarında değiştirdiği her şey, tek yerde.</p>
         <ul class="touches">
           <li><h3>Sanal bir kontrolcü</h3><p>Hizmet çalışırken Windows'ta ViGEmBus üzerinden oluşturulmuş fazladan bir Xbox 360 kontrolcüsü bulunur.</p></li>
+          <li><h3>Gerçek kontrolcü</h3><p>Uygulama açıkken HidHide, 8BitDo kontrolcünü diğer programların gözünden saklar. Uygulamayı kapatınca geri verilir.</p></li>
           <li><h3>Kayıt defteri</h3><p>Ayarların HKCU\Software\Ultimate2CFixer\Settings altında durur. Windows ile başlatmayı açarsan kullanıcın için bir başlangıç girdisi eklenir.</p></li>
-          <li><h3>Ağ</h3><p>İnternetten çektiği tek şey ViGEmBus yükleyicisidir, o da yalnızca sürücü yoksa. Pil seviyesi ağdan değil Bluetooth'tan gelir.</p></li>
+          <li><h3>Ağ</h3><p>İnternetten çektiği tek şeyler ViGEmBus ve HidHide yükleyicileridir, onlar da yalnızca bir sürücü yoksa. Pil seviyesi ağdan değil Bluetooth'tan gelir.</p></li>
         </ul>
       </div>
     </section>
@@ -354,6 +374,14 @@ cmake --build build --config Release</code></pre>
         <details>
           <summary>ViGEmBus nedir, kurmam gerekir mi?</summary>
           <p>ViGEmBus, programların sanal gamepad oluşturmasını sağlayan açık kaynaklı bir sürücüdür ve Ultimate2CFixer buna ihtiyaç duyar. Kurulu değilse uygulama indirip kurmayı önerir.</p>
+        </details>
+        <details>
+          <summary>HidHide nedir, uygulama kontrolcümü neden gizliyor?</summary>
+          <p>Bu olmasa Steam ve oyunlar iki kontrolcü görür, biri gerçek biri sanal, ve her basış iki kez sayılırdı. HidHide, gerçek kontrolcüyü diğer programlardan gizleyen açık kaynaklı bir sürücüdür. Ultimate2CFixer çalıştığı sürece bunu açık tutar (bunun için bir ayar yok) ve uygulamayı kapatınca kontrolcüyü geri verir. Sürücü yoksa uygulama kurmayı önerir.</p>
+        </details>
+        <details>
+          <summary>Kontrolcüyü neden bazen kapatıp açmam gerekiyor?</summary>
+          <p>Gizleme başlarken kontrolcüyü zaten tutan programlar olabilir, örneğin bir tarayıcı sekmesi ya da Steam; Windows onlara bir şeyin değiştiğini söylemez. Uygulamayı kontrolcü zaten açıkken başlatırsan seni uyarır: kontrolcüyü bir kez kapatıp aç, tarayıcı sayfasını da yenile. Uygulama Windows ile birlikte, kontrolcü bağlanmadan önce açılıyorsa bununla hiç karşılaşmazsın.</p>
         </details>
         <details>
           <summary>Hangi Windows sürümleri çalışır?</summary>
@@ -373,11 +401,11 @@ cmake --build build --config Release</code></pre>
         </details>
         <details>
           <summary>Windows ile başlayıp arka planda durabilir mi?</summary>
-          <p>Evet. Windows ile başlatma seçeneği var ve pencereyi kapatınca uygulama sistem tepsisine küçülebilir.</p>
+          <p>Evet. Windows ile başlatma seçeneği var, _ düğmesi uygulamayı sistem tepsisine kaldırır, X düğmesi kapatır.</p>
         </details>
         <details>
           <summary>Arayüz hangi dillerde?</summary>
-          <p>İngilizce ve Türkçe.</p>
+          <p>İngilizce, Türkçe ve İspanyolca. İspanyolca metin makine çevirisidir.</p>
         </details>
         <details>
           <summary>Ücretsiz mi?</summary>

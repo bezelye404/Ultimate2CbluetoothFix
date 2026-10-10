@@ -64,7 +64,8 @@
         },
         "inLanguage": [
           "en",
-          "tr"
+          "tr",
+          "es"
         ]
       },
       {
@@ -84,6 +85,22 @@
             "acceptedAnswer": {
               "@type": "Answer",
               "text": "ViGEmBus is an open-source driver that lets programs create virtual gamepads, and Ultimate2CFixer needs it. If it is missing, the app offers to download and install it."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What is HidHide, and why does the app hide my controller?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Without it, Steam and games would see two controllers, the real one and the virtual one, and every press would count twice. HidHide is an open-source driver that hides the real controller from other programs. Ultimate2CFixer turns it on whenever it runs (there's no setting for it) and gives the controller back when you close the app. If the driver is missing, the app offers to install it."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Why do I sometimes have to switch the controller off and on?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Some programs, like a browser tab or Steam, may already be holding the controller when the hiding starts, and Windows doesn't tell them anything changed. If you open the app while the controller is already on, it lets you know: turn the controller off and on once, and reload the browser page. If the app starts with Windows, before the controller connects, you won't run into this."
             }
           },
           {
@@ -123,7 +140,7 @@
             "name": "Can it start with Windows and stay out of the way?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Yes. There is a start with Windows option, and the app can minimize to the system tray when you close the window."
+              "text": "Yes. There's a start with Windows option, the _ button tucks the app into the system tray, and the X button closes it."
             }
           },
           {
@@ -131,7 +148,7 @@
             "name": "Which languages does the interface have?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "English and Turkish."
+              "text": "English, Turkish and Spanish. The Spanish text is a machine translation."
             }
           },
           {
@@ -219,8 +236,8 @@
         <p class="intro">Three steps, and a small driver doing the translation in the background.</p>
         <ol class="steps">
           <li><span class="num">1</span><div><h3>Pair the controller</h3><p>Connect the 8BitDo Ultimate 2C in Bluetooth mode from Windows' Bluetooth settings.</p></div></li>
-          <li><span class="num">2</span><div><h3>Start the service</h3><p>Open Ultimate2CFixer.exe and click Start Service. If the ViGEmBus driver is missing, the app offers to install it.</p></div></li>
-          <li><span class="num">3</span><div><h3>Play</h3><p>Games now see a virtual Xbox 360 controller that follows your Ultimate 2C.</p></div></li>
+          <li><span class="num">2</span><div><h3>Open the app</h3><p>Open Ultimate2CFixer.exe. It starts working on its own, and the Start Service and Stop Service buttons are there if you'd rather do it by hand. If a driver is missing, the app offers to install it for you.</p></div></li>
+          <li><span class="num">3</span><div><h3>Play</h3><p>Games see an Xbox 360 controller that does whatever your Ultimate 2C does. The real one is hidden, so a button press never counts twice.</p></div></li>
         </ol>
       </div>
     </section>
@@ -233,12 +250,12 @@
           <article class="card">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>
             <h3>DirectInput to XInput</h3>
-            <p>Reads the controller's DirectInput state, including the right stick on the lZ and lRz axes, and feeds it to a virtual Xbox 360 gamepad through ViGEmBus.</p>
+            <p>Reads the controller's DirectInput state, including the right stick on the lZ and lRz axes and both triggers as analog axes, and feeds it to a virtual Xbox 360 gamepad through ViGEmBus.</p>
           </article>
           <article class="card">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
-            <h3>Polling rate</h3>
-            <p>Choose 125, 250, 500 or 1000 Hz, which is an update every 8, 4, 2 or 1 ms.</p>
+            <h3>Max update rate</h3>
+            <p>Pick a top speed of 125, 250, 500 or 1000 Hz. The app only wakes up when the controller has something to say, so an idle controller costs next to nothing.</p>
           </article>
           <article class="card">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19C9 19 9 5 12 12s3 7 8 7"/><path d="M4 19h16" opacity=".5"/></svg>
@@ -249,6 +266,11 @@
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h6a4 4 0 0 1 4 4v10H7z"/><path d="M7 10h10"/></svg>
             <h3>Hair trigger</h3>
             <p>An optional setting that treats any trigger pull beyond the deadzone as a full press.</p>
+          </article>
+          <article class="card">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8V5h12v10h-3M4 9h12v10H4z"/></svg>
+            <h3>No double input</h3>
+            <p>Without this, Steam and games would see two controllers and every press would count twice. So while the app is open, only the virtual gamepad is visible. The real controller is hidden with the HidHide driver, and handed back when you close the app.</p>
           </article>
           <article class="card">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg>
@@ -263,12 +285,12 @@
           <article class="card">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M3.5 14h5l1.5 2.5h4L15.5 14h5"/></svg>
             <h3>Tray and small footprint</h3>
-            <p>Can stay in the system tray and start with Windows. The release notes list under 6 MB of memory in use and under 2 MB in the tray.</p>
+            <p>The _ button tucks the app into the system tray, the X button closes it, and it can start with Windows. The v1.1.0 release notes put the executable at 332 KB and the memory use at about 2 to 5 MB while idle.</p>
           </article>
           <article class="card">
             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2" fill="var(--surface)"/><circle cx="15" cy="12" r="2" fill="var(--surface)"/><circle cx="8" cy="17" r="2" fill="var(--surface)"/></svg>
             <h3>Layout and language</h3>
-            <p>A Nintendo layout option swaps A with B and X with Y. The interface is in English or Turkish. Settings are remembered between runs.</p>
+            <p>A Nintendo layout option swaps A with B and X with Y. The interface comes in English, Turkish or Spanish (the Spanish is a machine translation). Settings are remembered between runs.</p>
           </article>
         </div>
       </div>
@@ -277,42 +299,39 @@
     <section id="mapping">
       <div class="wrap">
         <h2>Axis mapping</h2>
-        <p class="intro">How the 8BitDo Ultimate 2C reports its controls to DirectInput in Bluetooth mode. The right stick is on lZ and lRz, not lRx and lRy.</p>
+        <p class="intro">How the 8BitDo Ultimate 2C reports its controls over Bluetooth, and where they end up on the virtual Xbox pad. The right stick is on lZ and lRz, not lRx and lRy.</p>
         <div class="table-scroll">
           <table>
-            <thead><tr><th scope="col">DirectInput field</th><th scope="col">Control</th></tr></thead>
+            <thead><tr><th scope="col">DirectInput</th><th scope="col">On the virtual Xbox pad</th></tr></thead>
             <tbody>
-              <tr><td><code>state.lX</code></td><td>Left stick (horizontal)</td></tr>
-              <tr><td><code>state.lY</code></td><td>Left stick (vertical)</td></tr>
-              <tr><td><code>state.lZ</code></td><td>Right stick (horizontal)</td></tr>
-              <tr><td><code>state.lRz</code></td><td>Right stick (vertical)</td></tr>
-              <tr><td><code>state.rglSlider[0]</code></td><td>Left trigger (LT), analog depth</td></tr>
-              <tr><td><code>state.rglSlider[1]</code></td><td>Right trigger (RT), analog depth</td></tr>
-              <tr><td><code>state.rgbButtons[6]</code></td><td>Left bumper (LB)</td></tr>
-              <tr><td><code>state.rgbButtons[7]</code></td><td>Right bumper (RB)</td></tr>
-              <tr><td><code>state.rgbButtons[8]</code></td><td>Left trigger (LT), digital click</td></tr>
-              <tr><td><code>state.rgbButtons[9]</code></td><td>Right trigger (RT), digital click</td></tr>
+              <tr><td><code>lX</code>, <code>lY</code></td><td>Left stick</td></tr>
+              <tr><td><code>lZ</code>, <code>lRz</code></td><td>Right stick</td></tr>
+              <tr><td>Brake axis</td><td>Left trigger, analog</td></tr>
+              <tr><td>Accelerator axis</td><td>Right trigger, analog</td></tr>
+              <tr><td>Buttons 6 and 7</td><td>Left and right bumper</td></tr>
+              <tr><td>Buttons 8 and 9</td><td>Trigger click, only used if the controller doesn't report an analog pull</td></tr>
             </tbody>
           </table>
         </div>
+        <p class="note">The trigger axes are reported as HID usages (Brake and Accelerator), and DirectInput's standard layout has no place for them. So the app reads the controller in its own format, picking each control by its HID usage.</p>
       </div>
     </section>
 
     <section id="install">
       <div class="wrap">
         <h2>Install</h2>
-        <p class="intro">You need Windows 10 or 11 (64-bit) and the ViGEmBus driver.</p>
+        <p class="intro">You need Windows 10 or 11 (64-bit) and two small drivers, ViGEmBus and HidHide. If they're missing, the app offers to install them.</p>
         <div class="install-grid">
           <div class="install-card">
             <h3><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/></svg>Download</h3>
             <p>Get Ultimate2CFixer.exe from the releases page. It is a single file, with nothing to unpack.</p>
             <a class="btn" href="https://github.com/bezelye404/Ultimate2CbluetoothFix/releases/latest">Open the releases page</a>
-            <p class="small">Pair the controller in Windows' Bluetooth settings, open the app and click Start Service.</p>
+            <p class="small">Pair the controller in Windows' Bluetooth settings and open the app. The file isn't code signed yet, so Windows SmartScreen may warn you the first time you run it.</p>
           </div>
           <div class="install-card">
-            <h3><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>ViGEmBus driver</h3>
-            <p>ViGEmBus is an open-source driver that creates virtual gamepads. If it is not installed yet, Ultimate2CFixer downloads its installer from the ViGEmBus releases on GitHub and runs it.</p>
-            <p class="small"><a href="https://github.com/nefarius/ViGEmBus">github.com/nefarius/ViGEmBus</a></p>
+            <h3><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>ViGEmBus and HidHide</h3>
+            <p>ViGEmBus creates the virtual gamepad, and HidHide hides the real controller from other programs. If either is missing, the app downloads its installer from the project's GitHub releases and runs it, but only after checking that it's signed by a verified publisher.</p>
+            <p class="small"><a href="https://github.com/nefarius/ViGEmBus">ViGEmBus</a> · <a href="https://github.com/nefarius/HidHide">HidHide</a></p>
           </div>
         </div>
         <div class="build">
@@ -332,8 +351,9 @@ cmake --build build --config Release</code></pre>
         <p class="intro">Everything the app changes on your PC, in one place.</p>
         <ul class="touches">
           <li><h3>A virtual controller</h3><p>While the service runs, Windows has an extra Xbox 360 controller, created through ViGEmBus.</p></li>
+          <li><h3>The real controller</h3><p>While the app is open, HidHide keeps your 8BitDo controller out of sight of other programs. It's handed back when you close the app.</p></li>
           <li><h3>The registry</h3><p>Your settings live in HKCU\Software\Ultimate2CFixer\Settings. If you turn on start with Windows, a startup entry is added for your user.</p></li>
-          <li><h3>The network</h3><p>The only thing it fetches from the internet is the ViGEmBus installer, and only when the driver is missing. Battery level comes over Bluetooth, not the network.</p></li>
+          <li><h3>The network</h3><p>The only things it fetches from the internet are the ViGEmBus and HidHide installers, and only when a driver is missing. Battery level comes over Bluetooth, not the network.</p></li>
         </ul>
       </div>
     </section>
@@ -348,6 +368,14 @@ cmake --build build --config Release</code></pre>
         <details>
           <summary>What is ViGEmBus, and do I have to install it?</summary>
           <p>ViGEmBus is an open-source driver that lets programs create virtual gamepads, and Ultimate2CFixer needs it. If it is missing, the app offers to download and install it.</p>
+        </details>
+        <details>
+          <summary>What is HidHide, and why does the app hide my controller?</summary>
+          <p>Without it, Steam and games would see two controllers, the real one and the virtual one, and every press would count twice. HidHide is an open-source driver that hides the real controller from other programs. Ultimate2CFixer turns it on whenever it runs (there's no setting for it) and gives the controller back when you close the app. If the driver is missing, the app offers to install it.</p>
+        </details>
+        <details>
+          <summary>Why do I sometimes have to switch the controller off and on?</summary>
+          <p>Some programs, like a browser tab or Steam, may already be holding the controller when the hiding starts, and Windows doesn't tell them anything changed. If you open the app while the controller is already on, it lets you know: turn the controller off and on once, and reload the browser page. If the app starts with Windows, before the controller connects, you won't run into this.</p>
         </details>
         <details>
           <summary>Which versions of Windows work?</summary>
@@ -367,11 +395,11 @@ cmake --build build --config Release</code></pre>
         </details>
         <details>
           <summary>Can it start with Windows and stay out of the way?</summary>
-          <p>Yes. There is a start with Windows option, and the app can minimize to the system tray when you close the window.</p>
+          <p>Yes. There's a start with Windows option, the _ button tucks the app into the system tray, and the X button closes it.</p>
         </details>
         <details>
           <summary>Which languages does the interface have?</summary>
-          <p>English and Turkish.</p>
+          <p>English, Turkish and Spanish. The Spanish text is a machine translation.</p>
         </details>
         <details>
           <summary>Is it free?</summary>

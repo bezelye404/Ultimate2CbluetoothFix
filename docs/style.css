@@ -192,3 +192,5 @@ footer.site a:hover { color: var(--text); }
 @media (max-width: 440px) {
   nav li:not(:last-child) { display: none; }
 }
+
+.note { color: var(--muted); font-size: 0.92rem; max-width: 42rem; margin-top: 1rem; }
