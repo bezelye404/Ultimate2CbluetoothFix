@@ -83,3 +83,8 @@ System Volume Information/
 AGENTS.md
 .agents/
 .gemini/
+.claude/
+CLAUDE.md
+
+# Release drafts (the published notes live on GitHub)
+RELEASE_NOTES_*.md
